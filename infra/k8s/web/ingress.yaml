@@ -1,0 +1,22 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: amfit-web
+  namespace: amfit
+  labels:
+    app.kubernetes.io/name: "amfit-web"
+    app.kubernetes.io/component: "frontend"
+    app.kubernetes.io/managed-by: "argocd"
+    environment: "dev"
+    lab_id: "lab-k8s-01"
+    lab_owner: "jose.mussauer"
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`app.amfit.local`)
+      kind: Rule
+      services:
+        - name: amfit-web
+          port: 3000
+  tls: {}

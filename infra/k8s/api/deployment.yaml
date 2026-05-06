@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amfit-api
+  namespace: amfit
+  labels:
+    app.kubernetes.io/name: "amfit-api"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/component: "api"
+    app.kubernetes.io/managed-by: "argocd"
+    environment: "dev"
+    lab_id: "lab-k8s-01"
+    lab_owner: "jose.mussauer"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "amfit-api"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "amfit-api"
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/component: "api"
+        environment: "dev"
+        lab_id: "lab-k8s-01"
+        lab_owner: "jose.mussauer"
+    spec:
+      nodeSelector:
+        workload: cicd
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: api
+          image: harbor.infra.local/amfit/api:latest
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: amfit-secrets
+                  key: pg-password
+            - name: DATABASE_URL
+              value: "postgres://amfit:$(PG_PASSWORD)@postgresql.shared-infra.svc.cluster.local:5432/amfit?sslmode=disable"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: amfit-secrets
+                  key: redis-password
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@redis.shared-infra.svc.cluster.local:6379/0"
+            - name: MINIO_ENDPOINT
+              value: "minio.amfit.svc.cluster.local:9000"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: amfit-secrets
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: amfit-secrets
+                  key: minio-secret-key
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: amfit-secrets
+                  key: jwt-private-key
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+            successThreshold: 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Primitivos ─────────────────────────────────────────────── */
+:root {
+  /* Cores */
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-slate-50:   #f8fafc;
+  --color-slate-100:  #f1f5f9;
+  --color-slate-700:  #334155;
+  --color-slate-900:  #0f172a;
+  --color-green-500:  #22c55e;
+  --color-green-600:  #16a34a;
+  --color-red-500:    #ef4444;
+  --color-amber-500:  #f59e0b;
+  --color-white:      #ffffff;
+
+  /* Tipografia */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Escala */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  1.875rem;
+
+  /* Espaçamento (base 4px) */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Border radius */
+  --radius-sm:   0.25rem;
+  --radius-md:   0.5rem;
+  --radius-lg:   0.75rem;
+  --radius-xl:   1rem;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* ── Semânticos (light) ──────────────────────────────────────── */
+:root {
+  --color-primary:       var(--color-orange-500);
+  --color-primary-hover: var(--color-orange-600);
+  --color-primary-light: var(--color-orange-400);
+
+  --color-success: var(--color-green-600);
+  --color-danger:  var(--color-red-500);
+  --color-warning: var(--color-amber-500);
+
+  --color-bg:         var(--color-white);
+  --color-bg-subtle:  var(--color-slate-50);
+  --color-bg-muted:   var(--color-slate-100);
+  --color-text:       var(--color-slate-900);
+  --color-text-muted: #64748b;
+  --color-border:     #e2e8f0;
+}
+
+/* ── Dark theme ──────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg:         #0f172a;
+  --color-bg-subtle:  #1e293b;
+  --color-bg-muted:   #293548;
+  --color-text:       #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-border:     #334155;
+}

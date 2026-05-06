@@ -1,0 +1,4 @@
+bin/
+keys/*.pem
+.env
+*.local
