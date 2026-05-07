@@ -1,5 +1,8 @@
 import type { ExpoConfig, ConfigContext } from 'expo/config';
 
+// Assets (icon, splash, adaptive-icon) ainda nao foram criados — Expo usa defaults.
+// Adicionar em apps/mobile/assets/ antes do primeiro build EAS.
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'AMFIT',
@@ -8,16 +11,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'amfit',
   platforms: ['android', 'ios'],
   orientation: 'portrait',
-  icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   splash: {
-    image: './assets/splash.png',
     resizeMode: 'contain',
     backgroundColor: '#f97316',
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#f97316',
     },
     package: 'com.amfit.app',

@@ -32,12 +32,12 @@ type Config struct {
 // Load lê as variáveis de ambiente e retorna um Config populado com fallbacks.
 func Load() *Config {
 	return &Config{
-		DatabaseURL: getEnv("DATABASE_URL", "postgres://amfit:amfit@localhost:5432/amfit?sslmode=disable"),
-		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379/0"),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://amfit:amfit123%21@localhost:5432/amfit?sslmode=disable"),
+		RedisURL:    getEnv("REDIS_URL", "redis://:redis123%21@localhost:6379/0"),
 
 		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
-		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
+		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "amfit-minio"),
+		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "amfit-minio-secret"),
 		MinioUseSSL:    getEnvBool("MINIO_USE_SSL", false),
 
 		JWTPrivateKeyPath: getEnv("JWT_PRIVATE_KEY_PATH", "keys/private.pem"),

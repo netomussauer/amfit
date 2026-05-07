@@ -1,9 +1,9 @@
 BINARY     := bin/server
 MAIN       := ./cmd/server
 MIGRATIONS := migrations
-DB_URL     ?= postgres://amfit:amfit@localhost:5432/amfit?sslmode=disable
+DB_URL     ?= postgres://amfit:amfit123%21@localhost:5432/amfit?sslmode=disable
 
-.PHONY: dev build test lint migrate-up migrate-down keys docker-up
+.PHONY: dev build test lint migrate-up migrate-down migrate-create keys docker-up
 
 ## dev: executa o servidor com go run (hot path para desenvolvimento)
 dev:
@@ -29,12 +29,17 @@ migrate-up:
 migrate-down:
 	migrate -path $(MIGRATIONS) -database "$(DB_URL)" down 1
 
-## keys: gera par de chaves RSA-4096 para JWT em keys/
+## keys: gera par de chaves RSA-2048 para JWT em keys/
 keys:
 	@mkdir -p keys
-	openssl genrsa -out keys/private.pem 4096
+	openssl genrsa -out keys/private.pem 2048
 	openssl rsa -in keys/private.pem -pubout -out keys/public.pem
 	@echo "Keys generated: keys/private.pem  keys/public.pem"
+
+## migrate-create: cria nova migration sequencial (uso: make migrate-create NAME=add_xxx)
+migrate-create:
+	@test -n "$(NAME)" || (echo "ERRO: forneça NAME=nome_da_migration"; exit 1)
+	migrate create -ext sql -dir $(MIGRATIONS) -seq $(NAME)
 
 ## docker-up: sobe os serviços de infraestrutura via docker compose na raiz do monorepo
 docker-up:

@@ -66,11 +66,14 @@ spec:
                 secretKeyRef:
                   name: amfit-secrets
                   key: minio-secret-key
-            - name: JWT_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: amfit-secrets
-                  key: jwt-private-key
+            - name: JWT_PRIVATE_KEY_PATH
+              value: "/etc/jwt/private.pem"
+            - name: JWT_PUBLIC_KEY_PATH
+              value: "/etc/jwt/public.pem"
+          volumeMounts:
+            - name: jwt-keys
+              mountPath: /etc/jwt
+              readOnly: true
           resources:
             requests:
               cpu: "100m"
@@ -100,3 +103,13 @@ spec:
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: jwt-keys
+          secret:
+            secretName: amfit-secrets
+            defaultMode: 0400
+            items:
+              - key: jwt-private-key
+                path: private.pem
+              - key: jwt-public-key
+                path: public.pem
