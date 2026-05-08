@@ -7,9 +7,14 @@ camada base.
 Descobertos em 2026-05-08 durante o primeiro PipelineRun manual da imagem
 AMFIT API.
 
+> **Status (2026-05-08 17:15):** todos os 3 bugs **RESOLVIDOS** no `infra-lab`.
+> Fixes aplicados e validados. Documentação dos fixes em
+> `infra-lab/docs/runbook.md` seções P20, P21 e P22.
+> AMFIT está liberado para retomar o build via Tekton sem workarounds.
+
 ---
 
-## Bug #1 — Gitea mirror falha por musl getaddrinfo
+## Bug #1 — Gitea mirror falha por musl getaddrinfo — **RESOLVIDO**
 
 ### Sintoma
 
@@ -80,7 +85,7 @@ Antes do restart, sync do mirror funcionava — Gitea mantém commits até
 
 ---
 
-## Bug #2 — Nó k3s-worker-cicd com egress restrito a alguns CDNs
+## Bug #2 — Nó k3s-worker-cicd com egress restrito a alguns CDNs — **RESOLVIDO** (era o mesmo Bug #1)
 
 ### Sintoma
 
@@ -145,7 +150,7 @@ Corrigir o egress permitirá:
 
 ---
 
-## Bug #3 — CoreDNS pinned em k3s-server por falta de imagem cacheada
+## Bug #3 — CoreDNS pinned em k3s-server por falta de imagem cacheada — **RESOLVIDO**
 
 ### Sintoma
 
