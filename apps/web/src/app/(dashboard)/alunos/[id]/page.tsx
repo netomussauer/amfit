@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AlunoDetalhe } from '@/features/alunos/components/AlunoDetalhe';
 import { FichaList } from '@/features/fichas/components/FichaList';
 
@@ -14,6 +15,16 @@ export default function AlunoDetalhePage({ params }: Props) {
     <div className="max-w-3xl space-y-10">
       <AlunoDetalhe alunoId={params.id} />
       <FichaList alunoId={params.id} />
+
+      <div>
+        <Link
+          href={`/alunos/${params.id}/historico`}
+          className="inline-flex items-center gap-1 text-sm font-medium text-[--color-primary] hover:text-[--color-primary-hover]"
+        >
+          Ver histórico de sessões
+          <span aria-hidden="true">→</span>
+        </Link>
+      </div>
     </div>
   );
 }

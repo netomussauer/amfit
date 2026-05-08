@@ -144,8 +144,12 @@ func main() {
 
 	// Execution
 	execRepos := execinfra.NewPostgresRepositories(pool)
-	_ = execRepos
-	execSvc := execapplication.NewExecutionService(nil, nil)
+	execSvc := execapplication.NewExecutionService(
+		execRepos.Sessoes,
+		execRepos.Registros,
+		execRepos.TreinoLookup,
+		execRepos.AlunoLookup,
+	)
 	execH := exechandlers.NewExecutionHandler(execSvc)
 
 	// Progress
@@ -212,14 +216,16 @@ func main() {
 	personalOnly := protected.Group("", middleware.RequireRole("PERSONAL"))
 	identityH.RegisterPersonalRoutes(personalOnly)
 	trainingH.RegisterPersonalRoutes(personalOnly)
+	execH.RegisterPersonalRoutes(personalOnly)
 
-	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha
+	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha,
+	// /sessoes/* e /alunos/me/sessoes (histórico)
 	alunoOnly := protected.Group("", middleware.RequireRole("ALUNO"))
 	identityH.RegisterAlunoRoutes(alunoOnly)
 	trainingH.RegisterAlunoRoutes(alunoOnly)
+	execH.RegisterAlunoRoutes(alunoOnly)
 
 	catalogH.Register(protected)
-	execH.Register(protected)
 	progressH.Register(protected)
 
 	// ── Graceful shutdown ─────────────────────────────────────────────

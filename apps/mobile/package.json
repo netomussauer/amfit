@@ -19,6 +19,7 @@
     "expo-secure-store": "~13.0.0",
     "expo-image-picker": "~15.0.7",
     "expo-video": "~1.2.4",
+    "expo-haptics": "~13.0.1",
     "react-hook-form": "^7.52.1",
     "@hookform/resolvers": "^3.9.0",
     "zod": "^3.23.8",

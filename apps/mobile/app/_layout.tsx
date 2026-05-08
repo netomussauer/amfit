@@ -54,8 +54,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         const inAuthGroup = segments[0] === '(auth)';
         const inAlunoGroup = segments[0] === '(aluno)';
         const inPersonalGroup = segments[0] === '(personal)';
+        // Rotas compartilhadas pelo aluno fora do grupo (aluno) — ex.: player de treino.
+        const inAlunoSharedRoute = segments[0] === 'treino';
 
-        if (role === ROLES.ALUNO && !inAlunoGroup) {
+        if (role === ROLES.ALUNO && !inAlunoGroup && !inAlunoSharedRoute) {
           router.replace('/(aluno)/');
         } else if (role === ROLES.PERSONAL && !inPersonalGroup) {
           router.replace('/(personal)/');

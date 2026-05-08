@@ -14,6 +14,7 @@ import { useTreinoHoje } from '@/features/treino/hooks/useTreinoHoje';
 import { TreinoHojeCard } from '@/features/treino/components/TreinoHojeCard';
 import { EmptyTreinoState } from '@/features/treino/components/EmptyTreinoState';
 import { TreinoSkeleton } from '@/features/treino/components/TreinoSkeleton';
+import { useIniciarSessao } from '@/features/execucao/hooks/useIniciarSessao';
 
 function firstName(fullName: string | undefined): string {
   if (!fullName) return '';
@@ -23,6 +24,7 @@ function firstName(fullName: string | undefined): string {
 export default function TreinoHojeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<JwtPayload | null>(null);
+  const [iniciarError, setIniciarError] = useState<string | null>(null);
 
   useEffect(() => {
     void getCurrentUser().then(setUser);
@@ -30,13 +32,38 @@ export default function TreinoHojeScreen() {
 
   const { data, isLoading, isError, error, isRefetching, refetch } =
     useTreinoHoje();
+  const iniciarMutation = useIniciarSessao();
 
   const greetingName = firstName(getDisplayName(user));
   const treino = data?.treino ?? null;
+  const sessaoHojeId = data?.sessao_hoje_id ?? null;
 
   // 404 (sem ficha ativa) é tratado como estado vazio, não erro real.
   const isSemFicha = error instanceof ApiError && error.status === 404;
   const showError = isError && !isSemFicha;
+
+  async function handleIniciar() {
+    if (!treino) return;
+    setIniciarError(null);
+    try {
+      const sessao = await iniciarMutation.mutateAsync({ treino_id: treino.id });
+      router.push(`/treino/${sessao.id}`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setIniciarError(err.message || 'Não foi possível iniciar o treino.');
+      } else {
+        setIniciarError('Erro inesperado ao iniciar o treino.');
+      }
+    }
+  }
+
+  function handleContinuar() {
+    if (!sessaoHojeId) return;
+    router.push(`/treino/${sessaoHojeId}`);
+  }
+
+  const podeIniciar = treino !== null && !iniciarMutation.isPending;
+  const continuarMode = sessaoHojeId !== null;
 
   return (
     <ScrollView
@@ -116,18 +143,42 @@ export default function TreinoHojeScreen() {
 
       <View className="mt-8">
         <TouchableOpacity
-          className="items-center rounded-lg bg-primary py-4 disabled:opacity-40"
-          disabled
+          className={`items-center rounded-lg bg-primary py-4 ${
+            podeIniciar ? '' : 'opacity-40'
+          }`}
+          disabled={!podeIniciar}
+          onPress={continuarMode ? handleContinuar : handleIniciar}
           accessibilityRole="button"
-          accessibilityLabel="Iniciar Treino — em breve"
-          accessibilityState={{ disabled: true }}
-          accessibilityHint="Funcionalidade ainda não disponível"
+          accessibilityLabel={
+            continuarMode ? 'Continuar treino em andamento' : 'Iniciar treino'
+          }
+          accessibilityState={{
+            disabled: !podeIniciar,
+            busy: iniciarMutation.isPending,
+          }}
         >
           <Text className="text-base font-semibold text-white">
-            Iniciar Treino
+            {iniciarMutation.isPending
+              ? 'Iniciando...'
+              : continuarMode
+                ? 'Continuar Treino'
+                : 'Iniciar Treino'}
           </Text>
-          <Text className="mt-0.5 text-xs text-white/80">Em breve</Text>
+          {continuarMode && (
+            <Text className="mt-0.5 text-xs text-white/80">
+              Você tem uma sessão em andamento
+            </Text>
+          )}
         </TouchableOpacity>
+
+        {iniciarError && (
+          <View
+            className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+            accessibilityRole="alert"
+          >
+            <Text className="text-sm text-red-600">{iniciarError}</Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
