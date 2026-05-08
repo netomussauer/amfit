@@ -36,7 +36,9 @@ spec:
       default: /workspace/source/.gocache
   steps:
     - name: vet-and-test
-      image: golang:$(params.go-version)-alpine
+      # Bookworm (Debian) ja vem com gcc + git pre-instalados, evitando apk add
+      # que falha quando o no nao tem egress para dl-cdn.alpinelinux.org.
+      image: golang:$(params.go-version)-bookworm
       workingDir: $(workspaces.source.path)/$(params.package-path)
       env:
         - name: CGO_ENABLED
@@ -48,11 +50,8 @@ spec:
         - name: GOMODCACHE
           value: /workspace/source/.gomodcache
       script: |
-        #!/usr/bin/env sh
+        #!/usr/bin/env bash
         set -eu
-
-        # Race detector requer cgo + gcc/musl-dev.
-        apk add --no-cache git build-base >/dev/null
 
         echo ">>> go version"
         go version

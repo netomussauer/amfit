@@ -45,7 +45,7 @@ spec:
   tasks:
     - name: git-clone
       taskRef:
-        name: git-clone
+        name: amfit-git-clone
         kind: Task
       params:
         - name: url

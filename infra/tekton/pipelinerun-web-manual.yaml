@@ -35,8 +35,9 @@ spec:
     pipeline: "45m"
     tasks: "30m"
   params:
+    # Usar FQDN K8s interno (gitea.lab.local nao tem porta 80, so 3000 via LB).
     - name: git-url
-      value: http://gitea.lab.local/labadmin/amfit.git
+      value: http://gitea-http.cicd.svc.cluster.local:3000/labadmin/amfit.git
     - name: git-revision
       value: main
     - name: image-repo

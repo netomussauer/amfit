@@ -18,10 +18,14 @@ commonLabels:
 
 resources:
   - serviceaccount.yaml
-  # task-golang-test.yaml e a unica Task especifica do AMFIT.
-  # As Tasks `git-clone` e `kaniko-build-push` sao reutilizadas das
-  # existentes em ns cicd (criadas pela infra-lab base, compartilhadas
-  # com o pipeline `build-and-push` de outros projetos do lab).
+  # Tasks especificas do AMFIT:
+  # - task-amfit-git-clone: substitui a Task git-clone do lab (alpine/git
+  #   tem bug de musl getaddrinfo com plugin hosts do CoreDNS).
+  # - task-golang-test: testes Go.
+  # A Task `kaniko-build-push` continua sendo reutilizada da existente em
+  # ns cicd (alinhada com a infra-lab base — Kaniko nao tem o problema do
+  # alpine/git pois resolve hostnames via Docker config / Go net package).
+  - task-amfit-git-clone.yaml
   - task-golang-test.yaml
   - pipeline-api.yaml
   - pipeline-web.yaml

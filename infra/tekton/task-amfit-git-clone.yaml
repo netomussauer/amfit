@@ -1,0 +1,85 @@
+---
+# Task de git clone com imagem baseada em glibc (Debian).
+# Substitui a Task `git-clone` do lab, que usa alpine/git:2.43.0 com musl libc
+# e tem getaddrinfo() falhando para hostnames customizados resolvidos via
+# CoreDNS plugin `hosts`. nslookup (busybox) funciona, mas qualquer cliente
+# que use getaddrinfo (git, curl, libcurl) recebe "Could not resolve host".
+#
+# Mantém a interface compatível com a Task `git-clone` do lab (params url,
+# revision, depth + workspace source + results commit, url) para evitar
+# divergencia se a Task do lab for corrigida no futuro.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: amfit-git-clone
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: ci-task
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Clone shallow de um repositorio Git para o workspace `source`, usando
+    imagem com glibc (Debian) para contornar o bug de musl getaddrinfo
+    quando ha entries no plugin `hosts` do CoreDNS.
+  workspaces:
+    - name: source
+      description: Workspace destino do clone.
+  params:
+    - name: url
+      description: URL do repositorio Git.
+      type: string
+    - name: revision
+      description: "Branch, tag ou commit SHA (default: HEAD)."
+      type: string
+      default: HEAD
+    - name: depth
+      description: "Profundidade do clone (default: 1; use 0 para clone completo)."
+      type: string
+      default: "1"
+  results:
+    - name: commit
+      description: SHA do commit clonado.
+    - name: url
+      description: URL usada no clone.
+  steps:
+    - name: clone
+      image: bitnami/git:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -eu
+
+        echo ">>> git version"
+        git --version
+
+        echo ">>> Inicializando repo em $(workspaces.source.path)"
+        git init -q
+        git remote add origin "$(params.url)"
+
+        if [ "$(params.depth)" = "0" ]; then
+          echo ">>> Clone completo"
+          git fetch --tags origin
+        else
+          echo ">>> Clone shallow (depth=$(params.depth)) revision=$(params.revision)"
+          git fetch --depth="$(params.depth)" --tags origin "$(params.revision)" \
+            || git fetch --depth="$(params.depth)" --tags origin
+        fi
+
+        git checkout "$(params.revision)" 2>/dev/null || git checkout FETCH_HEAD
+
+        COMMIT_SHA=$(git rev-parse HEAD)
+        printf "%s" "$COMMIT_SHA" > "$(results.commit.path)"
+        printf "%s" "$(params.url)" > "$(results.url.path)"
+
+        echo ">>> OK $(params.url) @ $COMMIT_SHA"
+      computeResources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
