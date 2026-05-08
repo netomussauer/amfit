@@ -1,0 +1,40 @@
+# Para builds com contexto = raiz do monorepo (apps/web/Dockerfile)
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/build
+**/.expo
+**/coverage
+
+# Go (usado se o build do api for feito a partir da raiz)
+apps/api/bin
+apps/api/keys
+apps/api/*.exe
+
+# Mobile (nunca entra em build de container)
+apps/mobile/android
+apps/mobile/ios
+
+# Git e ferramentas
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+
+# Docs e dev artifacts
+docs
+*.md
+!apps/web/README.md
+!apps/api/README.md
+
+# Env files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
