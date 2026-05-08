@@ -1,4 +1,17 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  type AxiosError,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import type { AuthResponse } from '@amfit/shared';
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from './auth';
+
+type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
@@ -8,35 +21,76 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // Token stored in memory (set via setAuthToken) or read from cookie on SSR
-  const token = typeof window !== 'undefined' ? window.__amfit_token : undefined;
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
+// Single in-flight refresh request to avoid stampedes when multiple
+// concurrent calls receive 401 simultaneously.
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
+
+    try {
+      const { data } = await axios.post<AuthResponse>(
+        `${apiClient.defaults.baseURL}/auth/refresh`,
+        { refresh_token: refreshToken },
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+      setAccessToken(data.access_token);
+      setRefreshToken(data.refresh_token);
+      return data.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      // Clear token and redirect to login on 401
-      window.__amfit_token = undefined;
-      window.location.href = '/login';
+  async (error: AxiosError) => {
+    const original = error.config as RetryableConfig | undefined;
+    const status = error.response?.status;
+
+    // Skip refresh logic for the refresh endpoint itself or already-retried requests.
+    const isRefreshCall = original?.url?.includes('/auth/refresh');
+
+    if (
+      status === 401 &&
+      original &&
+      !original._retry &&
+      !isRefreshCall &&
+      typeof window !== 'undefined'
+    ) {
+      original._retry = true;
+
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        original.headers = original.headers ?? {};
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient.request(original);
+      }
+
+      // Refresh failed — purge tokens and bounce to login.
+      clearTokens();
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     }
+
     return Promise.reject(error);
   },
 );
 
-export function setAuthToken(token: string | undefined) {
-  if (typeof window !== 'undefined') {
-    window.__amfit_token = token;
-  }
-}
-
-// Augment the Window interface to hold the in-memory token
-declare global {
-  interface Window {
-    __amfit_token?: string;
-  }
-}

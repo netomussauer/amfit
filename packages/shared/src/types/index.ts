@@ -1,7 +1,13 @@
 import { z } from 'zod';
-import { LoginRequestSchema, AuthResponseSchema } from '../schemas/auth.schema';
+import {
+  LoginRequestSchema,
+  RegisterPersonalRequestSchema,
+  RefreshTokenRequestSchema,
+  AuthResponseSchema,
+} from '../schemas/auth.schema';
 import {
   CriarAlunoRequestSchema,
+  AtualizarAlunoRequestSchema,
   AlunoResponseSchema,
   AlunoListResponseSchema,
 } from '../schemas/aluno.schema';
@@ -25,10 +31,13 @@ import {
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
+export type RegisterPersonalRequest = z.infer<typeof RegisterPersonalRequestSchema>;
+export type RefreshTokenRequest = z.infer<typeof RefreshTokenRequestSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 
 // Aluno
 export type CriarAlunoRequest = z.infer<typeof CriarAlunoRequestSchema>;
+export type AtualizarAlunoRequest = z.infer<typeof AtualizarAlunoRequestSchema>;
 export type AlunoResponse = z.infer<typeof AlunoResponseSchema>;
 export type AlunoListResponse = z.infer<typeof AlunoListResponseSchema>;
 

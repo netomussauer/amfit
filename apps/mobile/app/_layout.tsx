@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
-import { getStoredToken } from '@/shared/lib/api-client';
-import { ROLES, type AuthResponse } from '@amfit/shared';
+import { ROLES } from '@amfit/shared';
+import { setAuthFailedHandler } from '@/shared/lib/api-client';
+import { clearAll, getAccessToken, parseJwt } from '@/shared/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,33 +20,35 @@ const queryClient = new QueryClient({
   },
 });
 
-function parseJwtPayload(token: string): { role?: string } | null {
-  try {
-    const base64 = token.split('.')[1];
-    if (!base64) return null;
-    const json = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json) as { role?: string };
-  } catch {
-    return null;
-  }
-}
-
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    setAuthFailedHandler(() => {
+      void clearAll().finally(() => {
+        queryClient.clear();
+        router.replace('/(auth)/login');
+      });
+    });
+
+    return () => {
+      setAuthFailedHandler(null);
+    };
+  }, [router]);
+
+  useEffect(() => {
     async function checkAuth() {
       try {
-        const token = await getStoredToken();
+        const token = await getAccessToken();
 
         if (!token) {
           router.replace('/(auth)/login');
           return;
         }
 
-        const payload = parseJwtPayload(token);
+        const payload = parseJwt(token);
         const role = payload?.role;
 
         const inAuthGroup = segments[0] === '(auth)';

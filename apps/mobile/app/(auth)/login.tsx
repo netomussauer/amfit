@@ -11,18 +11,20 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { LoginRequestSchema, type LoginRequest, ROLES } from '@amfit/shared';
-import { apiRequest, storeToken } from '@/shared/lib/api-client';
-import type { AuthResponse } from '@amfit/shared';
+import { LoginRequestSchema, type LoginRequest, ROLES, type Role } from '@amfit/shared';
+import { useLogin } from '@/features/auth/hooks/useLogin';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { mutate: doLogin, isPending } = useLogin();
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    setValue,
+    watch,
+    formState: { errors },
   } = useForm<LoginRequest>({
     resolver: zodResolver(LoginRequestSchema),
     defaultValues: {
@@ -32,23 +34,26 @@ export default function LoginScreen() {
     },
   });
 
-  async function handleLogin(values: LoginRequest) {
-    setServerError(null);
-    try {
-      const data = await apiRequest<AuthResponse>('/auth/login', {
-        method: 'POST',
-        body: values,
-      });
-      await storeToken(data.access_token);
+  const tipo = watch('tipo');
 
-      if (data.usuario.role === ROLES.PERSONAL) {
-        router.replace('/(personal)/');
-      } else {
-        router.replace('/(aluno)/');
-      }
-    } catch {
-      setServerError('E-mail ou senha inválidos.');
-    }
+  function handleTipoChange(novoTipo: Role) {
+    setValue('tipo', novoTipo, { shouldValidate: false });
+  }
+
+  function handleLogin(values: LoginRequest) {
+    setServerError(null);
+    doLogin(values, {
+      onSuccess: (data) => {
+        if (data.usuario.role === ROLES.PERSONAL) {
+          router.replace('/(personal)/');
+        } else {
+          router.replace('/(aluno)/');
+        }
+      },
+      onError: () => {
+        setServerError('E-mail ou senha inválidos.');
+      },
+    });
   }
 
   return (
@@ -67,6 +72,51 @@ export default function LoginScreen() {
           </Text>
 
           <View className="w-full space-y-4">
+            <View>
+              <Text className="mb-2 text-sm font-medium text-gray-700">
+                Tipo de conta
+              </Text>
+              <View
+                className="flex-row rounded-lg border border-gray-300 p-1"
+                accessibilityRole="radiogroup"
+              >
+                <TouchableOpacity
+                  className={`flex-1 items-center rounded-md py-2 ${
+                    tipo === ROLES.ALUNO ? 'bg-primary' : 'bg-transparent'
+                  }`}
+                  onPress={() => handleTipoChange(ROLES.ALUNO)}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Entrar como aluno"
+                  accessibilityState={{ selected: tipo === ROLES.ALUNO }}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      tipo === ROLES.ALUNO ? 'text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    Aluno
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`flex-1 items-center rounded-md py-2 ${
+                    tipo === ROLES.PERSONAL ? 'bg-primary' : 'bg-transparent'
+                  }`}
+                  onPress={() => handleTipoChange(ROLES.PERSONAL)}
+                  accessibilityRole="radio"
+                  accessibilityLabel="Entrar como personal trainer"
+                  accessibilityState={{ selected: tipo === ROLES.PERSONAL }}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      tipo === ROLES.PERSONAL ? 'text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    Personal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View>
               <Text className="mb-1 text-sm font-medium text-gray-700">E-mail *</Text>
               <Controller
@@ -119,7 +169,10 @@ export default function LoginScreen() {
             </View>
 
             {serverError && (
-              <Text className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600" accessibilityRole="alert">
+              <Text
+                className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600"
+                accessibilityRole="alert"
+              >
                 {serverError}
               </Text>
             )}
@@ -127,13 +180,13 @@ export default function LoginScreen() {
             <TouchableOpacity
               className="mt-2 w-full items-center rounded-lg bg-primary py-3 disabled:opacity-50"
               onPress={handleSubmit(handleLogin)}
-              disabled={isSubmitting}
+              disabled={isPending}
               accessibilityRole="button"
               accessibilityLabel="Entrar"
-              accessibilityState={{ busy: isSubmitting }}
+              accessibilityState={{ busy: isPending, disabled: isPending }}
             >
               <Text className="font-semibold text-white">
-                {isSubmitting ? 'Entrando...' : 'Entrar'}
+                {isPending ? 'Entrando...' : 'Entrar'}
               </Text>
             </TouchableOpacity>
           </View>

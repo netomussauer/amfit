@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,8 +33,13 @@ type PersonalTrainer struct {
 	Telefone     string
 	CREF         string
 	Ativo        bool
-	CriadoEm    time.Time
+	CriadoEm     time.Time
 	AtualizadoEm time.Time
+}
+
+// FullName retorna o nome do personal já normalizado (trim).
+func (p *PersonalTrainer) FullName() string {
+	return strings.TrimSpace(p.Nome)
 }
 
 // Aluno é o cliente vinculado a um personal trainer.
@@ -46,8 +52,13 @@ type Aluno struct {
 	Sexo           *Sexo
 	Telefone       string
 	Ativo          bool
-	CriadoEm      time.Time
-	AtualizadoEm  time.Time
+	CriadoEm       time.Time
+	AtualizadoEm   time.Time
+}
+
+// FullName retorna o nome do aluno já normalizado (trim).
+func (a *Aluno) FullName() string {
+	return strings.TrimSpace(a.Nome)
 }
 
 // Credencial armazena o hash de senha de um usuário (personal ou aluno).
@@ -61,10 +72,15 @@ type Credencial struct {
 
 // RefreshToken representa um refresh token armazenado no banco para rotação e revogação.
 type RefreshToken struct {
-	ID        uuid.UUID
-	OwnerID   uuid.UUID
-	JTI       string
-	ExpiraEm  time.Time
-	Revogado  bool
+	ID       uuid.UUID
+	OwnerID  uuid.UUID
+	JTI      string
+	ExpiraEm time.Time
+	Revogado bool
 	CriadoEm time.Time
+}
+
+// IsExpired retorna true se o refresh token já expirou.
+func (rt *RefreshToken) IsExpired(now time.Time) bool {
+	return now.After(rt.ExpiraEm)
 }

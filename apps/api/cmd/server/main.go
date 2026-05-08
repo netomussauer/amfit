@@ -98,15 +98,20 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to load JWT keys — run 'make keys' first")
 	}
-	_ = privateKey // usado nos handlers de auth
 	log.Info().Msg("JWT keys loaded")
 
 	// ── Wiring de dependências ────────────────────────────────────────
 
 	// Identity
 	identityRepos := identityinfra.NewPostgresRepositories(pool)
-	_ = identityRepos
-	identitySvc := identityapplication.NewIdentityService(nil, nil, nil, nil)
+	identitySvc := identityapplication.NewIdentityService(
+		identityRepos.Personal,
+		identityRepos.Aluno,
+		identityRepos.Credencial,
+		identityRepos.RefreshTokens,
+		privateKey,
+		publicKey,
+	)
 	identityH := identityhandlers.NewIdentityHandler(identitySvc)
 
 	// Catalog
@@ -179,9 +184,22 @@ func main() {
 	// ── Rotas de API ──────────────────────────────────────────────────
 	api := app.Group("/api/v1")
 
-	identityH.Register(api)
+	// Públicas (auth: register-personal, login, refresh)
+	identityH.RegisterPublic(api)
 
 	protected := api.Group("", middleware.NewAuthMiddleware(publicKey))
+
+	// Autenticadas (qualquer role): /auth/logout
+	identityH.RegisterAuthenticated(protected)
+
+	// Restritas a PERSONAL: CRUD de alunos
+	personalOnly := protected.Group("", middleware.RequireRole("PERSONAL"))
+	identityH.RegisterPersonalRoutes(personalOnly)
+
+	// Restritas a ALUNO: /alunos/me
+	alunoOnly := protected.Group("", middleware.RequireRole("ALUNO"))
+	identityH.RegisterAlunoRoutes(alunoOnly)
+
 	catalogH.Register(protected)
 	trainingH.Register(protected)
 	execH.Register(protected)

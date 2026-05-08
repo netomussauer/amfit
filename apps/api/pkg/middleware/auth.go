@@ -9,44 +9,50 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// problemDetail representa a estrutura RFC 7807 para erros de API.
-type problemDetail struct {
-	Type   string `json:"type"`
-	Title  string `json:"title"`
-	Status int    `json:"status"`
-	Detail string `json:"detail"`
-}
-
 // NewAuthMiddleware retorna um middleware que extrai e valida o Bearer token,
 // injetando user_id, role e tenant_id no contexto do Fiber.
 func NewAuthMiddleware(publicKey *rsa.PublicKey) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		header := c.Get("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			return c.Status(fiber.StatusUnauthorized).JSON(problemDetail{
-				Type:   "https://amfit.local/errors/unauthorized",
-				Title:  "Unauthorized",
-				Status: fiber.StatusUnauthorized,
-				Detail: "missing or malformed Authorization header",
-			})
+			return WriteProblem(c, NewProblem(
+				fiber.StatusUnauthorized,
+				"unauthorized", "Unauthorized",
+				"missing or malformed Authorization header",
+			))
 		}
 
 		tokenStr := strings.TrimPrefix(header, "Bearer ")
 
 		claims, err := auth.VerifyToken(tokenStr, publicKey)
 		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(problemDetail{
-				Type:   "https://amfit.local/errors/unauthorized",
-				Title:  "Unauthorized",
-				Status: fiber.StatusUnauthorized,
-				Detail: "invalid or expired token",
-			})
+			return WriteProblem(c, NewProblem(
+				fiber.StatusUnauthorized,
+				"unauthorized", "Unauthorized",
+				"invalid or expired token",
+			))
 		}
 
 		c.Locals("user_id", claims["sub"])
 		c.Locals("role", claims["role"])
 		c.Locals("tenant_id", claims["tenant_id"])
 
+		return c.Next()
+	}
+}
+
+// RequireRole devolve um middleware que rejeita requisições cujo claim role
+// no contexto do Fiber não corresponde ao role exigido.
+func RequireRole(role string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		current, _ := c.Locals("role").(string)
+		if current != role {
+			return WriteProblem(c, NewProblem(
+				fiber.StatusForbidden,
+				"forbidden", "Forbidden",
+				"role does not allow this resource",
+			))
+		}
 		return c.Next()
 	}
 }

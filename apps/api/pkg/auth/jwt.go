@@ -80,6 +80,23 @@ func SignToken(claims jwt.MapClaims, privateKey *rsa.PrivateKey) (string, error)
 	return signed, nil
 }
 
+// SignRefreshToken cria um refresh token JWT RS256 com TTL customizável.
+// O chamador deve incluir sub, role, tenant_id e jti nos claims.
+func SignRefreshToken(claims jwt.MapClaims, privateKey *rsa.PrivateKey, ttl time.Duration) (string, error) {
+	now := time.Now()
+	claims["iat"] = now.Unix()
+	claims["exp"] = now.Add(ttl).Unix()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+
+	signed, err := token.SignedString(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("auth: sign refresh token: %w", err)
+	}
+
+	return signed, nil
+}
+
 // VerifyToken valida a assinatura e a expiração do token, retornando os claims.
 func VerifyToken(tokenStr string, publicKey *rsa.PublicKey) (jwt.MapClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, jwt.MapClaims{}, func(t *jwt.Token) (any, error) {

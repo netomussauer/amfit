@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import { ACCESS_TOKEN_COOKIE } from '@/shared/lib/auth';
 
 export default function RootPage() {
-  const cookieStore = cookies();
-  const token = cookieStore.get('access_token');
+  const token = cookies().get(ACCESS_TOKEN_COOKIE);
 
   if (token) {
     redirect('/dashboard');

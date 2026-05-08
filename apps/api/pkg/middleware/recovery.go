@@ -15,12 +15,11 @@ func Recovery() fiber.Handler {
 					Str("path", c.Path()).
 					Msg("recovered from panic")
 
-				err = c.Status(fiber.StatusInternalServerError).JSON(problemDetail{
-					Type:   "https://amfit.local/errors/internal",
-					Title:  "Internal Server Error",
-					Status: fiber.StatusInternalServerError,
-					Detail: "an unexpected error occurred",
-				})
+				err = WriteProblem(c, NewProblem(
+					fiber.StatusInternalServerError,
+					"internal", "Internal Server Error",
+					"an unexpected error occurred",
+				))
 			}
 		}()
 

@@ -1,24 +1,25 @@
-import * as SecureStore from 'expo-secure-store';
+import {
+  clearAll,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from './auth';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
-const TOKEN_KEY = 'amfit_access_token';
-
-export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
-}
-
-export async function storeToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
-}
-
-export async function removeToken(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
-}
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   params?: Record<string, string | number | boolean | undefined>;
+  _retry?: boolean;
+};
+
+type RefreshResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
 };
 
 export class ApiError extends Error {
@@ -31,13 +32,53 @@ export class ApiError extends Error {
   }
 }
 
+let onAuthFailed: (() => void) | null = null;
+
+export function setAuthFailedHandler(handler: (() => void) | null): void {
+  onAuthFailed = handler;
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function performRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+      if (!refreshToken) return false;
+
+      const response = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = (await response.json()) as RefreshResponse;
+      await setAccessToken(data.access_token);
+      if (data.refresh_token) {
+        await setRefreshToken(data.refresh_token);
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, params } = options;
+  const { method = 'GET', body, params, _retry = false } = options;
 
-  const token = await getStoredToken();
+  const token = await getAccessToken();
 
   const url = new URL(`${BASE_URL}${path}`);
   if (params) {
@@ -62,7 +103,16 @@ export async function apiRequest<T>(
   });
 
   if (response.status === 401) {
-    await removeToken();
+    const isAuthEndpoint = path.startsWith('/auth/');
+    if (!_retry && !isAuthEndpoint) {
+      const refreshed = await performRefresh();
+      if (refreshed) {
+        return apiRequest<T>(path, { ...options, _retry: true });
+      }
+    }
+
+    await clearAll();
+    onAuthFailed?.();
     throw new ApiError(401, 'Sessão expirada. Faça login novamente.');
   }
 
@@ -77,3 +127,10 @@ export async function apiRequest<T>(
 
   return response.json() as Promise<T>;
 }
+
+// Re-exports para compatibilidade com código que ainda importa daqui.
+export {
+  getAccessToken as getStoredToken,
+  setAccessToken as storeToken,
+  removeAccessToken as removeToken,
+} from './auth';
