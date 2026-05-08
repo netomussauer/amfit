@@ -31,19 +31,19 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -o /out/server \
         ./cmd/server
 
-# Stage 2 — runtime minimo
-FROM alpine:3.20
-
-RUN apk add --no-cache ca-certificates tzdata && \
-    addgroup -g 1000 amfit && \
-    adduser -u 1000 -G amfit -D -h /app amfit
+# Stage 2 — runtime distroless
+# - Sem package manager (evita apt/apk com egress restrito)
+# - ca-certificates ja incluso
+# - User nonroot (uid 65532) ja configurado pela imagem base
+# - tag :nonroot e debian12-based
+FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 
-COPY --from=builder /out/server     /app/server
-COPY --chown=amfit:amfit migrations/ /app/migrations/
+COPY --from=builder --chown=nonroot:nonroot /out/server      /app/server
+COPY --from=builder --chown=nonroot:nonroot /src/migrations/ /app/migrations/
 
-USER amfit:amfit
+USER nonroot:nonroot
 EXPOSE 8080
 
 # As chaves JWT vem montadas via Secret no K8s em /etc/jwt/

@@ -30,8 +30,9 @@ spec:
         workload: cicd
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
+        # uid/gid 65532 = nonroot user da imagem distroless (gcr.io/distroless/static-debian12:nonroot)
+        runAsUser: 65532
+        runAsGroup: 65532
       containers:
         - name: api
           image: harbor.infra.local/amfit/api:latest
