@@ -1,0 +1,74 @@
+---
+# Task — `go test ./... -race` em apps/api/
+# Roda lint mínimo (go vet) + testes com race detector.
+# Falha fast: o `set -e` aborta no primeiro erro.
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: golang-test
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: ci-task
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Executa `go vet` + `go test -race -count=1 ./...` no diretório especificado.
+    Usado pelo pipeline da API antes do build da imagem.
+  workspaces:
+    - name: source
+      description: Workspace contendo o repositório clonado.
+  params:
+    - name: package-path
+      description: Caminho relativo ao workspace onde rodar os testes.
+      type: string
+      default: apps/api
+    - name: go-version
+      description: Versão da imagem golang a usar.
+      type: string
+      default: "1.22"
+    - name: gocache-dir
+      description: Diretório usado como GOCACHE (acelera builds repetidos).
+      type: string
+      default: /workspace/source/.gocache
+  steps:
+    - name: vet-and-test
+      image: golang:$(params.go-version)-alpine
+      workingDir: $(workspaces.source.path)/$(params.package-path)
+      env:
+        - name: CGO_ENABLED
+          value: "1"
+        - name: GOFLAGS
+          value: "-mod=readonly"
+        - name: GOCACHE
+          value: $(params.gocache-dir)
+        - name: GOMODCACHE
+          value: /workspace/source/.gomodcache
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        # Race detector requer cgo + gcc/musl-dev.
+        apk add --no-cache git build-base >/dev/null
+
+        echo ">>> go version"
+        go version
+
+        echo ">>> go mod download"
+        go mod download
+
+        echo ">>> go vet ./..."
+        go vet ./...
+
+        echo ">>> go test -race -count=1 ./..."
+        go test -race -count=1 ./...
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 2Gi

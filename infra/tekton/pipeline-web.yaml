@@ -1,0 +1,91 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: amfit-build-web
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: pipeline-web
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Pipeline de build + push da imagem AMFIT Web (Next.js).
+    Stages: git-clone → kaniko build/push (contexto = raiz do monorepo, pois o
+    Dockerfile depende de packages/shared/).
+  params:
+    - name: git-url
+      type: string
+      default: http://gitea.lab.local/labadmin/amfit.git
+    - name: git-revision
+      type: string
+      default: main
+    - name: image-repo
+      type: string
+      default: harbor.infra.local/amfit/web
+    - name: image-tag
+      type: string
+      default: latest
+    - name: cache-repo
+      type: string
+      default: harbor.infra.local/amfit/cache
+  workspaces:
+    - name: source
+    - name: dockerconfig
+    - name: git-basic-auth
+      optional: true
+  results:
+    - name: image-url
+      value: $(tasks.kaniko-build-push.results.image-url)
+    - name: image-digest
+      value: $(tasks.kaniko-build-push.results.image-digest)
+    - name: commit-short
+      value: $(tasks.git-clone.results.commit-short)
+
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: Task
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+        - name: depth
+          value: "1"
+        - name: deleteExisting
+          value: "true"
+      workspaces:
+        - name: output
+          workspace: source
+        - name: basic-auth
+          workspace: git-basic-auth
+
+    - name: kaniko-build-push
+      runAfter:
+        - git-clone
+      taskRef:
+        name: kaniko-build-push
+        kind: Task
+      params:
+        - name: context
+          value: ""
+        - name: dockerfile
+          value: apps/web/Dockerfile
+        - name: image-repo
+          value: $(params.image-repo)
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: image-tag-extra
+          value: $(tasks.git-clone.results.commit-short)
+        - name: cache-repo
+          value: $(params.cache-repo)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig

@@ -1,0 +1,274 @@
+---
+# =============================================================================
+# Tekton Triggers — amfit
+# Recebe eventos de push do Gitea e cria PipelineRuns para api + web.
+# Path-filtering avançado (mudou só apps/api/?) fica para Fase 2 — por ora
+# qualquer push em `main` dispara os dois pipelines.
+# =============================================================================
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: amfit-gitea-binding
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: trigger-binding
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  params:
+    - name: git-url
+      value: $(body.repository.clone_url)
+    - name: git-revision
+      value: $(body.head_commit.id)
+    - name: git-revision-short
+      value: $(extensions.short_sha)
+    - name: git-ref
+      value: $(body.ref)
+    - name: pusher
+      value: $(body.pusher.username)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: amfit-build-template
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: trigger-template
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  params:
+    - name: git-url
+    - name: git-revision
+    - name: git-revision-short
+    - name: git-ref
+    - name: pusher
+      default: unknown
+  resourceTemplates:
+    # -------------------------------------------------------------------------
+    # PipelineRun — API
+    # -------------------------------------------------------------------------
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: amfit-build-api-$(tt.params.git-revision-short)-
+        namespace: cicd
+        labels:
+          app.kubernetes.io/name: amfit-tekton
+          app.kubernetes.io/component: pipelinerun-api
+          app.kubernetes.io/managed-by: argocd
+          environment: dev
+          lab_id: lab-k8s-01
+          lab_owner: jose.mussauer
+          tekton.dev/pipeline: amfit-build-api
+          trigger: gitea-push
+          git-revision-short: $(tt.params.git-revision-short)
+        annotations:
+          gitea.io/pusher: $(tt.params.pusher)
+          gitea.io/ref: $(tt.params.git-ref)
+      spec:
+        pipelineRef:
+          name: amfit-build-api
+        serviceAccountName: tekton-amfit
+        timeouts:
+          pipeline: "45m"
+          tasks: "30m"
+        params:
+          - name: git-url
+            value: $(tt.params.git-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-repo
+            value: harbor.infra.local/amfit/api
+          - name: image-tag
+            value: latest
+          - name: cache-repo
+            value: harbor.infra.local/amfit/cache
+        podTemplate:
+          nodeSelector:
+            workload: cicd
+          tolerations:
+            - key: workload
+              operator: Equal
+              value: cicd
+              effect: NoSchedule
+          securityContext:
+            fsGroup: 65532
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                storageClassName: local-path
+                resources:
+                  requests:
+                    storage: 5Gi
+          - name: dockerconfig
+            secret:
+              secretName: harbor-creds
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
+          - name: git-basic-auth
+            secret:
+              secretName: gitea-creds
+
+    # -------------------------------------------------------------------------
+    # PipelineRun — Web
+    # -------------------------------------------------------------------------
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: amfit-build-web-$(tt.params.git-revision-short)-
+        namespace: cicd
+        labels:
+          app.kubernetes.io/name: amfit-tekton
+          app.kubernetes.io/component: pipelinerun-web
+          app.kubernetes.io/managed-by: argocd
+          environment: dev
+          lab_id: lab-k8s-01
+          lab_owner: jose.mussauer
+          tekton.dev/pipeline: amfit-build-web
+          trigger: gitea-push
+          git-revision-short: $(tt.params.git-revision-short)
+        annotations:
+          gitea.io/pusher: $(tt.params.pusher)
+          gitea.io/ref: $(tt.params.git-ref)
+      spec:
+        pipelineRef:
+          name: amfit-build-web
+        serviceAccountName: tekton-amfit
+        timeouts:
+          pipeline: "45m"
+          tasks: "30m"
+        params:
+          - name: git-url
+            value: $(tt.params.git-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-repo
+            value: harbor.infra.local/amfit/web
+          - name: image-tag
+            value: latest
+          - name: cache-repo
+            value: harbor.infra.local/amfit/cache
+        podTemplate:
+          nodeSelector:
+            workload: cicd
+          tolerations:
+            - key: workload
+              operator: Equal
+              value: cicd
+              effect: NoSchedule
+          securityContext:
+            fsGroup: 65532
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                storageClassName: local-path
+                resources:
+                  requests:
+                    storage: 8Gi
+          - name: dockerconfig
+            secret:
+              secretName: harbor-creds
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
+          - name: git-basic-auth
+            secret:
+              secretName: gitea-creds
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: amfit-gitea-push
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: trigger
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  serviceAccountName: tekton-amfit
+  interceptors:
+    # 1. Valida assinatura HMAC do Gitea (header X-Gitea-Signature).
+    - ref:
+        name: gitea
+      params:
+        - name: secretRef
+          value:
+            secretName: gitea-webhook-secret
+            secretKey: secretToken
+        - name: eventTypes
+          value: ["push"]
+    # 2. Filtra: só dispara em push para refs/heads/main.
+    - ref:
+        name: cel
+      params:
+        - name: filter
+          value: "body.ref == 'refs/heads/main'"
+        - name: overlays
+          value:
+            - key: short_sha
+              expression: "body.head_commit.id.truncate(7)"
+  bindings:
+    - ref: amfit-gitea-binding
+  template:
+    ref: amfit-build-template
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: amfit-event-listener
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: event-listener
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  serviceAccountName: tekton-amfit
+  triggers:
+    - triggerRef: amfit-gitea-push
+  resources:
+    kubernetesResource:
+      serviceType: ClusterIP
+      spec:
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: amfit-tekton
+              app.kubernetes.io/component: event-listener
+              environment: dev
+              lab_id: lab-k8s-01
+              lab_owner: jose.mussauer
+          spec:
+            nodeSelector:
+              workload: cicd
+            tolerations:
+              - key: workload
+                operator: Equal
+                value: cicd
+                effect: NoSchedule
+            containers:
+              - name: event-listener
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 64Mi
+                  limits:
+                    cpu: 200m
+                    memory: 256Mi

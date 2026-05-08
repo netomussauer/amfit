@@ -1,0 +1,64 @@
+---
+# Smoke run manual — dispara o pipeline amfit-build-web uma vez.
+#
+#   kubectl create -f infra/tekton/pipelinerun-web-manual.yaml -n cicd
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: amfit-build-web-manual-
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: pipelinerun-web
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+    tekton.dev/pipeline: amfit-build-web
+    trigger: manual
+spec:
+  pipelineRef:
+    name: amfit-build-web
+  serviceAccountName: tekton-amfit
+  timeouts:
+    pipeline: "45m"
+    tasks: "30m"
+  params:
+    - name: git-url
+      value: http://gitea.lab.local/labadmin/amfit.git
+    - name: git-revision
+      value: main
+    - name: image-repo
+      value: harbor.infra.local/amfit/web
+    - name: image-tag
+      value: latest
+    - name: cache-repo
+      value: harbor.infra.local/amfit/cache
+  podTemplate:
+    nodeSelector:
+      workload: cicd
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: cicd
+        effect: NoSchedule
+    securityContext:
+      fsGroup: 65532
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 8Gi
+    - name: dockerconfig
+      secret:
+        secretName: harbor-creds
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    - name: git-basic-auth
+      secret:
+        secretName: gitea-creds

@@ -1,0 +1,131 @@
+---
+# Task local de git-clone — usada caso a ClusterTask `git-clone` do Tekton Catalog
+# (https://hub.tekton.dev/tekton/task/git-clone) não esteja instalada no cluster.
+#
+# Para verificar se já existe, rode:
+#   kubectl get clustertask git-clone
+#
+# Se a ClusterTask existir, este arquivo continua sendo aplicável (Task no namespace
+# `cicd` tem prioridade sobre ClusterTask quando referenciada por `kind: Task`).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: ci-task
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Clona um repositório Git no workspace `output` e exporta o SHA do commit
+    em um result, incluindo a versão "short" (7 caracteres) usada para tag de imagem.
+  workspaces:
+    - name: output
+      description: Workspace onde o repositório será clonado.
+    - name: basic-auth
+      optional: true
+      description: |
+        Secret do tipo `kubernetes.io/basic-auth` com credenciais Git.
+        Usado para clonar repositórios privados (Gitea mirror).
+  params:
+    - name: url
+      description: URL do repositório Git.
+      type: string
+    - name: revision
+      description: Branch, tag ou SHA a fazer checkout.
+      type: string
+      default: main
+    - name: depth
+      description: Shallow clone depth (0 = clone completo).
+      type: string
+      default: "1"
+    - name: subdirectory
+      description: Subdiretório do workspace onde clonar.
+      type: string
+      default: ""
+    - name: deleteExisting
+      description: Apaga subdirectory antes de clonar (idempotência).
+      type: string
+      default: "true"
+  results:
+    - name: commit
+      description: SHA completo do commit clonado.
+    - name: commit-short
+      description: SHA curto (7 chars) — usado como image tag.
+    - name: url
+      description: URL do repositório clonado.
+  steps:
+    - name: clone
+      image: alpine/git:2.43.0
+      env:
+        - name: PARAM_URL
+          value: $(params.url)
+        - name: PARAM_REVISION
+          value: $(params.revision)
+        - name: PARAM_DEPTH
+          value: $(params.depth)
+        - name: PARAM_SUBDIRECTORY
+          value: $(params.subdirectory)
+        - name: PARAM_DELETE_EXISTING
+          value: $(params.deleteExisting)
+        - name: WORKSPACE_OUTPUT_PATH
+          value: $(workspaces.output.path)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
+          value: $(workspaces.basic-auth.bound)
+        - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
+          value: $(workspaces.basic-auth.path)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ]; then
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.git-credentials" "${HOME}/.git-credentials"
+          cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.gitconfig" "${HOME}/.gitconfig"
+          chmod 400 "${HOME}/.git-credentials"
+          chmod 400 "${HOME}/.gitconfig"
+        fi
+
+        CHECKOUT_DIR="${WORKSPACE_OUTPUT_PATH}/${PARAM_SUBDIRECTORY}"
+
+        if [ "${PARAM_DELETE_EXISTING}" = "true" ] && [ -d "${CHECKOUT_DIR}" ]; then
+          rm -rf "${CHECKOUT_DIR:?}"/*  || true
+          rm -rf "${CHECKOUT_DIR:?}"/.[!.]* || true
+          rm -rf "${CHECKOUT_DIR:?}"/..?* || true
+        fi
+
+        mkdir -p "${CHECKOUT_DIR}"
+        cd "${CHECKOUT_DIR}"
+
+        git init -q
+        git remote add origin "${PARAM_URL}"
+
+        if [ "${PARAM_DEPTH}" -gt 0 ] 2>/dev/null; then
+          git fetch --depth="${PARAM_DEPTH}" origin "${PARAM_REVISION}"
+        else
+          git fetch origin "${PARAM_REVISION}"
+        fi
+
+        git checkout -q FETCH_HEAD
+
+        RESULT_SHA="$(git rev-parse HEAD)"
+        RESULT_SHORT="$(git rev-parse --short=7 HEAD)"
+
+        printf "%s" "${RESULT_SHA}"   > "$(results.commit.path)"
+        printf "%s" "${RESULT_SHORT}" > "$(results.commit-short.path)"
+        printf "%s" "${PARAM_URL}"    > "$(results.url.path)"
+
+        echo "Cloned ${PARAM_URL}@${PARAM_REVISION} (${RESULT_SHORT})"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi

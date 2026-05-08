@@ -1,0 +1,26 @@
+---
+# Kustomization para apply ordenado de toda a stack Tekton do AMFIT.
+#
+#   kubectl apply -k infra/tekton/
+#
+# IMPORTANTE: secret-template.yaml NÃO está incluído aqui. Crie os Secrets
+# reais (harbor-creds, gitea-creds, gitea-webhook-secret) via
+# `kubectl create secret` antes de aplicar este kustomization.
+# Veja README.md e secret-template.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cicd
+
+commonLabels:
+  app.kubernetes.io/part-of: amfit
+  lab_id: lab-k8s-01
+  lab_owner: jose.mussauer
+
+resources:
+  - serviceaccount.yaml
+  - task-git-clone.yaml
+  - task-golang-test.yaml
+  - task-kaniko-build-push.yaml
+  - pipeline-api.yaml
+  - pipeline-web.yaml
+  - trigger-amfit.yaml

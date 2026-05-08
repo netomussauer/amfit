@@ -1,0 +1,70 @@
+---
+# Smoke run manual — dispara o pipeline amfit-build-api uma vez.
+# Use `kubectl create -f` (não `apply`) para gerar um nome único a cada execução.
+#
+#   kubectl create -f infra/tekton/pipelinerun-api-manual.yaml -n cicd
+#
+# Acompanhe os logs com:
+#   tkn pipelinerun logs -L -f -n cicd
+#   # ou
+#   kubectl get pipelinerun -n cicd -w
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: amfit-build-api-manual-
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: pipelinerun-api
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+    tekton.dev/pipeline: amfit-build-api
+    trigger: manual
+spec:
+  pipelineRef:
+    name: amfit-build-api
+  serviceAccountName: tekton-amfit
+  timeouts:
+    pipeline: "45m"
+    tasks: "30m"
+  params:
+    - name: git-url
+      value: http://gitea.lab.local/labadmin/amfit.git
+    - name: git-revision
+      value: main
+    - name: image-repo
+      value: harbor.infra.local/amfit/api
+    - name: image-tag
+      value: latest
+    - name: cache-repo
+      value: harbor.infra.local/amfit/cache
+  podTemplate:
+    nodeSelector:
+      workload: cicd
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: cicd
+        effect: NoSchedule
+    securityContext:
+      fsGroup: 65532
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 5Gi
+    - name: dockerconfig
+      secret:
+        secretName: harbor-creds
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    - name: git-basic-auth
+      secret:
+        secretName: gitea-creds

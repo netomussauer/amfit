@@ -1,0 +1,99 @@
+---
+# Task — Build + push de imagem com Kaniko (sem Docker daemon).
+# Tags emitidas:
+#   - $(params.image-repo):$(params.image-tag)        (ex.: latest, sha-XXXXXXX, semver)
+#   - $(params.image-repo):$(params.image-tag-extra)  (ex.: SHA curto, sempre)
+# Cache compartilhado em harbor.infra.local/amfit/cache (configurado no pipeline).
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko-build-push
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: ci-task
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Constrói uma imagem container com Kaniko e dá push para Harbor com múltiplas tags.
+  workspaces:
+    - name: source
+      description: Workspace contendo o código-fonte clonado.
+    - name: dockerconfig
+      description: |
+        Workspace montando um Secret docker-registry como /kaniko/.docker/config.json.
+        O Secret deve ter a chave `.dockerconfigjson` (tipo kubernetes.io/dockerconfigjson).
+      mountPath: /kaniko/.docker
+  params:
+    - name: context
+      description: Diretório usado como contexto de build (relativo ao workspace `source`).
+      type: string
+      default: ""
+    - name: dockerfile
+      description: Caminho do Dockerfile relativo ao workspace `source`.
+      type: string
+    - name: image-repo
+      description: "Repositório destino (ex.: harbor.infra.local/amfit/api)."
+      type: string
+    - name: image-tag
+      description: "Tag principal (ex.: latest, semver)."
+      type: string
+      default: latest
+    - name: image-tag-extra
+      description: Tag adicional — convencionalmente o SHA curto do commit.
+      type: string
+    - name: cache-repo
+      description: Repositório usado para cache de layers Kaniko.
+      type: string
+      default: harbor.infra.local/amfit/cache
+    - name: extra-args
+      description: Argumentos extras a passar ao `executor`.
+      type: array
+      default: []
+  results:
+    - name: image-digest
+      description: Digest sha256 da imagem publicada.
+    - name: image-url
+      description: URL completa (repo:tag) da imagem.
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      workingDir: $(workspaces.source.path)
+      args:
+        - --dockerfile=$(params.dockerfile)
+        - --context=$(workspaces.source.path)/$(params.context)
+        - --destination=$(params.image-repo):$(params.image-tag)
+        - --destination=$(params.image-repo):$(params.image-tag-extra)
+        - --cache=true
+        - --cache-repo=$(params.cache-repo)
+        - --cache-ttl=168h
+        - --snapshot-mode=redo
+        - --use-new-run
+        - --digest-file=$(results.image-digest.path)
+        - $(params.extra-args[*])
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    - name: write-image-url
+      image: alpine:3.20
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+        printf "%s:%s" "$(params.image-repo)" "$(params.image-tag)" > "$(results.image-url.path)"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

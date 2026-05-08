@@ -1,0 +1,117 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: amfit-build-api
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: amfit-tekton
+    app.kubernetes.io/component: pipeline-api
+    app.kubernetes.io/managed-by: argocd
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+spec:
+  description: |
+    Pipeline de build + push da imagem AMFIT API (Go).
+    Stages: git-clone → go test -race → kaniko build/push (apps/api/).
+    Falha fast: qualquer task com erro aborta o pipeline.
+  params:
+    - name: git-url
+      type: string
+      default: http://gitea.lab.local/labadmin/amfit.git
+      description: URL do repositório Gitea (mirror).
+    - name: git-revision
+      type: string
+      default: main
+      description: Branch/tag/SHA a buildar.
+    - name: image-repo
+      type: string
+      default: harbor.infra.local/amfit/api
+      description: Repositório Harbor de destino.
+    - name: image-tag
+      type: string
+      default: latest
+      description: Tag principal (latest para main; SHA curto também é sempre adicionada).
+    - name: cache-repo
+      type: string
+      default: harbor.infra.local/amfit/cache
+      description: Repositório para cache de layers Kaniko.
+  workspaces:
+    - name: source
+      description: Workspace onde o código é clonado e compartilhado entre tasks.
+    - name: dockerconfig
+      description: Workspace que monta o Secret harbor-creds em /kaniko/.docker.
+    - name: git-basic-auth
+      description: Workspace que monta o Secret gitea-creds (basic-auth).
+      optional: true
+  results:
+    - name: image-url
+      description: URL completa da imagem publicada (repo:tag).
+      value: $(tasks.kaniko-build-push.results.image-url)
+    - name: image-digest
+      description: Digest sha256 da imagem publicada.
+      value: $(tasks.kaniko-build-push.results.image-digest)
+    - name: commit-short
+      description: SHA curto do commit buildado.
+      value: $(tasks.git-clone.results.commit-short)
+
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: Task
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+        - name: depth
+          value: "1"
+        - name: deleteExisting
+          value: "true"
+      workspaces:
+        - name: output
+          workspace: source
+        - name: basic-auth
+          workspace: git-basic-auth
+
+    - name: golang-test
+      runAfter:
+        - git-clone
+      taskRef:
+        name: golang-test
+        kind: Task
+      params:
+        - name: package-path
+          value: apps/api
+        - name: go-version
+          value: "1.22"
+      workspaces:
+        - name: source
+          workspace: source
+
+    - name: kaniko-build-push
+      runAfter:
+        - golang-test
+      taskRef:
+        name: kaniko-build-push
+        kind: Task
+      params:
+        - name: context
+          value: apps/api
+        - name: dockerfile
+          value: apps/api/Dockerfile
+        - name: image-repo
+          value: $(params.image-repo)
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: image-tag-extra
+          value: $(tasks.git-clone.results.commit-short)
+        - name: cache-repo
+          value: $(params.cache-repo)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
