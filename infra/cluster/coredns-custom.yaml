@@ -1,0 +1,47 @@
+# =============================================================================
+# CoreDNS custom overrides — resolve hostnames internos do lab para os
+# ClusterIPs dos Services correspondentes (em vez dos IPs MetalLB, que
+# sofrem de hairpin NAT em K3s — pods nao conseguem alcancar LB IPs do
+# proprio cluster).
+#
+# Aplicado em: 2026-05-08
+# Local: ConfigMap kube-system/coredns-custom (montado em /etc/coredns/custom)
+# Reload: automatico em ~15s via plugin reload do CoreDNS
+#
+# IMPORTANTE: este manifesto e CONFIG DE CLUSTER, nao de aplicacao. O ideal
+# e mover para o repo `infra-lab` (ou similar) que gerencia a infra base.
+# Mantido aqui temporariamente para que a entrega do AMFIT seja autocontida.
+#
+# ATUALIZAR este arquivo se algum Service (gitea-http, harbor, argocd-server,
+# gitea-event-listener-lb) for recriado e ganhar novo ClusterIP. Para
+# verificar IPs atuais:
+#   kubectl get svc -A | grep -E "gitea-http|^harbor|argocd-server|gitea-event-listener-lb"
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: coredns-custom
+    app.kubernetes.io/component: dns-overrides
+    environment: dev
+    lab_id: lab-k8s-01
+    lab_owner: jose.mussauer
+data:
+  lab.server: |
+    lab.local:53 {
+      hosts {
+        10.43.188.246 gitea.lab.local
+        10.43.13.131  argocd.lab.local
+        10.43.21.62   events.lab.local
+        fallthrough
+      }
+    }
+  infra.server: |
+    infra.local:53 {
+      hosts {
+        10.43.122.92 harbor.infra.local
+        fallthrough
+      }
+    }
