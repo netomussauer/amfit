@@ -11,6 +11,7 @@ export default function ExerciciosLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Exercícios' }} />
       <Stack.Screen name="novo" options={{ title: 'Novo Exercício' }} />
+      <Stack.Screen name="[id]" options={{ title: 'Detalhes' }} />
     </Stack>
   );
 }

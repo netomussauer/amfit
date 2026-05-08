@@ -132,8 +132,14 @@ func main() {
 
 	// Training
 	trainingRepos := traininginfra.NewPostgresRepositories(pool)
-	_ = trainingRepos
-	trainingSvc := trainingapplication.NewTrainingService(nil, nil, nil)
+	trainingSvc := trainingapplication.NewTrainingService(
+		trainingRepos.Fichas,
+		trainingRepos.Treinos,
+		trainingRepos.Itens,
+		trainingRepos.FichaCompleta,
+		trainingRepos.TreinoHoje,
+		trainingRepos.AlunoLookup,
+	)
 	trainingH := traininghandlers.NewTrainingHandler(trainingSvc)
 
 	// Execution
@@ -202,16 +208,17 @@ func main() {
 	// Autenticadas (qualquer role): /auth/logout
 	identityH.RegisterAuthenticated(protected)
 
-	// Restritas a PERSONAL: CRUD de alunos
+	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos
 	personalOnly := protected.Group("", middleware.RequireRole("PERSONAL"))
 	identityH.RegisterPersonalRoutes(personalOnly)
+	trainingH.RegisterPersonalRoutes(personalOnly)
 
-	// Restritas a ALUNO: /alunos/me
+	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha
 	alunoOnly := protected.Group("", middleware.RequireRole("ALUNO"))
 	identityH.RegisterAlunoRoutes(alunoOnly)
+	trainingH.RegisterAlunoRoutes(alunoOnly)
 
 	catalogH.Register(protected)
-	trainingH.Register(protected)
 	execH.Register(protected)
 	progressH.Register(protected)
 

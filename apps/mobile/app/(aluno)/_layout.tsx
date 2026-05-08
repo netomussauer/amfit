@@ -38,6 +38,13 @@ export default function AlunoLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="ficha"
+        options={{
+          // Rota acessível via push da tab Treino — não exibe entrada na tab bar.
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

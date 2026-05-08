@@ -45,4 +45,7 @@ export const exercicioService = {
       isMultipart: true,
     });
   },
+
+  desativar: (id: string) =>
+    apiRequest<void>(`/exercicios/${id}`, { method: 'DELETE' }),
 };

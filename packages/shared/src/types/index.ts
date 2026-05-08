@@ -22,7 +22,14 @@ import {
   ItemTreinoResponseSchema,
   TreinoResponseSchema,
   FichaResponseSchema,
+  FichaListResponseSchema,
   CriarFichaRequestSchema,
+  AtualizarFichaRequestSchema,
+  CriarTreinoRequestSchema,
+  AtualizarTreinoRequestSchema,
+  CriarItemTreinoRequestSchema,
+  AtualizarItemTreinoRequestSchema,
+  ReordenarItensRequestSchema,
 } from '../schemas/ficha.schema';
 import {
   RegistrarSerieRequestSchema,
@@ -54,7 +61,14 @@ export type AtualizarExercicioRequest = z.infer<typeof AtualizarExercicioRequest
 export type ItemTreinoResponse = z.infer<typeof ItemTreinoResponseSchema>;
 export type TreinoResponse = z.infer<typeof TreinoResponseSchema>;
 export type FichaResponse = z.infer<typeof FichaResponseSchema>;
+export type FichaListResponse = z.infer<typeof FichaListResponseSchema>;
 export type CriarFichaRequest = z.infer<typeof CriarFichaRequestSchema>;
+export type AtualizarFichaRequest = z.infer<typeof AtualizarFichaRequestSchema>;
+export type CriarTreinoRequest = z.infer<typeof CriarTreinoRequestSchema>;
+export type AtualizarTreinoRequest = z.infer<typeof AtualizarTreinoRequestSchema>;
+export type CriarItemTreinoRequest = z.infer<typeof CriarItemTreinoRequestSchema>;
+export type AtualizarItemTreinoRequest = z.infer<typeof AtualizarItemTreinoRequestSchema>;
+export type ReordenarItensRequest = z.infer<typeof ReordenarItensRequestSchema>;
 
 // Sessao
 export type RegistrarSerieRequest = z.infer<typeof RegistrarSerieRequestSchema>;
