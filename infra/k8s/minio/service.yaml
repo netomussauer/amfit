@@ -11,7 +11,11 @@ metadata:
     lab_id: "lab-k8s-01"
     lab_owner: "jose.mussauer"
 spec:
-  type: ClusterIP
+  # Exposicao via MetalLB para servir midia publica do bucket exercicios.
+  # DNS sugerido: minio.amfit.local -> 192.168.1.207 (porta 9000 = S3 API,
+  # porta 9001 = console). Sem TLS no MVP, MIDIA_PUBLIC_URL usa http://.
+  type: LoadBalancer
+  loadBalancerIP: 192.168.1.207
   selector:
     app.kubernetes.io/name: "minio"
   ports:

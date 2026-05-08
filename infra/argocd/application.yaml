@@ -2,7 +2,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: amfit
-  namespace: argocd
+  # ArgoCD do lab roda no namespace cicd (nao argocd).
+  namespace: cicd
   labels:
     app.kubernetes.io/name: "amfit"
     app.kubernetes.io/managed-by: "argocd"
@@ -14,7 +15,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://gitea.infra.local/amfit/amfit.git
+    # Gitea local mirroreia o repo do GitHub. Owner = labadmin.
+    repoURL: http://gitea.lab.local/labadmin/amfit.git
     targetRevision: main
     path: infra/k8s
   destination:

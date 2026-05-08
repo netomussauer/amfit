@@ -66,9 +66,11 @@ spec:
                 secretKeyRef:
                   name: amfit-secrets
                   key: minio-secret-key
-            # Prefixo público das mídias (Traefik → MinIO console)
+            # Prefixo publico das midias (MinIO LoadBalancer 192.168.1.207).
+            # Sem TLS no MVP — DNS minio.amfit.local resolve para o IP MetalLB,
+            # porta 9000 = S3 API. Migrar para HTTPS quando houver Traefik.
             - name: MIDIA_PUBLIC_URL
-              value: "https://minio.amfit.local/exercicios"
+              value: "http://minio.amfit.local:9000/exercicios"
             - name: JWT_PRIVATE_KEY_PATH
               value: "/etc/jwt/private.pem"
             - name: JWT_PUBLIC_KEY_PATH
