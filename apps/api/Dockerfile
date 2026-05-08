@@ -8,11 +8,12 @@ FROM golang:1.22-bookworm AS builder
 
 WORKDIR /src
 
-# Cache layer de modulos
+# Cache layer de modulos. Kaniko nao suporta --mount=type=cache; em troca,
+# go mod download popula /go/pkg/mod e o go.sum automaticamente. GOFLAGS=-mod=mod
+# permite atualizar go.sum se ele estiver vazio/incompleto.
+ENV GOFLAGS=-mod=mod
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+RUN go mod download
 
 # Codigo da aplicacao
 COPY cmd/      ./cmd/
@@ -23,9 +24,7 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 
 # Build estatico (CGO_DISABLED) com flags de tamanho minimo
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT}" \
         -o /out/server \
