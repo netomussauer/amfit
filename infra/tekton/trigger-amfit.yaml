@@ -247,9 +247,11 @@ spec:
                 operator: Equal
                 value: cicd
                 effect: NoSchedule
+            # Tekton Triggers preenche `containers[0].name` automaticamente
+            # ("event-listener") — o webhook rejeita se setarmos manualmente.
+            # Apenas overrides de resources sao permitidos aqui.
             containers:
-              - name: event-listener
-                resources:
+              - resources:
                   requests:
                     cpu: 50m
                     memory: 64Mi

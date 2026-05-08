@@ -65,7 +65,9 @@ spec:
 
         echo ">>> go test -race -count=1 ./..."
         go test -race -count=1 ./...
-      resources:
+      # Em tekton.dev/v1 o campo `resources` foi renomeado para
+      # `computeResources` em Steps (alinhado com Pod.spec.containers).
+      computeResources:
         requests:
           cpu: 500m
           memory: 1Gi
