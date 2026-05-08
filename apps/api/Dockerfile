@@ -1,13 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
 # Stage 1 — build do binario Go com cache de modulos
-FROM golang:1.22-alpine AS builder
-
-# git e necessario para resolver pseudo-versions de modulos Go (ex.:
-# v0.0.0-YYYYMMDDHHMMSS-COMMIT) que requerem `git init --bare` no cache.
-# GOPROXY entrega o tarball mas o cache local precisa do git para
-# materializar a pseudo-version corretamente.
-RUN apk add --no-cache git
+# bookworm (Debian) ja vem com git pre-instalado, evitando dependencia
+# de dl-cdn.alpinelinux.org durante o build (egress do no k3s-worker-cicd
+# ainda apresenta intermitencia para esse host especifico).
+FROM golang:1.22-bookworm AS builder
 
 WORKDIR /src
 
