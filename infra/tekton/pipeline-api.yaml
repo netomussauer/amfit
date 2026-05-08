@@ -14,13 +14,15 @@ metadata:
 spec:
   description: |
     Pipeline de build + push da imagem AMFIT API (Go).
-    Stages: git-clone → go test -race → kaniko build/push (apps/api/).
+    Stages: git-clone -> go test -race -> kaniko build/push (apps/api/).
+    Reutiliza as Tasks `git-clone` e `kaniko-build-push` ja existentes
+    no namespace `cicd` (compartilhadas com outros pipelines do lab).
     Falha fast: qualquer task com erro aborta o pipeline.
   params:
     - name: git-url
       type: string
       default: http://gitea.lab.local/labadmin/amfit.git
-      description: URL do repositório Gitea (mirror).
+      description: URL do repositorio Gitea (mirror).
     - name: git-revision
       type: string
       default: main
@@ -28,23 +30,16 @@ spec:
     - name: image-repo
       type: string
       default: harbor.infra.local/amfit/api
-      description: Repositório Harbor de destino.
+      description: Repositorio Harbor de destino.
     - name: image-tag
       type: string
       default: latest
-      description: Tag principal (latest para main; SHA curto também é sempre adicionada).
-    - name: cache-repo
-      type: string
-      default: harbor.infra.local/amfit/cache
-      description: Repositório para cache de layers Kaniko.
+      description: Tag da imagem.
   workspaces:
     - name: source
-      description: Workspace onde o código é clonado e compartilhado entre tasks.
-    - name: dockerconfig
-      description: Workspace que monta o Secret harbor-creds em /kaniko/.docker.
-    - name: git-basic-auth
-      description: Workspace que monta o Secret gitea-creds (basic-auth).
-      optional: true
+      description: Workspace onde o codigo e clonado e compartilhado entre tasks.
+    - name: docker-credentials
+      description: Workspace que monta o Secret harbor-creds para o Kaniko.
   results:
     - name: image-url
       description: URL completa da imagem publicada (repo:tag).
@@ -52,9 +47,9 @@ spec:
     - name: image-digest
       description: Digest sha256 da imagem publicada.
       value: $(tasks.kaniko-build-push.results.image-digest)
-    - name: commit-short
-      description: SHA curto do commit buildado.
-      value: $(tasks.git-clone.results.commit-short)
+    - name: commit
+      description: SHA do commit buildado.
+      value: $(tasks.git-clone.results.commit)
 
   tasks:
     - name: git-clone
@@ -68,13 +63,9 @@ spec:
           value: $(params.git-revision)
         - name: depth
           value: "1"
-        - name: deleteExisting
-          value: "true"
       workspaces:
-        - name: output
+        - name: source
           workspace: source
-        - name: basic-auth
-          workspace: git-basic-auth
 
     - name: golang-test
       runAfter:
@@ -98,20 +89,16 @@ spec:
         name: kaniko-build-push
         kind: Task
       params:
-        - name: context
-          value: apps/api
+        - name: image
+          value: $(params.image-repo)
+        - name: tag
+          value: $(params.image-tag)
         - name: dockerfile
           value: apps/api/Dockerfile
-        - name: image-repo
-          value: $(params.image-repo)
-        - name: image-tag
-          value: $(params.image-tag)
-        - name: image-tag-extra
-          value: $(tasks.git-clone.results.commit-short)
-        - name: cache-repo
-          value: $(params.cache-repo)
+        - name: context
+          value: apps/api
       workspaces:
         - name: source
           workspace: source
-        - name: dockerconfig
-          workspace: dockerconfig
+        - name: docker-credentials
+          workspace: docker-credentials

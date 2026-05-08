@@ -88,8 +88,6 @@ spec:
             value: harbor.infra.local/amfit/api
           - name: image-tag
             value: latest
-          - name: cache-repo
-            value: harbor.infra.local/amfit/cache
         podTemplate:
           nodeSelector:
             workload: cicd
@@ -109,15 +107,9 @@ spec:
                 resources:
                   requests:
                     storage: 5Gi
-          - name: dockerconfig
+          - name: docker-credentials
             secret:
               secretName: harbor-creds
-              items:
-                - key: .dockerconfigjson
-                  path: config.json
-          - name: git-basic-auth
-            secret:
-              secretName: gitea-creds
 
     # -------------------------------------------------------------------------
     # PipelineRun — Web
@@ -156,8 +148,6 @@ spec:
             value: harbor.infra.local/amfit/web
           - name: image-tag
             value: latest
-          - name: cache-repo
-            value: harbor.infra.local/amfit/cache
         podTemplate:
           nodeSelector:
             workload: cicd
@@ -177,15 +167,9 @@ spec:
                 resources:
                   requests:
                     storage: 8Gi
-          - name: dockerconfig
+          - name: docker-credentials
             secret:
               secretName: harbor-creds
-              items:
-                - key: .dockerconfigjson
-                  path: config.json
-          - name: git-basic-auth
-            secret:
-              secretName: gitea-creds
 ---
 apiVersion: triggers.tekton.dev/v1beta1
 kind: Trigger

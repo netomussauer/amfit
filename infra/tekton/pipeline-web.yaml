@@ -14,8 +14,10 @@ metadata:
 spec:
   description: |
     Pipeline de build + push da imagem AMFIT Web (Next.js).
-    Stages: git-clone → kaniko build/push (contexto = raiz do monorepo, pois o
-    Dockerfile depende de packages/shared/).
+    Stages: git-clone -> kaniko build/push (contexto = raiz do monorepo,
+    pois o Dockerfile depende de packages/shared/).
+    Reutiliza as Tasks `git-clone` e `kaniko-build-push` ja existentes
+    no namespace `cicd`.
   params:
     - name: git-url
       type: string
@@ -29,21 +31,16 @@ spec:
     - name: image-tag
       type: string
       default: latest
-    - name: cache-repo
-      type: string
-      default: harbor.infra.local/amfit/cache
   workspaces:
     - name: source
-    - name: dockerconfig
-    - name: git-basic-auth
-      optional: true
+    - name: docker-credentials
   results:
     - name: image-url
       value: $(tasks.kaniko-build-push.results.image-url)
     - name: image-digest
       value: $(tasks.kaniko-build-push.results.image-digest)
-    - name: commit-short
-      value: $(tasks.git-clone.results.commit-short)
+    - name: commit
+      value: $(tasks.git-clone.results.commit)
 
   tasks:
     - name: git-clone
@@ -57,13 +54,9 @@ spec:
           value: $(params.git-revision)
         - name: depth
           value: "1"
-        - name: deleteExisting
-          value: "true"
       workspaces:
-        - name: output
+        - name: source
           workspace: source
-        - name: basic-auth
-          workspace: git-basic-auth
 
     - name: kaniko-build-push
       runAfter:
@@ -72,20 +65,16 @@ spec:
         name: kaniko-build-push
         kind: Task
       params:
-        - name: context
-          value: ""
+        - name: image
+          value: $(params.image-repo)
+        - name: tag
+          value: $(params.image-tag)
         - name: dockerfile
           value: apps/web/Dockerfile
-        - name: image-repo
-          value: $(params.image-repo)
-        - name: image-tag
-          value: $(params.image-tag)
-        - name: image-tag-extra
-          value: $(tasks.git-clone.results.commit-short)
-        - name: cache-repo
-          value: $(params.cache-repo)
+        - name: context
+          value: "."
       workspaces:
         - name: source
           workspace: source
-        - name: dockerconfig
-          workspace: dockerconfig
+        - name: docker-credentials
+          workspace: docker-credentials

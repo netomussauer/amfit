@@ -18,9 +18,11 @@ commonLabels:
 
 resources:
   - serviceaccount.yaml
-  - task-git-clone.yaml
+  # task-golang-test.yaml e a unica Task especifica do AMFIT.
+  # As Tasks `git-clone` e `kaniko-build-push` sao reutilizadas das
+  # existentes em ns cicd (criadas pela infra-lab base, compartilhadas
+  # com o pipeline `build-and-push` de outros projetos do lab).
   - task-golang-test.yaml
-  - task-kaniko-build-push.yaml
   - pipeline-api.yaml
   - pipeline-web.yaml
   - trigger-amfit.yaml

@@ -8,15 +8,19 @@ do home-lab. Disparados por push no Gitea local (mirror) ou manualmente via `kub
 ├── kustomization.yaml              # apply ordenado (kubectl apply -k .)
 ├── serviceaccount.yaml             # SA tekton-amfit + Role/RoleBinding
 ├── secret-template.yaml            # TEMPLATE — NÃO commitar credenciais reais
-├── task-git-clone.yaml             # Task local de git clone (fallback do Catalog)
 ├── task-golang-test.yaml           # go vet + go test -race em apps/api/
-├── task-kaniko-build-push.yaml     # build/push com Kaniko (sem Docker daemon)
 ├── pipeline-api.yaml               # amfit-build-api (clone → test → build/push)
 ├── pipeline-web.yaml               # amfit-build-web (clone → build/push)
 ├── pipelinerun-api-manual.yaml     # smoke run manual da API
 ├── pipelinerun-web-manual.yaml     # smoke run manual do Web
 └── trigger-amfit.yaml              # EventListener + Trigger + Binding + Template
 ```
+
+> **Nota sobre Tasks compartilhadas**: as Tasks `git-clone` e
+> `kaniko-build-push` referenciadas pelos Pipelines NÃO estão neste
+> diretório — são as Tasks já existentes em `cicd` (provisionadas pela
+> infra-lab base e usadas pelo Pipeline `build-and-push` de outros
+> projetos). Apenas `golang-test` é específica do AMFIT.
 
 ## Pré-requisitos no cluster
 
