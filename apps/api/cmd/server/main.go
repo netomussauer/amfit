@@ -93,6 +93,12 @@ func main() {
 	}
 	log.Info().Msg("MinIO connected and buckets ensured")
 
+	// Apenas o bucket de exercícios é público — evolucao e coach-videos
+	// permanecem privados (acesso via presigned URL nas próximas fatias).
+	if err := minioClient.SetBucketPublicRead(startupCtx, "exercicios"); err != nil {
+		log.Warn().Err(err).Msg("falha ao aplicar policy public-read em exercicios — continuando")
+	}
+
 	// ── JWT keys ──────────────────────────────────────────────────────
 	privateKey, publicKey, err := auth.LoadKeys(cfg.JWTPrivateKeyPath, cfg.JWTPublicKeyPath)
 	if err != nil {
@@ -116,8 +122,12 @@ func main() {
 
 	// Catalog
 	catalogRepos := cataloginfra.NewPostgresRepositories(pool)
-	_ = catalogRepos
-	catalogSvc := catalogapplication.NewCatalogService(nil, nil)
+	catalogStorage := cataloginfra.NewMinioStorage(minioClient, cfg.MidiaPublicURL)
+	catalogSvc := catalogapplication.NewCatalogService(
+		catalogRepos.GruposMusculares,
+		catalogRepos.Exercicios,
+		catalogStorage,
+	)
 	catalogH := cataloghandlers.NewCatalogHandler(catalogSvc)
 
 	// Training

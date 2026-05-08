@@ -52,3 +52,29 @@ func (c *Client) EnsureBucket(ctx context.Context, bucketName, region string) er
 func (c *Client) Underlying() *minio.Client {
 	return c.mc
 }
+
+// publicReadPolicyTemplate é uma policy S3-compatível que concede s3:GetObject
+// anônimo a todos os objetos do bucket. Usada pelo bucket "exercicios" para
+// servir mídias demonstrativas via URL pública sem presigned-URLs.
+const publicReadPolicyTemplate = `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"AWS": ["*"]},
+      "Action": ["s3:GetObject"],
+      "Resource": ["arn:aws:s3:::%s/*"]
+    }
+  ]
+}`
+
+// SetBucketPublicRead aplica uma policy public-read no bucket informado.
+// Idempotente — chamadas repetidas sobrescrevem a policy com o mesmo conteúdo.
+func (c *Client) SetBucketPublicRead(ctx context.Context, bucketName string) error {
+	policy := fmt.Sprintf(publicReadPolicyTemplate, bucketName)
+	if err := c.mc.SetBucketPolicy(ctx, bucketName, policy); err != nil {
+		return fmt.Errorf("storage: set bucket policy %q: %w", bucketName, err)
+	}
+	log.Info().Str("bucket", bucketName).Msg("storage: public-read policy applied")
+	return nil
+}

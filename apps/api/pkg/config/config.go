@@ -20,6 +20,11 @@ type Config struct {
 	MinioSecretKey string
 	MinioUseSSL    bool
 
+	// MidiaPublicURL é o prefixo público (até o nome do bucket exclusive) onde
+	// o MinIO serve as mídias dos exercícios. Em dev local aponta para o
+	// próprio MinIO via 9000; no lab K3s passa pelo Traefik (minio.amfit.local).
+	MidiaPublicURL string
+
 	// JWT
 	JWTPrivateKeyPath string
 	JWTPublicKeyPath  string
@@ -39,6 +44,8 @@ func Load() *Config {
 		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "amfit-minio"),
 		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "amfit-minio-secret"),
 		MinioUseSSL:    getEnvBool("MINIO_USE_SSL", false),
+
+		MidiaPublicURL: getEnv("MIDIA_PUBLIC_URL", "http://localhost:9000/exercicios"),
 
 		JWTPrivateKeyPath: getEnv("JWT_PRIVATE_KEY_PATH", "keys/private.pem"),
 		JWTPublicKeyPath:  getEnv("JWT_PUBLIC_KEY_PATH", "keys/public.pem"),

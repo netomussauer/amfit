@@ -12,6 +12,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   params?: Record<string, string | number | boolean | undefined>;
+  isMultipart?: boolean;
   _retry?: boolean;
 };
 
@@ -76,7 +77,7 @@ export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, params, _retry = false } = options;
+  const { method = 'GET', body, params, isMultipart = false, _retry = false } = options;
 
   const token = await getAccessToken();
 
@@ -89,17 +90,23 @@ export async function apiRequest<T>(
     });
   }
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
+  if (!isMultipart) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let requestBody: BodyInit | undefined;
+  if (body !== undefined) {
+    requestBody = isMultipart ? (body as BodyInit) : JSON.stringify(body);
   }
 
   const response = await fetch(url.toString(), {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: requestBody,
   });
 
   if (response.status === 401) {

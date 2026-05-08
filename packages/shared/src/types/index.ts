@@ -14,7 +14,9 @@ import {
 import {
   GrupoMuscularSchema,
   ExercicioResponseSchema,
+  ExercicioListResponseSchema,
   CriarExercicioRequestSchema,
+  AtualizarExercicioRequestSchema,
 } from '../schemas/exercicio.schema';
 import {
   ItemTreinoResponseSchema,
@@ -44,7 +46,9 @@ export type AlunoListResponse = z.infer<typeof AlunoListResponseSchema>;
 // Exercicio
 export type GrupoMuscular = z.infer<typeof GrupoMuscularSchema>;
 export type ExercicioResponse = z.infer<typeof ExercicioResponseSchema>;
+export type ExercicioListResponse = z.infer<typeof ExercicioListResponseSchema>;
 export type CriarExercicioRequest = z.infer<typeof CriarExercicioRequestSchema>;
+export type AtualizarExercicioRequest = z.infer<typeof AtualizarExercicioRequestSchema>;
 
 // Ficha
 export type ItemTreinoResponse = z.infer<typeof ItemTreinoResponseSchema>;

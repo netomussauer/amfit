@@ -66,6 +66,9 @@ spec:
                 secretKeyRef:
                   name: amfit-secrets
                   key: minio-secret-key
+            # Prefixo público das mídias (Traefik → MinIO console)
+            - name: MIDIA_PUBLIC_URL
+              value: "https://minio.amfit.local/exercicios"
             - name: JWT_PRIVATE_KEY_PATH
               value: "/etc/jwt/private.pem"
             - name: JWT_PUBLIC_KEY_PATH
