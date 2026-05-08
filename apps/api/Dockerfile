@@ -3,9 +3,11 @@
 # Stage 1 — build do binario Go com cache de modulos
 FROM golang:1.22-alpine AS builder
 
-# git nao e necessario para `go mod download` quando GOPROXY=proxy.golang.org
-# (default). `apk add git` foi removido para evitar dependencia de
-# dl-cdn.alpinelinux.org durante o build (ambiente do lab tem egress restrito).
+# git e necessario para resolver pseudo-versions de modulos Go (ex.:
+# v0.0.0-YYYYMMDDHHMMSS-COMMIT) que requerem `git init --bare` no cache.
+# GOPROXY entrega o tarball mas o cache local precisa do git para
+# materializar a pseudo-version corretamente.
+RUN apk add --no-cache git
 
 WORKDIR /src
 
