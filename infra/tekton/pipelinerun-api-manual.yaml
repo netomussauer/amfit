@@ -25,7 +25,20 @@ metadata:
 spec:
   pipelineRef:
     name: amfit-build-api
-  serviceAccountName: tekton-amfit
+  # Em tekton.dev/v1, serviceAccountName e podTemplate ficam dentro de
+  # taskRunTemplate (antes eram top-level no v1beta1).
+  taskRunTemplate:
+    serviceAccountName: tekton-amfit
+    podTemplate:
+      nodeSelector:
+        workload: cicd
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: cicd
+          effect: NoSchedule
+      securityContext:
+        fsGroup: 65532
   timeouts:
     pipeline: "45m"
     tasks: "30m"
@@ -38,16 +51,6 @@ spec:
       value: harbor.infra.local/amfit/api
     - name: image-tag
       value: latest
-  podTemplate:
-    nodeSelector:
-      workload: cicd
-    tolerations:
-      - key: workload
-        operator: Equal
-        value: cicd
-        effect: NoSchedule
-    securityContext:
-      fsGroup: 65532
   workspaces:
     - name: source
       volumeClaimTemplate:

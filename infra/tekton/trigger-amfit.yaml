@@ -75,7 +75,18 @@ spec:
       spec:
         pipelineRef:
           name: amfit-build-api
-        serviceAccountName: tekton-amfit
+        taskRunTemplate:
+          serviceAccountName: tekton-amfit
+          podTemplate:
+            nodeSelector:
+              workload: cicd
+            tolerations:
+              - key: workload
+                operator: Equal
+                value: cicd
+                effect: NoSchedule
+            securityContext:
+              fsGroup: 65532
         timeouts:
           pipeline: "45m"
           tasks: "30m"
@@ -88,16 +99,6 @@ spec:
             value: harbor.infra.local/amfit/api
           - name: image-tag
             value: latest
-        podTemplate:
-          nodeSelector:
-            workload: cicd
-          tolerations:
-            - key: workload
-              operator: Equal
-              value: cicd
-              effect: NoSchedule
-          securityContext:
-            fsGroup: 65532
         workspaces:
           - name: source
             volumeClaimTemplate:
@@ -135,7 +136,18 @@ spec:
       spec:
         pipelineRef:
           name: amfit-build-web
-        serviceAccountName: tekton-amfit
+        taskRunTemplate:
+          serviceAccountName: tekton-amfit
+          podTemplate:
+            nodeSelector:
+              workload: cicd
+            tolerations:
+              - key: workload
+                operator: Equal
+                value: cicd
+                effect: NoSchedule
+            securityContext:
+              fsGroup: 65532
         timeouts:
           pipeline: "45m"
           tasks: "30m"
@@ -148,16 +160,6 @@ spec:
             value: harbor.infra.local/amfit/web
           - name: image-tag
             value: latest
-        podTemplate:
-          nodeSelector:
-            workload: cicd
-          tolerations:
-            - key: workload
-              operator: Equal
-              value: cicd
-              effect: NoSchedule
-          securityContext:
-            fsGroup: 65532
         workspaces:
           - name: source
             volumeClaimTemplate:
