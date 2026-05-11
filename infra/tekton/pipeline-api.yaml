@@ -67,23 +67,22 @@ spec:
         - name: source
           workspace: source
 
-    # FIXME: golang-test esta temporariamente desabilitado. Falha em
-    # `go mod download` com "invalid version: unknown revision" para
-    # github.com/jackc/pgservicefile. Suspeita: GOPROXY cache stale ou
-    # egress limitado no no k3s-worker-cicd. Reativar apos diagnose
-    # (testar `GOPROXY=direct` ou rodar go mod tidy localmente).
-    # - name: golang-test
-    #   runAfter: [git-clone]
-    #   taskRef: { name: golang-test, kind: Task }
-    #   params:
-    #     - { name: package-path, value: apps/api }
-    #     - { name: go-version, value: "1.22" }
-    #   workspaces:
-    #     - { name: source, workspace: source }
+    # golang-test reativado: a falha anterior em `go mod download` para
+    # pgservicefile era go.sum vazio (0 linhas). Repopulado via
+    # `go mod tidy` em pod golang temporario; agora -mod=readonly da Task
+    # encontra todos os hashes.
+    - name: golang-test
+      runAfter: [git-clone]
+      taskRef: { name: golang-test, kind: Task }
+      params:
+        - { name: package-path, value: apps/api }
+        - { name: go-version, value: "1.22" }
+      workspaces:
+        - { name: source, workspace: source }
 
     - name: kaniko-build-push
       runAfter:
-        - git-clone
+        - golang-test
       taskRef:
         name: kaniko-build-push
         kind: Task
