@@ -37,6 +37,67 @@ minutos. MinIO já está Running.
 
 ---
 
+## 1.1 Trust do `containerd` no CA do Harbor — **PENDENTE** (2026-05-11)
+
+**Status:** descoberto após o fix do DNS (item 1). Bloqueia o pull
+das imagens `harbor.lab.local/amfit/*` pelos nós do K3s.
+
+**Sintoma:**
+
+```
+Failed to pull image "harbor.lab.local/amfit/api:latest":
+... tls: failed to verify certificate: x509: certificate signed by unknown authority
+```
+
+**Por quê:** o Harbor do lab usa certificado auto-assinado (CA
+interno do lab, não pública). `containerd` em cada nó valida TLS
+contra o trust store do SO, que não tem o CA do lab.
+
+**Como resolver — escolher uma:**
+
+### Opção A (mais simples) — `registries.yaml` com `insecure_skip_verify`
+
+Em cada nó do cluster, criar/atualizar `/etc/rancher/k3s/registries.yaml`:
+
+```yaml
+mirrors:
+  "harbor.lab.local":
+    endpoint:
+      - "https://harbor.lab.local"
+configs:
+  "harbor.lab.local":
+    tls:
+      insecure_skip_verify: true
+```
+
+E reiniciar o agent K3s:
+
+```bash
+sudo systemctl restart k3s-agent   # workers
+sudo systemctl restart k3s         # control-plane
+```
+
+Recomendado: aplicar via playbook Ansible (ex.:
+`infra-lab/ansible/playbooks/07-k3s-registries.yml`).
+
+### Opção B (mais correta) — instalar CA do Harbor no trust store
+
+```bash
+sudo cp harbor-ca.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+sudo systemctl restart k3s-agent
+```
+
+Requer extrair o CA do Harbor primeiro. Mais defensivo (não pula
+verificação) mas mais trabalho.
+
+**Após o fix:** `kubectl delete pod -n amfit -l app.kubernetes.io/name=amfit-api`
+e `... amfit-web` para resetar o ImagePullBackOff. ArgoCD selfHeal
+não força recriação porque o Pod está "Pending" do ponto de vista
+dele, não Degraded.
+
+---
+
 ## 2. Ajuste do Secret `amfit-secrets` no GitOps
 
 **Status:** workaround em produção (ignoreDifferences). Decisão para
