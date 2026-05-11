@@ -46,8 +46,11 @@ spec:
               containerPort: 3000
               protocol: TCP
           env:
-            - name: NEXT_PUBLIC_API_URL
-              value: "https://api.amfit.local"
+            # API_ORIGIN e usado pelo next.config.mjs em rewrites() para fazer
+            # proxy server-side de /api/v1/* para o backend. Mantemos a chamada
+            # cluster-internal (sem TLS, sem DNS Pi-hole).
+            - name: API_ORIGIN
+              value: "http://amfit-api.amfit.svc.cluster.local:8080"
           resources:
             requests:
               cpu: "100m"

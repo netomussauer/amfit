@@ -226,16 +226,22 @@ func main() {
 	catalogH.Register(api, auth)
 	progressH.Register(api, auth)
 
-	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos.
-	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
-	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
-	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	// IMPORTANTE: registramos as rotas do ALUNO ANTES das do PERSONAL.
+	// Fiber v3 resolve rotas pela ORDEM DE REGISTRO (não por especificidade),
+	// então `/alunos/me` precisa estar registrada antes de `/alunos/:id` para
+	// não cair na rota paramétrica. Mesmo raciocínio para `/alunos/me/sessoes`
+	// vs `/alunos/:alunoId/sessoes`.
 
 	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha,
 	// /sessoes/* e /alunos/me/sessoes (histórico).
 	identityH.RegisterAlunoRoutes(api, auth, requireAluno)
 	trainingH.RegisterAlunoRoutes(api, auth, requireAluno)
 	execH.RegisterAlunoRoutes(api, auth, requireAluno)
+
+	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos.
+	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)

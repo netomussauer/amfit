@@ -13,8 +13,14 @@ import {
 
 type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+// baseURL relativa: o servidor Next.js faz proxy de /api/v1/* para o backend
+// via `rewrites()` no next.config.mjs. Isso mantem todas as chamadas do
+// browser na mesma origem do web, evita CORS e nao precisa expor o backend
+// diretamente ao cliente.
+const API_BASE = '/api/v1';
+
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080',
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },
