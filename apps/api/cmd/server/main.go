@@ -203,31 +203,39 @@ func main() {
 	})
 
 	// ── Rotas de API ──────────────────────────────────────────────────
+	//
+	// Em Fiber v3, fiber.Router.Group("", middleware) muta o router pai —
+	// rotas registradas no PAI depois do Group também passam pelo middleware.
+	// Para evitar contaminação, criamos sub-grupos INDEPENDENTES partindo de
+	// `api` (cada um com sua chain explícita de middlewares).
+	auth := middleware.NewAuthMiddleware(publicKey)
+	requirePersonal := middleware.RequireRole("PERSONAL")
+	requireAluno := middleware.RequireRole("ALUNO")
+
 	api := app.Group("/api/v1")
 
 	// Públicas (auth: register-personal, login, refresh)
 	identityH.RegisterPublic(api)
 
-	protected := api.Group("", middleware.NewAuthMiddleware(publicKey))
-
-	// Autenticadas (qualquer role): /auth/logout
-	identityH.RegisterAuthenticated(protected)
+	// Autenticadas (qualquer role): /auth/logout, /grupos-musculares,
+	// /exercicios (GET), /progress (futuro)
+	authenticated := api.Group("", auth)
+	identityH.RegisterAuthenticated(authenticated)
+	catalogH.Register(authenticated)
+	progressH.Register(authenticated)
 
 	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos
-	personalOnly := protected.Group("", middleware.RequireRole("PERSONAL"))
+	personalOnly := api.Group("", auth, requirePersonal)
 	identityH.RegisterPersonalRoutes(personalOnly)
 	trainingH.RegisterPersonalRoutes(personalOnly)
 	execH.RegisterPersonalRoutes(personalOnly)
 
 	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha,
 	// /sessoes/* e /alunos/me/sessoes (histórico)
-	alunoOnly := protected.Group("", middleware.RequireRole("ALUNO"))
+	alunoOnly := api.Group("", auth, requireAluno)
 	identityH.RegisterAlunoRoutes(alunoOnly)
 	trainingH.RegisterAlunoRoutes(alunoOnly)
 	execH.RegisterAlunoRoutes(alunoOnly)
-
-	catalogH.Register(protected)
-	progressH.Register(protected)
 
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
