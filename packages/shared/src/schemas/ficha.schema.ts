@@ -112,17 +112,5 @@ export const ReordenarItensRequestSchema = z.object({
   ids: z.array(z.string().uuid()).min(1, 'Lista de itens vazia'),
 });
 
-// ── Type exports ─────────────────────────────────────────────────────
-
-export type ItemTreinoResponse = z.infer<typeof ItemTreinoResponseSchema>;
-export type TreinoResponse = z.infer<typeof TreinoResponseSchema>;
-export type FichaResponse = z.infer<typeof FichaResponseSchema>;
-export type FichaListResponse = z.infer<typeof FichaListResponseSchema>;
-
-export type CriarFichaRequest = z.infer<typeof CriarFichaRequestSchema>;
-export type AtualizarFichaRequest = z.infer<typeof AtualizarFichaRequestSchema>;
-export type CriarTreinoRequest = z.infer<typeof CriarTreinoRequestSchema>;
-export type AtualizarTreinoRequest = z.infer<typeof AtualizarTreinoRequestSchema>;
-export type CriarItemTreinoRequest = z.infer<typeof CriarItemTreinoRequestSchema>;
-export type AtualizarItemTreinoRequest = z.infer<typeof AtualizarItemTreinoRequestSchema>;
-export type ReordenarItensRequest = z.infer<typeof ReordenarItensRequestSchema>;
+// Types inferidos sao exportados centralmente em ../types/index.ts
+// para evitar conflito de re-export em src/index.ts.

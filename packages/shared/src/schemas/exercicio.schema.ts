@@ -37,9 +37,5 @@ export const AtualizarExercicioRequestSchema = z.object({
   descricao: z.string().max(2000).optional().or(z.literal('')),
 });
 
-export type GrupoMuscular = z.infer<typeof GrupoMuscularSchema>;
-export type GrupoMuscularListResponse = z.infer<typeof GrupoMuscularListResponseSchema>;
-export type ExercicioResponse = z.infer<typeof ExercicioResponseSchema>;
-export type ExercicioListResponse = z.infer<typeof ExercicioListResponseSchema>;
-export type CriarExercicioRequest = z.infer<typeof CriarExercicioRequestSchema>;
-export type AtualizarExercicioRequest = z.infer<typeof AtualizarExercicioRequestSchema>;
+// Types inferidos sao exportados centralmente em ../types/index.ts
+// para evitar conflito de re-export em src/index.ts.
