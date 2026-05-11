@@ -2,35 +2,61 @@
 
 Plataforma de gestão de treinos de musculação com dois perfis: **personal trainer** (portal web + app mobile) e **aluno** (app mobile).
 
+## Status
+
+| Camada | Estado |
+|---|---|
+| Backend (4 bounded contexts) | ✅ Identity, Catalog, Training, Execution |
+| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico |
+| Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico) + Personal (dashboard, exercícios) |
+| Build CI (Tekton) | ✅ Pipelines API + Web ativos |
+| Deploy GitOps (ArgoCD) | ✅ Application Healthy em produção (lab K3s) |
+
+**Endpoints em produção (lab):**
+
+| Serviço | URL externa | URL interna |
+|---|---|---|
+| API | <http://api.amfit.local:8080> | 192.168.1.205:8080 |
+| Web | <http://app.amfit.local:3000> | 192.168.1.206:3000 |
+| MinIO | <http://minio.amfit.local:9000> (API) / :9001 (console) | 192.168.1.207 |
+
 ## Stack
 
 | Camada | Tecnologia |
 |---|---|
 | Backend | Go 1.22 + Fiber v3 (arquitetura hexagonal) |
-| Web Admin | Next.js 14 (App Router) + Tailwind CSS + shadcn/ui |
-| Mobile | Expo SDK 51 + React Native + TypeScript |
+| Web admin | Next.js 14 (App Router) + Tailwind CSS + TanStack Query |
+| Mobile | Expo SDK 51 + React Native + TypeScript + NativeWind |
 | Banco de dados | PostgreSQL 16 |
 | Cache | Redis 7 |
-| Storage | MinIO (S3-compatible) |
+| Storage | MinIO (S3-compatible, bucket público para mídias de exercícios) |
 | Monorepo | pnpm Workspaces + Turborepo |
-| Infra | K3s + ArgoCD + Tekton + Traefik + Harbor |
+| Imagens | Distroless multi-stage (`gcr.io/distroless/{static,nodejs20}-debian12:nonroot`) |
+| Registry | Harbor (`harbor.lab.local`) |
+| Pipelines | Tekton (`amfit-build-api` + `amfit-build-web`) com Kaniko |
+| GitOps | ArgoCD (path `infra/k8s/`) |
+| Exposição | MetalLB LoadBalancer (sem IngressController) |
+| DNS interno | Pi-hole (`*.lab.local`, `*.infra.local`, `*.amfit.local`) |
 
 ## Estrutura
 
 ```
 amfit/
 ├── apps/
-│   ├── api/          # Backend Go — bounded contexts, migrations, pkg/*
-│   ├── web/          # Portal do personal trainer (Next.js)
-│   └── mobile/       # App aluno + personal (Expo)
+│   ├── api/                # Backend Go — bounded contexts, migrations, pkg/*, Dockerfile distroless
+│   ├── web/                # Portal personal trainer (Next.js 14, output: standalone)
+│   └── mobile/             # App aluno + personal (Expo)
 ├── packages/
-│   └── shared/       # @amfit/shared — schemas Zod, tipos, constantes
+│   └── shared/             # @amfit/shared — schemas Zod, tipos, constantes
 ├── infra/
-│   ├── k8s/          # Manifestos Kubernetes (API, web, MinIO)
-│   └── argocd/       # Application CR (GitOps)
+│   ├── k8s/                # Manifestos K8s (namespace, api, web, minio) — sincronizado por ArgoCD
+│   ├── argocd/             # Application CR
+│   ├── tekton/             # Pipelines + Triggers + ServiceAccount + RBAC + PipelineRuns manuais
+│   └── cluster/            # ConfigMaps de cluster (coredns-custom) + LAB-BUGS.md + PENDING.md
 ├── docs/
-│   └── SDD.md        # Arquitetura completa, ERD, OpenAPI, roadmap
-└── docker-compose.yml
+│   └── SDD.md              # Arquitetura completa: ADRs, ERD, OpenAPI, fluxos, roadmap
+├── docker-compose.yml      # PostgreSQL + Redis + MinIO para dev local
+└── .env.example
 ```
 
 ## Pré-requisitos
@@ -42,148 +68,132 @@ amfit/
 
 ## Setup local
 
-### 1. Dependências
-
 ```bash
-# JavaScript (web + mobile + shared)
+# 1. Dependências
 pnpm install
+cd apps/api && go mod tidy && cd ../..
 
-# Go
-cd apps/api && go mod tidy
-```
-
-### 2. Variáveis de ambiente
-
-```bash
+# 2. Variáveis de ambiente
 cp .env.example .env
-# edite .env se necessário — defaults funcionam com o docker-compose
-```
 
-### 3. Chaves JWT (RS256)
+# 3. Chaves JWT RS256
+cd apps/api && make keys && cd ../..
 
-```bash
-cd apps/api
-make keys
-# gera apps/api/keys/private.pem e keys/public.pem
-```
-
-### 4. Serviços locais
-
-```bash
-# na raiz do projeto
+# 4. PostgreSQL + Redis + MinIO via Docker
 docker compose up -d
-```
 
-Serviços disponíveis:
+# 5. Rodar (em terminais separados)
+cd apps/api    && make dev      # → http://localhost:8080
+cd apps/web    && pnpm dev      # → http://localhost:3000
+cd apps/mobile && pnpm start    # → Expo
 
-| Serviço | URL |
-|---|---|
-| PostgreSQL | `localhost:5432` — db `amfit`, user `amfit` |
-| Redis | `localhost:6379` |
-| MinIO API | `localhost:9000` |
-| MinIO Console | `localhost:9001` |
-
-### 5. Rodar
-
-```bash
-# API Go
-cd apps/api && make dev
-# → http://localhost:8080
-
-# Web (Next.js)
-cd apps/web && pnpm dev
-# → http://localhost:3000
-
-# Mobile (Expo)
-cd apps/mobile && pnpm start
-```
-
-Verificar que a API está saudável:
-
-```bash
-curl http://localhost:8080/healthz
+# 6. Smoke test
+curl http://localhost:8080/healthz   # {"status":"ok"}
 ```
 
 ## Comandos úteis
 
 ```bash
-# Turborepo — rodar tudo em paralelo
-pnpm dev          # dev de todos os workspaces
-pnpm build        # build de todos os workspaces
-pnpm lint         # lint de todos os workspaces
+# Turborepo (raiz do monorepo)
+pnpm dev               # dev de todos os workspaces em paralelo
+pnpm build             # build de todos
+pnpm lint              # lint de todos
 
 # API Go (dentro de apps/api/)
-make dev          # go run ./cmd/server
-make build        # compila para bin/server
-make test         # go test ./...
-make lint         # golangci-lint run
-make migrate-up   # aplica migrations pendentes
-make migrate-down # reverte 1 migration
-make keys         # gera par RS256 em keys/
+make dev               # go run ./cmd/server
+make build             # binário em bin/server
+make test              # go test -race ./...
+make migrate-up        # aplica migrations pendentes
+make migrate-create NAME=add_xxx
+make keys              # gera par RS256 em keys/
 
 # Docker Compose (raiz)
-docker compose up -d      # sobe PG + Redis + MinIO
-docker compose down       # para os serviços
-docker compose down -v    # para e apaga volumes
+docker compose up -d
+docker compose down -v
 ```
 
-## Migrations
+## Build de imagens (Tekton no cluster)
 
-As migrations ficam em `apps/api/migrations/` no formato `golang-migrate` (pares `.up.sql` / `.down.sql`).
-
-São aplicadas automaticamente na inicialização da API. Para rodar manualmente:
+Tekton pipelines em `infra/tekton/` constroem as imagens via Kaniko e publicam em Harbor sem necessidade de Docker local.
 
 ```bash
-cd apps/api
-make migrate-up    # aplica todas as pendentes
-make migrate-down  # reverte a última
+# Setup inicial (uma vez)
+kubectl apply -k infra/tekton/
+
+# Secrets reais (FORA do Git — ver infra/tekton/secret-template.yaml)
+kubectl create secret docker-registry harbor-creds ... -n cicd
+kubectl create secret generic gitea-webhook-secret ... -n cicd
+
+# Build manual de cada imagem
+kubectl create -f infra/tekton/pipelinerun-api-manual.yaml -n cicd
+kubectl create -f infra/tekton/pipelinerun-web-manual.yaml -n cicd
+
+# Logs
+tkn pipelinerun logs --last -f -n cicd
 ```
 
-## Deploy no lab (K3s)
+A imagem do **Web** é buildada no nó `ubuntu-neto` (8Gi) por causa do `pnpm install` pesado — o nodeSelector está no PipelineRun. API é leve, qualquer nó com label `workload=cicd` serve.
 
-O deploy é gerenciado pelo ArgoCD apontando para `infra/k8s/` na branch `main`.
+Ver [`infra/tekton/README.md`](infra/tekton/README.md) para operação detalhada e config do webhook do Gitea.
+
+## Deploy no lab (ArgoCD GitOps)
 
 ```bash
-# Aplicar o namespace e a Application do ArgoCD (apenas na primeira vez)
-kubectl apply -f infra/k8s/namespace.yaml
+# Primeira vez:
 kubectl apply -f infra/argocd/application.yaml
 
-# Substituir o placeholder da chave JWT no Secret antes do apply
-# infra/k8s/api/secret.yaml → jwt-private-key
+# Estado:
+kubectl get application amfit -n cicd
+kubectl get pods -n amfit
+
+# Smoke tests:
+curl http://192.168.1.205:8080/healthz                # API
+curl -o /dev/null -w "%{http_code}\n" http://192.168.1.206:3000/   # Web
 ```
 
-Após o apply do ArgoCD, qualquer push para `main` sincroniza automaticamente.
+ArgoCD aponta para `infra/k8s/` na branch `main` (via Gitea mirror em `gitea.lab.local/labadmin/amfit.git`). Qualquer push pra `main` que toque manifestos K8s é sincronizado automaticamente (`selfHeal: true`).
 
-**Ingresses (Traefik):**
+**PostgreSQL e Redis vêm do namespace `shared-infra` pré-existente.** O AMFIT só deploya API, Web e MinIO. PostgreSQL/Redis são consumidos via DNS interno do cluster.
 
-| Serviço | URL |
-|---|---|
-| API | `https://api.amfit.local` |
-| Web Admin | `https://app.amfit.local` |
-| MinIO Console | `https://minio.amfit.local` |
+### Secret de pull do Harbor
 
-> PostgreSQL e Redis consomem os serviços pré-existentes do namespace `shared-infra` — não há StatefulSets desses serviços neste repositório.
+Harbor exige autenticação. O Secret `harbor-pull-secret` é criado uma vez no namespace `amfit` clonando `harbor-creds` de `cicd` (mesma credencial do robot account Tekton):
+
+```bash
+kubectl get secret harbor-creds -n cicd -o yaml \
+  | sed 's/namespace: cicd/namespace: amfit/; s/name: harbor-creds/name: harbor-pull-secret/' \
+  | sed '/resourceVersion:\|uid:\|creationTimestamp:/d' \
+  | kubectl apply -f -
+```
+
+Os Deployments `amfit-api` e `amfit-web` referenciam esse secret via `imagePullSecrets`.
 
 ## Arquitetura
 
-Ver [docs/SDD.md](docs/SDD.md) para:
+Ver [`docs/SDD.md`](docs/SDD.md) para:
 
 - Decisões arquiteturais (ADRs)
-- Mapa de bounded contexts (DDD)
+- Mapa de bounded contexts (DDD): Identity, Catalog, Training, Execution, Progress, Notification, Chat, Gamification, Financial
 - ERD completo
 - Contratos OpenAPI 3.1
-- Fluxos de navegação mobile
+- Fluxos de navegação mobile e fluxo do player de treino
 - Estratégia de real-time (WebSocket + SSE)
 - Módulo financeiro (Asaas)
-- Gamificação e Progressive Overload
-- Roadmap de implementação (Fases 0–4)
+- Gamificação + Progressive Overload Automático
+- Funcionalidades diferenciais (White Label, Coach por vídeo, IA, Wearables)
+- Roadmap completo
 
 ## Roadmap
 
 | Fase | Foco | Status |
 |---|---|---|
-| **0 — Fundação** | Monorepo, infra K8s, migrations, scaffolding | **Concluída** |
-| **1 — MVP Core** | Auth, CRUD alunos/exercícios, montagem de fichas, app mobile funcional | Em andamento |
-| **2 — Experiência** | Histórico, gráficos, medidas, notificações, Progressive Overload | — |
-| **3 — Diferenciais** | White Label, Coach por vídeo, IA para fichas, financeiro | — |
-| **4 — Expansão** | Wearables, modo offline, app personal completo | — |
+| **0 — Fundação** | Monorepo, infra K8s, migrations, scaffolding | ✅ Concluída |
+| **1 — MVP Core** | Auth, CRUD alunos/exercícios, fichas, app mobile funcional, execução de treino, histórico | ✅ Concluída (4 fatias: Identity, Catalog, Training, Execution) |
+| **2 — Experiência** | Progressive Overload, Anamnese inteligente, gráficos de evolução, notificações push, compartilhamento social | Próxima |
+| **3 — Diferenciais** | White Label, Coach por vídeo, IA para fichas (Claude API), módulo financeiro (Asaas) | — |
+| **4 — Expansão** | Wearables (Apple Health + Google Health Connect), modo offline | — |
+
+## Pendências de infra documentadas
+
+- [`infra/cluster/PENDING.md`](infra/cluster/PENDING.md) — JWT keys via Sealed Secrets, CoreDNS pinned, golang-test desabilitado
+- [`infra/cluster/LAB-BUGS.md`](infra/cluster/LAB-BUGS.md) — Bugs do lab base resolvidos durante a entrega
