@@ -37,9 +37,20 @@ minutos. MinIO já está Running.
 
 ---
 
-## 1.1 Trust do `containerd` no CA do Harbor — **PENDENTE** (2026-05-11)
+## 1.1 Trust do `containerd` no CA do Harbor — **RESOLVIDO** (2026-05-11)
 
-**Status:** descoberto após o fix do DNS (item 1). Bloqueia o pull
+**Status:** CA do Harbor instalado no trust store dos 5 nós K3s via playbook
+`infra-lab/ansible/playbooks/07-k3s-registries.yml` (Opção B — install CA).
+Validado: `curl https://harbor.lab.local/v2/` retorna HTTP 401 sem `-k`, e
+`crictl pull harbor.lab.local/amfit/api:latest` baixou a imagem com sucesso.
+
+**Por que a Opção A (registries.yaml `insecure_skip_verify`) não funcionou:**
+K3s v1.29.3 gera o `hosts.toml` em formato legacy (top-level `skip_verify`),
+mas o containerd 1.7+ requer `skip_verify` dentro do bloco `[host."..."]`.
+A config é gerada mas não é honrada. A Opção B (instalar o CA no trust store
+do SO) é mais correta e contorna o bug.
+
+**Status original:** descoberto após o fix do DNS (item 1). Bloqueia o pull
 das imagens `harbor.lab.local/amfit/*` pelos nós do K3s.
 
 **Sintoma:**
@@ -95,6 +106,66 @@ verificação) mas mais trabalho.
 e `... amfit-web` para resetar o ImagePullBackOff. ArgoCD selfHeal
 não força recriação porque o Pod está "Pending" do ponto de vista
 dele, não Degraded.
+
+---
+
+## 1.2 `imagePullSecrets` ausente nos Deployments do AMFIT — **PENDENTE** (2026-05-11)
+
+**Status:** descoberto após o fix do CA (item 1.1). Bloqueia o pull das
+imagens `harbor.lab.local/amfit/*` por falta de autenticação.
+
+**Sintoma:**
+
+```text
+Failed to pull image "harbor.lab.local/amfit/api:latest":
+... pull access denied, repository does not exist or may require authorization:
+authorization failed: no basic auth credentials
+```
+
+**Por quê:** o Harbor exige autenticação para pull (não é projeto público).
+O `containerd` em cada nó não tem credenciais — quem deve passar é o Pod via
+`imagePullSecrets`. Os Deployments `amfit-api` e `amfit-web` do AMFIT não
+declaram um `imagePullSecrets` apontando para um secret docker-registry no
+namespace `amfit`.
+
+**Como resolver:**
+
+1. Criar Secret docker-registry no namespace `amfit` com credenciais do Harbor:
+
+   ```bash
+   kubectl create secret docker-registry harbor-pull-secret \
+     --docker-server=harbor.lab.local \
+     --docker-username=admin \
+     --docker-password=Harbor12345! \
+     --namespace=amfit
+   ```
+
+2. Referenciar o secret nos `Deployment.spec.template.spec.imagePullSecrets`
+   de `infra/k8s/api/deployment.yaml` e `infra/k8s/web/deployment.yaml`:
+
+   ```yaml
+   spec:
+     template:
+       spec:
+         imagePullSecrets:
+           - name: harbor-pull-secret
+         containers:
+           - name: api
+             image: harbor.lab.local/amfit/api:latest
+   ```
+
+3. Commit + push → ArgoCD aplica automaticamente.
+
+**Alternativa (sem editar Deployments):** atrelar o secret ao ServiceAccount
+default do namespace `amfit`:
+
+```bash
+kubectl patch sa default -n amfit --type=json -p='[{
+  "op": "add",
+  "path": "/imagePullSecrets",
+  "value": [{"name": "harbor-pull-secret"}]
+}]'
+```
 
 ---
 
