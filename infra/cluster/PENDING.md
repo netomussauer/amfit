@@ -1,8 +1,14 @@
 # Pendências de infra para o deploy do AMFIT completar
 
-## 1. DNS interno do lab para `harbor.infra.local`
+## 1. DNS interno do lab para `harbor.infra.local` — **RESOLVIDO** (2026-05-11)
 
-**Status:** pendente. Configurar no Pi-hole / dnsmasq da rede do lab.
+**Status:** Pi-hole deployado no cluster K3s em 192.168.1.53. Todos os 5 nós
+configurados para usar Pi-hole como DNS primário via playbook Ansible
+`infra-lab/ansible/playbooks/06-internal-dns.yml`. Registros A criados via
+ConfigMap `pihole-custom-dns` cobrindo `*.lab.local`, `*.infra.local` e
+`*.amfit.local`. Ver `infra-lab/kubernetes/network-services/pihole/`.
+
+**Status original:** pendente. Configurar no Pi-hole / dnsmasq da rede do lab.
 
 **Por quê:** o `containerd` em cada nó do K3s **NÃO usa o CoreDNS do
 cluster** — usa o resolver do próprio nó. Como o build via Tekton/Kaniko
