@@ -169,27 +169,50 @@ kubectl patch sa default -n amfit --type=json -p='[{
 
 ---
 
-## 2. Ajuste do Secret `amfit-secrets` no GitOps
+## 2. Ajuste do Secret `amfit-secrets` no GitOps — **RESOLVIDO** (2026-05-11)
 
-**Status:** workaround em produção (ignoreDifferences). Decisão para
+**Status:** Sealed Secrets controller v0.36.6 instalado no cluster
+(ver `infra-lab/kubernetes/sealed-secrets/` e ADR-011). O secret real
+do `amfit-secrets` foi exportado, encriptado offline com o cert público
+do controller e salvo em `infra/k8s/api/sealedsecret.yaml`.
+
+**Próximos passos no repo AMFIT (manuais — fora do escopo do infra-lab):**
+
+1. Adicionar `sealedsecret.yaml` à Kustomization do AMFIT (mesma pasta que
+   `deployment.yaml`, `service.yaml`).
+2. **Remover** `secret.yaml` antigo com placeholders.
+3. Remover `ignoreDifferences` do `Application` do ArgoCD para `amfit-secrets`
+   (não é mais necessário — o SealedSecret tem o conteúdo real).
+4. Commit + push → ArgoCD aplica → controller decripta → Secret `amfit-secrets`
+   é recriado idêntico ao atual (não há mudança operacional para os pods).
+
+**Como criar novos secrets para o AMFIT no futuro:**
+
+```bash
+# No repo do infra-lab:
+kubectl create secret generic novo-secret \
+  --from-literal=KEY=valor \
+  --namespace=amfit \
+  --dry-run=client -o yaml > /tmp/secret.yaml
+
+./scripts/seal-secret.sh /tmp/secret.yaml > /caminho/amfit/infra/k8s/sealed-novo.yaml
+
+# Commit no repo AMFIT — ArgoCD pega e o controller decripta.
+shred -u /tmp/secret.yaml
+```
+
+**Status original:** workaround em produção (ignoreDifferences). Decisão para
 fase posterior.
 
-**Estado atual:** o `infra/k8s/api/secret.yaml` no repo contém
+**Estado original:** o `infra/k8s/api/secret.yaml` no repo continha
 **placeholders** (`REPLACE_WITH_*_PEM`). A Secret real no cluster foi
 criada manualmente via `kubectl create secret docker-registry` com
-as chaves JWT geradas localmente. ArgoCD ignora diff em `/data`
-através de `ignoreDifferences`, então o conteúdo real não é
+as chaves JWT geradas localmente. ArgoCD ignorava diff em `/data`
+através de `ignoreDifferences`, então o conteúdo real não era
 sobrescrito.
 
-**Risco:** se a Secret for deletada do cluster e o ArgoCD ressyncar,
-os pods vão usar os placeholders e a API falha ao carregar as chaves
-JWT.
-
-**Soluções definitivas (escolher uma):**
-- Migrar para **Sealed Secrets** (já tem ArgoCD, requer kubeseal +
-  controller no cluster)
-- Migrar para **SOPS + age** com Kustomize KSops plugin
-- **External Secrets Operator** apontando para Vault/AWS SM/etc
+**Risco (era):** se a Secret fosse deletada do cluster e o ArgoCD ressyncasse,
+os pods usariam os placeholders e a API falharia ao carregar as chaves JWT.
 
 ---
 
