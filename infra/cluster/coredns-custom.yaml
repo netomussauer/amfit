@@ -35,6 +35,7 @@ data:
         10.43.188.246 gitea.lab.local
         10.43.13.131  argocd.lab.local
         10.43.21.62   events.lab.local
+        10.43.122.92  harbor.lab.local
         fallthrough
       }
     }
