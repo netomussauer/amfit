@@ -50,7 +50,7 @@ spec:
     - name: git-revision
       value: main
     - name: image-repo
-      value: harbor.infra.local/amfit/api
+      value: harbor.lab.local/amfit/api
     - name: image-tag
       value: latest
   workspaces:

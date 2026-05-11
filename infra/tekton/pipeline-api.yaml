@@ -29,7 +29,7 @@ spec:
       description: Branch/tag/SHA a buildar.
     - name: image-repo
       type: string
-      default: harbor.infra.local/amfit/api
+      default: harbor.lab.local/amfit/api
       description: Repositorio Harbor de destino.
     - name: image-tag
       type: string

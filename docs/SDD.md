@@ -1682,7 +1682,7 @@ spec:
         workload: cicd
       containers:
         - name: api
-          image: harbor.infra.local/amfit/api:latest
+          image: harbor.lab.local/amfit/api:latest
           ports:
             - containerPort: 8080
           env:

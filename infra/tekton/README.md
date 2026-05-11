@@ -48,7 +48,7 @@ Os Secrets ficam **fora do Git** e são criados imperativamente:
 ```bash
 # Harbor — push de imagens
 kubectl create secret docker-registry harbor-creds \
-  --docker-server=harbor.infra.local \
+  --docker-server=harbor.lab.local \
   --docker-username=<HARBOR_USER> \
   --docker-password=<HARBOR_CLI_SECRET> \
   --docker-email=jose.mussauer@stone.com.br \
@@ -165,7 +165,7 @@ kubectl logs -n cicd -l tekton.dev/pipelineRun=<NAME> -f --all-containers
 
   ```bash
   kubectl delete secret harbor-creds -n cicd
-  kubectl create secret docker-registry harbor-creds --docker-server=harbor.infra.local ...
+  kubectl create secret docker-registry harbor-creds --docker-server=harbor.lab.local ...
   ```
 
 - O `dockerconfig` workspace precisa montar como `config.json` (não `.dockerconfigjson`).
@@ -177,7 +177,7 @@ kubectl logs -n cicd -l tekton.dev/pipelineRun=<NAME> -f --all-containers
   com permissão de push nele. Crie via UI do Harbor ou:
 
   ```bash
-  curl -u <user>:<pass> -X POST http://harbor.infra.local/api/v2.0/projects \
+  curl -u <user>:<pass> -X POST http://harbor.lab.local/api/v2.0/projects \
     -H 'Content-Type: application/json' \
     -d '{"project_name":"cache","public":false}'
   ```
@@ -186,7 +186,7 @@ kubectl logs -n cicd -l tekton.dev/pipelineRun=<NAME> -f --all-containers
 
 - Configure um proxy cache no Harbor para Docker Hub (Harbor → Project → Configure
   como Proxy Cache) e ajuste os `FROM` dos Dockerfiles para
-  `harbor.infra.local/dockerhub-proxy/library/<imagem>`.
+  `harbor.lab.local/dockerhub-proxy/library/<imagem>`.
 
 ### `git clone failed: authentication required`
 

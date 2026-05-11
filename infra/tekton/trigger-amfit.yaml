@@ -96,7 +96,7 @@ spec:
           - name: git-revision
             value: $(tt.params.git-revision)
           - name: image-repo
-            value: harbor.infra.local/amfit/api
+            value: harbor.lab.local/amfit/api
           - name: image-tag
             value: latest
         workspaces:
@@ -157,7 +157,7 @@ spec:
           - name: git-revision
             value: $(tt.params.git-revision)
           - name: image-repo
-            value: harbor.infra.local/amfit/web
+            value: harbor.lab.local/amfit/web
           - name: image-tag
             value: latest
         workspaces:

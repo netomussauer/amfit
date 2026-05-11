@@ -27,7 +27,7 @@ spec:
       default: main
     - name: image-repo
       type: string
-      default: harbor.infra.local/amfit/web
+      default: harbor.lab.local/amfit/web
     - name: image-tag
       type: string
       default: latest

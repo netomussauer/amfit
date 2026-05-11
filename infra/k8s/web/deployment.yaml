@@ -35,7 +35,7 @@ spec:
         runAsGroup: 65532
       containers:
         - name: web
-          image: harbor.infra.local/amfit/web:latest
+          image: harbor.lab.local/amfit/web:latest
           ports:
             - name: http
               containerPort: 3000
