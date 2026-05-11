@@ -168,9 +168,10 @@ func main() {
 	app.Use(middleware.Recovery())
 	app.Use(middleware.Logger())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-		AllowHeaders: "Origin,Content-Type,Authorization",
+		// Fiber v3 mudou estes campos de string para []string.
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
 	}))
 
 	// ── Rotas públicas ────────────────────────────────────────────────
