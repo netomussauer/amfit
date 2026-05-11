@@ -16,9 +16,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Codigo da aplicacao
-COPY cmd/      ./cmd/
-COPY internal/ ./internal/
-COPY pkg/      ./pkg/
+COPY cmd/        ./cmd/
+COPY internal/   ./internal/
+COPY pkg/        ./pkg/
+COPY migrations/ ./migrations/
 
 ARG VERSION=dev
 ARG COMMIT=unknown
