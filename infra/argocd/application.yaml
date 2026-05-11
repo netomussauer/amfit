@@ -33,9 +33,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-  ignoreDifferences:
-    - group: ""
-      kind: Secret
-      jsonPointers:
-        - /data
-        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+  # Sem ignoreDifferences: o Secret amfit-secrets agora e gerado pelo
+  # controller Sealed Secrets a partir de sealedsecret.yaml. O proprio
+  # SealedSecret e gerenciado pelo ArgoCD, e a Secret derivada nao aparece
+  # no plano de sync porque tem ownerReferences apontando pra SealedSecret.
