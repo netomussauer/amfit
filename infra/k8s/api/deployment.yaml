@@ -38,6 +38,10 @@ spec:
         # uid/gid 65532 = nonroot user da imagem distroless (gcr.io/distroless/static-debian12:nonroot)
         runAsUser: 65532
         runAsGroup: 65532
+        # fsGroup faz o kubelet aplicar chgrp 65532 nos arquivos montados de
+        # volumes (Secret jwt-keys). Sem isso, defaultMode: 0400 deixa o PEM
+        # legivel so pro root e o container (nonroot) recebe permission denied.
+        fsGroup: 65532
       containers:
         - name: api
           image: harbor.lab.local/amfit/api:latest
