@@ -35,8 +35,7 @@ spec:
     - name: source
     - name: docker-credentials
   results:
-    - name: image-url
-      value: $(tasks.kaniko-build-push.results.image-url)
+    # NOTA: Task lab `kaniko-build-push` declara mas nao emite `image-url`.
     - name: image-digest
       value: $(tasks.kaniko-build-push.results.image-digest)
     - name: commit

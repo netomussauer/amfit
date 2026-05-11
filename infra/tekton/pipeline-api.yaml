@@ -41,9 +41,9 @@ spec:
     - name: docker-credentials
       description: Workspace que monta o Secret harbor-creds para o Kaniko.
   results:
-    - name: image-url
-      description: URL completa da imagem publicada (repo:tag).
-      value: $(tasks.kaniko-build-push.results.image-url)
+    # NOTA: a Task lab `kaniko-build-push` declara result `image-url` mas nao
+    # o emite — so emite `image-digest`. Removido daqui para evitar
+    # CouldntGetPipelineResult cosmetico.
     - name: image-digest
       description: Digest sha256 da imagem publicada.
       value: $(tasks.kaniko-build-push.results.image-digest)
