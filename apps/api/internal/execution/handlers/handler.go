@@ -29,17 +29,19 @@ func NewExecutionHandler(svc *application.ExecutionService) *ExecutionHandler {
 }
 
 // RegisterAlunoRoutes registra as rotas restritas ao role ALUNO.
-func (h *ExecutionHandler) RegisterAlunoRoutes(router fiber.Router) {
-	router.Post("/sessoes", h.IniciarSessao)
-	router.Get("/sessoes/:id", h.BuscarSessao)
-	router.Patch("/sessoes/:id/series", h.RegistrarSerie)
-	router.Patch("/sessoes/:id/concluir", h.ConcluirSessao)
-	router.Get("/alunos/me/sessoes", h.ListarMinhasSessoes)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("ALUNO")).
+func (h *ExecutionHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Post("/sessoes", middleware.Chain(mws, h.IniciarSessao)...)
+	router.Get("/sessoes/:id", middleware.Chain(mws, h.BuscarSessao)...)
+	router.Patch("/sessoes/:id/series", middleware.Chain(mws, h.RegistrarSerie)...)
+	router.Patch("/sessoes/:id/concluir", middleware.Chain(mws, h.ConcluirSessao)...)
+	router.Get("/alunos/me/sessoes", middleware.Chain(mws, h.ListarMinhasSessoes)...)
 }
 
 // RegisterPersonalRoutes registra as rotas restritas ao role PERSONAL.
-func (h *ExecutionHandler) RegisterPersonalRoutes(router fiber.Router) {
-	router.Get("/alunos/:alunoId/sessoes", h.ListarSessoesDoAluno)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("PERSONAL")).
+func (h *ExecutionHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Get("/alunos/:alunoId/sessoes", middleware.Chain(mws, h.ListarSessoesDoAluno)...)
 }
 
 // IniciarSessao trata POST /sessoes (role=ALUNO).

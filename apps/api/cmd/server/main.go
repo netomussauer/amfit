@@ -204,38 +204,38 @@ func main() {
 
 	// ── Rotas de API ──────────────────────────────────────────────────
 	//
-	// Em Fiber v3, fiber.Router.Group("", middleware) muta o router pai —
-	// rotas registradas no PAI depois do Group também passam pelo middleware.
-	// Para evitar contaminação, criamos sub-grupos INDEPENDENTES partindo de
-	// `api` (cada um com sua chain explícita de middlewares).
+	// Em Fiber v3, fiber.Router.Group("", middleware) muta o router pai e
+	// contamina rotas registradas depois — uma chamada como
+	// `api.Group("", auth, requirePersonal)` faz com que TODAS as rotas
+	// registradas posteriormente em `api` (mesmo via outros sub-grupos)
+	// herdem `requirePersonal`. Por isso aplicamos os middlewares POR ROTA
+	// via `middleware.Chain` dentro de cada Register*; o router `api` fica
+	// "limpo", sem middlewares acumulados.
 	auth := middleware.NewAuthMiddleware(publicKey)
 	requirePersonal := middleware.RequireRole("PERSONAL")
 	requireAluno := middleware.RequireRole("ALUNO")
 
 	api := app.Group("/api/v1")
 
-	// Públicas (auth: register-personal, login, refresh)
+	// Públicas (sem middleware): register-personal, login, refresh
 	identityH.RegisterPublic(api)
 
 	// Autenticadas (qualquer role): /auth/logout, /grupos-musculares,
 	// /exercicios (GET), /progress (futuro)
-	authenticated := api.Group("", auth)
-	identityH.RegisterAuthenticated(authenticated)
-	catalogH.Register(authenticated)
-	progressH.Register(authenticated)
+	identityH.RegisterAuthenticated(api, auth)
+	catalogH.Register(api, auth)
+	progressH.Register(api, auth)
 
-	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos
-	personalOnly := api.Group("", auth, requirePersonal)
-	identityH.RegisterPersonalRoutes(personalOnly)
-	trainingH.RegisterPersonalRoutes(personalOnly)
-	execH.RegisterPersonalRoutes(personalOnly)
+	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos.
+	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
 	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha,
-	// /sessoes/* e /alunos/me/sessoes (histórico)
-	alunoOnly := api.Group("", auth, requireAluno)
-	identityH.RegisterAlunoRoutes(alunoOnly)
-	trainingH.RegisterAlunoRoutes(alunoOnly)
-	execH.RegisterAlunoRoutes(alunoOnly)
+	// /sessoes/* e /alunos/me/sessoes (histórico).
+	identityH.RegisterAlunoRoutes(api, auth, requireAluno)
+	trainingH.RegisterAlunoRoutes(api, auth, requireAluno)
+	execH.RegisterAlunoRoutes(api, auth, requireAluno)
 
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)

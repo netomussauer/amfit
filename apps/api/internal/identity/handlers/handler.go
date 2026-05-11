@@ -36,22 +36,25 @@ func (h *IdentityHandler) RegisterPublic(router fiber.Router) {
 }
 
 // RegisterAuthenticated registra rotas que exigem qualquer usuário autenticado.
-func (h *IdentityHandler) RegisterAuthenticated(router fiber.Router) {
-	router.Post("/auth/logout", h.Logout)
+// mws é a chain aplicada por rota (tipicamente: auth).
+func (h *IdentityHandler) RegisterAuthenticated(router fiber.Router, mws ...fiber.Handler) {
+	router.Post("/auth/logout", middleware.Chain(mws, h.Logout)...)
 }
 
 // RegisterPersonalRoutes registra rotas restritas ao role PERSONAL.
-func (h *IdentityHandler) RegisterPersonalRoutes(router fiber.Router) {
-	router.Post("/alunos", h.CriarAluno)
-	router.Get("/alunos", h.ListarAlunos)
-	router.Get("/alunos/:id", h.BuscarAluno)
-	router.Patch("/alunos/:id", h.AtualizarAluno)
-	router.Delete("/alunos/:id", h.DesativarAluno)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("PERSONAL")).
+func (h *IdentityHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Post("/alunos", middleware.Chain(mws, h.CriarAluno)...)
+	router.Get("/alunos", middleware.Chain(mws, h.ListarAlunos)...)
+	router.Get("/alunos/:id", middleware.Chain(mws, h.BuscarAluno)...)
+	router.Patch("/alunos/:id", middleware.Chain(mws, h.AtualizarAluno)...)
+	router.Delete("/alunos/:id", middleware.Chain(mws, h.DesativarAluno)...)
 }
 
 // RegisterAlunoRoutes registra rotas restritas ao role ALUNO.
-func (h *IdentityHandler) RegisterAlunoRoutes(router fiber.Router) {
-	router.Get("/alunos/me", h.BuscarMeuPerfil)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("ALUNO")).
+func (h *IdentityHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Get("/alunos/me", middleware.Chain(mws, h.BuscarMeuPerfil)...)
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────

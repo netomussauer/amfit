@@ -33,20 +33,23 @@ func NewCatalogHandler(svc *application.CatalogService) *CatalogHandler {
 // Register monta todas as rotas do contexto Catalog. As rotas de leitura são
 // acessíveis a qualquer role autenticado; as de escrita exigem PERSONAL.
 //
-// Aplica RequireRole por rota (em vez de router.Group("", middleware)) porque
-// em Fiber v3 o Group com path vazio + middleware contamina rotas anteriores
-// do router pai, gerando 403 nas rotas de leitura.
-func (h *CatalogHandler) Register(router fiber.Router) {
+// `mws` é a chain de middlewares aplicada por rota (tipicamente: auth). Para
+// as rotas de escrita, RequireRole(PERSONAL) é adicionado ao final. Aplica
+// middlewares por rota (em vez de router.Group("", middleware)) porque em
+// Fiber v3 o Group com path vazio muta o router pai e contamina rotas
+// registradas depois.
+func (h *CatalogHandler) Register(router fiber.Router, mws ...fiber.Handler) {
 	// Leitura: PERSONAL e ALUNO podem ler.
-	router.Get("/grupos-musculares", h.ListarGruposMusculares)
-	router.Get("/exercicios", h.ListarExercicios)
-	router.Get("/exercicios/:id", h.BuscarExercicio)
+	router.Get("/grupos-musculares", middleware.Chain(mws, h.ListarGruposMusculares)...)
+	router.Get("/exercicios", middleware.Chain(mws, h.ListarExercicios)...)
+	router.Get("/exercicios/:id", middleware.Chain(mws, h.BuscarExercicio)...)
 
-	// Escrita: somente PERSONAL — middleware aplicado em cada rota.
-	requirePersonal := middleware.RequireRole(rolePersonal)
-	router.Post("/exercicios", requirePersonal, h.CriarExercicio)
-	router.Patch("/exercicios/:id", requirePersonal, h.AtualizarExercicio)
-	router.Delete("/exercicios/:id", requirePersonal, h.DesativarExercicio)
+	// Escrita: somente PERSONAL.
+	writeMws := append([]fiber.Handler{}, mws...)
+	writeMws = append(writeMws, middleware.RequireRole(rolePersonal))
+	router.Post("/exercicios", middleware.Chain(writeMws, h.CriarExercicio)...)
+	router.Patch("/exercicios/:id", middleware.Chain(writeMws, h.AtualizarExercicio)...)
+	router.Delete("/exercicios/:id", middleware.Chain(writeMws, h.DesativarExercicio)...)
 }
 
 // ── Grupos Musculares ──────────────────────────────────────────────────────

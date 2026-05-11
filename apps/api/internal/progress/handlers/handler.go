@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"github.com/amfit/api/internal/progress/application"
+	"github.com/amfit/api/pkg/middleware"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -17,9 +18,10 @@ func NewProgressHandler(svc *application.ProgressService) *ProgressHandler {
 }
 
 // Register monta as rotas do contexto Progress no router fornecido.
-func (h *ProgressHandler) Register(router fiber.Router) {
-	router.Get("/alunos/:id/progresso/:exercicio_id", h.GetProgressoExercicio)
-	router.Get("/dashboard", h.GetDashboard)
+// mws é a chain aplicada por rota (tipicamente: auth).
+func (h *ProgressHandler) Register(router fiber.Router, mws ...fiber.Handler) {
+	router.Get("/alunos/:id/progresso/:exercicio_id", middleware.Chain(mws, h.GetProgressoExercicio)...)
+	router.Get("/dashboard", middleware.Chain(mws, h.GetDashboard)...)
 }
 
 // GetProgressoExercicio retorna o histórico de carga de um exercício para o aluno.

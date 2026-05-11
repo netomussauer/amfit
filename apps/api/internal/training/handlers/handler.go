@@ -29,28 +29,30 @@ func NewTrainingHandler(svc *application.TrainingService) *TrainingHandler {
 }
 
 // RegisterPersonalRoutes registra as rotas restritas ao role PERSONAL.
-func (h *TrainingHandler) RegisterPersonalRoutes(router fiber.Router) {
-	router.Post("/fichas", h.CriarFicha)
-	router.Get("/fichas", h.ListarFichas)
-	router.Get("/fichas/:id", h.BuscarFicha)
-	router.Patch("/fichas/:id", h.AtualizarFicha)
-	router.Delete("/fichas/:id", h.DesativarFicha)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("PERSONAL")).
+func (h *TrainingHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Post("/fichas", middleware.Chain(mws, h.CriarFicha)...)
+	router.Get("/fichas", middleware.Chain(mws, h.ListarFichas)...)
+	router.Get("/fichas/:id", middleware.Chain(mws, h.BuscarFicha)...)
+	router.Patch("/fichas/:id", middleware.Chain(mws, h.AtualizarFicha)...)
+	router.Delete("/fichas/:id", middleware.Chain(mws, h.DesativarFicha)...)
 
-	router.Post("/fichas/:fichaId/treinos", h.CriarTreino)
-	router.Patch("/treinos/:id", h.AtualizarTreino)
-	router.Delete("/treinos/:id", h.RemoverTreino)
+	router.Post("/fichas/:fichaId/treinos", middleware.Chain(mws, h.CriarTreino)...)
+	router.Patch("/treinos/:id", middleware.Chain(mws, h.AtualizarTreino)...)
+	router.Delete("/treinos/:id", middleware.Chain(mws, h.RemoverTreino)...)
 
-	router.Post("/treinos/:treinoId/itens", h.CriarItemTreino)
-	router.Patch("/treinos/:treinoId/itens/reordenar", h.ReordenarItens)
+	router.Post("/treinos/:treinoId/itens", middleware.Chain(mws, h.CriarItemTreino)...)
+	router.Patch("/treinos/:treinoId/itens/reordenar", middleware.Chain(mws, h.ReordenarItens)...)
 
-	router.Patch("/itens/:id", h.AtualizarItemTreino)
-	router.Delete("/itens/:id", h.RemoverItemTreino)
+	router.Patch("/itens/:id", middleware.Chain(mws, h.AtualizarItemTreino)...)
+	router.Delete("/itens/:id", middleware.Chain(mws, h.RemoverItemTreino)...)
 }
 
 // RegisterAlunoRoutes registra as rotas restritas ao role ALUNO.
-func (h *TrainingHandler) RegisterAlunoRoutes(router fiber.Router) {
-	router.Get("/alunos/me/treino-hoje", h.TreinoHoje)
-	router.Get("/alunos/me/ficha", h.MinhaFicha)
+// mws é a chain aplicada por rota (tipicamente: auth + RequireRole("ALUNO")).
+func (h *TrainingHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.Handler) {
+	router.Get("/alunos/me/treino-hoje", middleware.Chain(mws, h.TreinoHoje)...)
+	router.Get("/alunos/me/ficha", middleware.Chain(mws, h.MinhaFicha)...)
 }
 
 // ── Fichas ─────────────────────────────────────────────────────────────────
