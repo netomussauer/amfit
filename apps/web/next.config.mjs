@@ -9,8 +9,13 @@ const nextConfig = {
   // Em monorepos pnpm, outputFileTracingRoot precisa apontar para a raiz do
   // workspace para que o Next inclua packages/shared + node_modules necessarios.
   // Sem isso, .next/standalone fica sem server.js no path esperado pelo CMD.
+  //
+  // No Next.js 14, outputFileTracingRoot vive dentro de `experimental` (moveu
+  // para top-level no 15+).
   output: 'standalone',
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  experimental: {
+    outputFileTracingRoot: path.join(__dirname, '../../'),
+  },
   // Necessario quando @amfit/shared e workspace TS (sem build separado)
   transpilePackages: ['@amfit/shared'],
 };
