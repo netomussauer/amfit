@@ -40,16 +40,16 @@ func NewCatalogHandler(svc *application.CatalogService) *CatalogHandler {
 // registradas depois.
 func (h *CatalogHandler) Register(router fiber.Router, mws ...fiber.Handler) {
 	// Leitura: PERSONAL e ALUNO podem ler.
-	router.Get("/grupos-musculares", middleware.Chain(mws, h.ListarGruposMusculares)...)
-	router.Get("/exercicios", middleware.Chain(mws, h.ListarExercicios)...)
-	router.Get("/exercicios/:id", middleware.Chain(mws, h.BuscarExercicio)...)
+	middleware.Get(router, "/grupos-musculares", mws, h.ListarGruposMusculares)
+	middleware.Get(router, "/exercicios", mws, h.ListarExercicios)
+	middleware.Get(router, "/exercicios/:id", mws, h.BuscarExercicio)
 
 	// Escrita: somente PERSONAL.
 	writeMws := append([]fiber.Handler{}, mws...)
 	writeMws = append(writeMws, middleware.RequireRole(rolePersonal))
-	router.Post("/exercicios", middleware.Chain(writeMws, h.CriarExercicio)...)
-	router.Patch("/exercicios/:id", middleware.Chain(writeMws, h.AtualizarExercicio)...)
-	router.Delete("/exercicios/:id", middleware.Chain(writeMws, h.DesativarExercicio)...)
+	middleware.Post(router, "/exercicios", writeMws, h.CriarExercicio)
+	middleware.Patch(router, "/exercicios/:id", writeMws, h.AtualizarExercicio)
+	middleware.Delete(router, "/exercicios/:id", writeMws, h.DesativarExercicio)
 }
 
 // ── Grupos Musculares ──────────────────────────────────────────────────────

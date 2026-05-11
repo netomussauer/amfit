@@ -20,8 +20,8 @@ func NewProgressHandler(svc *application.ProgressService) *ProgressHandler {
 // Register monta as rotas do contexto Progress no router fornecido.
 // mws é a chain aplicada por rota (tipicamente: auth).
 func (h *ProgressHandler) Register(router fiber.Router, mws ...fiber.Handler) {
-	router.Get("/alunos/:id/progresso/:exercicio_id", middleware.Chain(mws, h.GetProgressoExercicio)...)
-	router.Get("/dashboard", middleware.Chain(mws, h.GetDashboard)...)
+	middleware.Get(router, "/alunos/:id/progresso/:exercicio_id", mws, h.GetProgressoExercicio)
+	middleware.Get(router, "/dashboard", mws, h.GetDashboard)
 }
 
 // GetProgressoExercicio retorna o histórico de carga de um exercício para o aluno.

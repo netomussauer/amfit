@@ -31,17 +31,17 @@ func NewExecutionHandler(svc *application.ExecutionService) *ExecutionHandler {
 // RegisterAlunoRoutes registra as rotas restritas ao role ALUNO.
 // mws é a chain aplicada por rota (tipicamente: auth + RequireRole("ALUNO")).
 func (h *ExecutionHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.Handler) {
-	router.Post("/sessoes", middleware.Chain(mws, h.IniciarSessao)...)
-	router.Get("/sessoes/:id", middleware.Chain(mws, h.BuscarSessao)...)
-	router.Patch("/sessoes/:id/series", middleware.Chain(mws, h.RegistrarSerie)...)
-	router.Patch("/sessoes/:id/concluir", middleware.Chain(mws, h.ConcluirSessao)...)
-	router.Get("/alunos/me/sessoes", middleware.Chain(mws, h.ListarMinhasSessoes)...)
+	middleware.Post(router, "/sessoes", mws, h.IniciarSessao)
+	middleware.Get(router, "/sessoes/:id", mws, h.BuscarSessao)
+	middleware.Patch(router, "/sessoes/:id/series", mws, h.RegistrarSerie)
+	middleware.Patch(router, "/sessoes/:id/concluir", mws, h.ConcluirSessao)
+	middleware.Get(router, "/alunos/me/sessoes", mws, h.ListarMinhasSessoes)
 }
 
 // RegisterPersonalRoutes registra as rotas restritas ao role PERSONAL.
 // mws é a chain aplicada por rota (tipicamente: auth + RequireRole("PERSONAL")).
 func (h *ExecutionHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
-	router.Get("/alunos/:alunoId/sessoes", middleware.Chain(mws, h.ListarSessoesDoAluno)...)
+	middleware.Get(router, "/alunos/:alunoId/sessoes", mws, h.ListarSessoesDoAluno)
 }
 
 // IniciarSessao trata POST /sessoes (role=ALUNO).
