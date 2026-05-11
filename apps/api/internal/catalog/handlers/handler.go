@@ -33,20 +33,20 @@ func NewCatalogHandler(svc *application.CatalogService) *CatalogHandler {
 // Register monta todas as rotas do contexto Catalog. As rotas de leitura são
 // acessíveis a qualquer role autenticado; as de escrita exigem PERSONAL.
 //
-// O agrupamento por sub-router (router.Group) garante que o middleware de
-// RequireRole se aplica somente às rotas mutáveis, mantendo /grupos-musculares
-// e /exercicios (GET) abertas a ALUNO.
+// Aplica RequireRole por rota (em vez de router.Group("", middleware)) porque
+// em Fiber v3 o Group com path vazio + middleware contamina rotas anteriores
+// do router pai, gerando 403 nas rotas de leitura.
 func (h *CatalogHandler) Register(router fiber.Router) {
 	// Leitura: PERSONAL e ALUNO podem ler.
 	router.Get("/grupos-musculares", h.ListarGruposMusculares)
 	router.Get("/exercicios", h.ListarExercicios)
 	router.Get("/exercicios/:id", h.BuscarExercicio)
 
-	// Escrita: somente PERSONAL.
-	personalOnly := router.Group("", middleware.RequireRole(rolePersonal))
-	personalOnly.Post("/exercicios", h.CriarExercicio)
-	personalOnly.Patch("/exercicios/:id", h.AtualizarExercicio)
-	personalOnly.Delete("/exercicios/:id", h.DesativarExercicio)
+	// Escrita: somente PERSONAL — middleware aplicado em cada rota.
+	requirePersonal := middleware.RequireRole(rolePersonal)
+	router.Post("/exercicios", requirePersonal, h.CriarExercicio)
+	router.Patch("/exercicios/:id", requirePersonal, h.AtualizarExercicio)
+	router.Delete("/exercicios/:id", requirePersonal, h.DesativarExercicio)
 }
 
 // ── Grupos Musculares ──────────────────────────────────────────────────────
