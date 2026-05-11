@@ -47,7 +47,7 @@ JOIN sessao_treino s ON s.id = r.sessao_id
 JOIN item_treino   i ON i.id = r.item_treino_id
 WHERE s.aluno_id     = $1
   AND i.exercicio_id = $2
-  AND s.status       = 'CONCLUIDA'
+  AND s.status       = 'CONCLUIDO'
   AND r.concluida    = TRUE
   AND s.data_execucao BETWEEN $3 AND $4
 ORDER BY s.data_execucao ASC, r.numero_serie ASC
@@ -111,14 +111,14 @@ sessoes_7d AS (
     FROM sessao_treino s
     JOIN alunos_pessoal a ON a.id = s.aluno_id
     WHERE s.data_execucao >= $2::date
-      AND s.status = 'CONCLUIDA'
+      AND s.status = 'CONCLUIDO'
 ),
 sessoes_30d AS (
     SELECT s.aluno_id
     FROM sessao_treino s
     JOIN alunos_pessoal a ON a.id = s.aluno_id
     WHERE s.data_execucao >= $3::date
-      AND s.status = 'CONCLUIDA'
+      AND s.status = 'CONCLUIDO'
 )
 SELECT
     (SELECT COUNT(*) FROM alunos_pessoal)                                     AS alunos_ativos,

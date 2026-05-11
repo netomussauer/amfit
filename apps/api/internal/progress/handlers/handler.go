@@ -11,6 +11,7 @@ import (
 	"github.com/amfit/api/pkg/middleware"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 // ProgressHandler expoe os endpoints de progresso e dashboard.
@@ -118,6 +119,7 @@ func (h *ProgressHandler) Dashboard(c fiber.Ctx) error {
 
 	resumo, err := h.svc.Dashboard(c.Context(), personalID)
 	if err != nil {
+		log.Error().Err(err).Str("personal_id", personalID.String()).Msg("dashboard query failed")
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusInternalServerError, "internal", "Internal Server Error",
 			"falha ao buscar dashboard",
@@ -241,6 +243,7 @@ func writeProgressError(c fiber.Ctx, err error, fallback string) error {
 			"recurso nao encontrado",
 		))
 	}
+	log.Error().Err(err).Str("path", c.Path()).Msg("progress handler error")
 	return middleware.WriteProblem(c, middleware.NewProblem(
 		fiber.StatusInternalServerError, "internal", "Internal Server Error",
 		fallback,
