@@ -154,8 +154,11 @@ func main() {
 
 	// Progress
 	progressRepos := progressinfra.NewPostgresRepositories(pool)
-	_ = progressRepos
-	progressSvc := progressapplication.NewProgressService(nil, nil)
+	progressSvc := progressapplication.NewProgressService(
+		progressRepos.Historico,
+		progressRepos.Dashboard,
+		progressRepos.Access,
+	)
 	progressH := progresshandlers.NewProgressHandler(progressSvc)
 
 	// ── Fiber app ─────────────────────────────────────────────────────
@@ -221,10 +224,9 @@ func main() {
 	identityH.RegisterPublic(api)
 
 	// Autenticadas (qualquer role): /auth/logout, /grupos-musculares,
-	// /exercicios (GET), /progress (futuro)
+	// /exercicios (GET).
 	identityH.RegisterAuthenticated(api, auth)
 	catalogH.Register(api, auth)
-	progressH.Register(api, auth)
 
 	// IMPORTANTE: registramos as rotas do ALUNO ANTES das do PERSONAL.
 	// Fiber v3 resolve rotas pela ORDEM DE REGISTRO (não por especificidade),
@@ -233,15 +235,18 @@ func main() {
 	// vs `/alunos/:alunoId/sessoes`.
 
 	// Restritas a ALUNO: /alunos/me, /alunos/me/treino-hoje, /alunos/me/ficha,
-	// /sessoes/* e /alunos/me/sessoes (histórico).
+	// /sessoes/*, /alunos/me/sessoes (historico) e /alunos/me/progresso/*.
 	identityH.RegisterAlunoRoutes(api, auth, requireAluno)
 	trainingH.RegisterAlunoRoutes(api, auth, requireAluno)
 	execH.RegisterAlunoRoutes(api, auth, requireAluno)
+	progressH.RegisterAlunoRoutes(api, auth, requireAluno)
 
-	// Restritas a PERSONAL: CRUD de alunos + gestão de fichas/treinos.
+	// Restritas a PERSONAL: CRUD de alunos + gestao de fichas/treinos +
+	// /alunos/:id/progresso/* + /dashboard.
 	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	progressH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
