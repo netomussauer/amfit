@@ -28,6 +28,11 @@ spec:
     spec:
       nodeSelector:
         workload: cicd
+      # Harbor exige autenticacao para pull. harbor-pull-secret e criado
+      # uma vez no ns amfit clonando harbor-creds do ns cicd (robot account
+      # tekton-pusher com push+pull em amfit/*).
+      imagePullSecrets:
+        - name: harbor-pull-secret
       securityContext:
         runAsNonRoot: true
         # uid/gid 65532 = nonroot user da imagem distroless (gcr.io/distroless/static-debian12:nonroot)
