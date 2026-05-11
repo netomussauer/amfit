@@ -16,9 +16,13 @@ spec:
   project: default
   source:
     # Gitea local mirroreia o repo do GitHub. Owner = labadmin.
-    repoURL: http://gitea.lab.local/labadmin/amfit.git
+    # Usa FQDN K8s interno + porta correta (gitea.lab.local nao expoe :80,
+    # so via LB MetalLB na porta 3000). Mesmo padrao que o Tekton.
+    repoURL: http://gitea-http.cicd.svc.cluster.local:3000/labadmin/amfit.git
     targetRevision: main
     path: infra/k8s
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: amfit
