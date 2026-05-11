@@ -31,6 +31,19 @@ spec:
           effect: NoSchedule
       securityContext:
         fsGroup: 65532
+  # Override de recursos: o kaniko-build-push do lab tem limit 4Gi que
+  # estoura no build do Web (pnpm install do Next.js + snapshotter Kaniko).
+  taskRunSpecs:
+    - pipelineTaskName: kaniko-build-push
+      stepSpecs:
+        - name: build-and-push
+          computeResources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 8Gi
   timeouts:
     pipeline: "45m"
     tasks: "30m"
