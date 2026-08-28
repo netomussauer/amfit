@@ -1,3 +1,7 @@
+> **Arquivado em 2026-08-28.** Documento histórico — todos os 3 bugs abaixo
+> já estavam resolvidos desde 2026-05-08 (ver nota de status logo abaixo).
+> Movido para `archive/` para não ser confundido com pendências ativas.
+
 # Bugs do home-lab descobertos durante a entrega do AMFIT
 
 Documentados aqui para referência quando atacar no repo `infra-lab`. **Estes

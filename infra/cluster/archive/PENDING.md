@@ -1,3 +1,9 @@
+> **Arquivado em 2026-08-28 — todos os itens abaixo estão RESOLVIDOS.**
+> Este documento é histórico (troubleshooting da entrega inicial, maio/2026).
+> Não há pendências de infra abertas para o AMFIT hoje. Ver README.md para
+> o estado atual. Mantido aqui apenas como referência de diagnóstico caso
+> um problema semelhante reapareça.
+
 # Pendências de infra para o deploy do AMFIT completar
 
 ## 1. DNS interno do lab para `harbor.infra.local` — **RESOLVIDO** (2026-05-11)
@@ -109,10 +115,14 @@ dele, não Degraded.
 
 ---
 
-## 1.2 `imagePullSecrets` ausente nos Deployments do AMFIT — **PENDENTE** (2026-05-11)
+## 1.2 `imagePullSecrets` ausente nos Deployments do AMFIT — **RESOLVIDO** (confirmado 2026-08-28)
 
-**Status:** descoberto após o fix do CA (item 1.1). Bloqueia o pull das
-imagens `harbor.lab.local/amfit/*` por falta de autenticação.
+**Status:** `infra/k8s/api/deployment.yaml` e `infra/k8s/web/deployment.yaml`
+já declaram `imagePullSecrets: harbor-pull-secret`, conforme o item 3 abaixo
+descreve. Verificado por leitura direta do código em 2026-08-28.
+
+**Status original:** descoberto após o fix do CA (item 1.1). Bloqueava o pull
+das imagens `harbor.lab.local/amfit/*` por falta de autenticação.
 
 **Sintoma:**
 
@@ -216,12 +226,13 @@ os pods usariam os placeholders e a API falharia ao carregar as chaves JWT.
 
 ---
 
-## 3. CoreDNS pinned em `k3s-server`
+## 3. CoreDNS pinned em `k3s-server` — **RESOLVIDO** (confirmado 2026-08-28)
 
-**Status:** workaround temporário aplicado em sessão anterior. Ver
-`LAB-BUGS.md` #3 para detalhes. Conforme o `LAB-BUGS.md` atualizado,
-foi marcado como resolvido — validar se o nodeSelector foi removido
-ou se ainda está fixado.
+**Status:** validado ao vivo no cluster em 2026-08-28 —
+`kubectl get deploy coredns -n kube-system` mostra `nodeSelector` apenas
+com o padrão `kubernetes.io/os: linux` (sem pin de nó específico), e os 2
+pods do CoreDNS estão de fato distribuídos em nós diferentes
+(`k3s-server` e `ci-runner`). O workaround foi removido.
 
 ---
 

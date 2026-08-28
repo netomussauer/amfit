@@ -46,8 +46,10 @@ spec:
               containerPort: 3000
               protocol: TCP
           env:
-            # API_ORIGIN e usado pelo next.config.mjs em rewrites() para fazer
-            # proxy server-side de /api/v1/* para o backend. Mantemos a chamada
+            # API_ORIGIN e usado pelo route handler catch-all em
+            # src/app/api/v1/[...path]/route.ts para fazer proxy server-side
+            # de /api/v1/* para o backend (rewrites() do next.config.mjs foi
+            # abandonado em favor desse route handler). Mantemos a chamada
             # cluster-internal (sem TLS, sem DNS Pi-hole).
             - name: API_ORIGIN
               value: "http://amfit-api.amfit.svc.cluster.local:8080"

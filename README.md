@@ -6,10 +6,10 @@ Plataforma de gestão de treinos de musculação com dois perfis: **personal tra
 
 | Camada | Estado |
 |---|---|
-| Backend (4 bounded contexts) | ✅ Identity, Catalog, Training, Execution |
-| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico |
-| Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico) + Personal (dashboard, exercícios) |
-| Build CI (Tekton) | ✅ Pipelines API + Web ativos |
+| Backend (5 bounded contexts) | ✅ Identity, Catalog, Training, Execution, Progress |
+| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga |
+| Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico, evolução de carga) + Personal (dashboard, exercícios) |
+| Build CI (Tekton) | ✅ Pipelines API + Web ativos (`golang-test` reativado: `go vet` + `go test -race`) |
 | Deploy GitOps (ArgoCD) | ✅ Application Healthy em produção (lab K3s) |
 
 **Endpoints em produção (lab):**
@@ -189,11 +189,16 @@ Ver [`docs/SDD.md`](docs/SDD.md) para:
 |---|---|---|
 | **0 — Fundação** | Monorepo, infra K8s, migrations, scaffolding | ✅ Concluída |
 | **1 — MVP Core** | Auth, CRUD alunos/exercícios, fichas, app mobile funcional, execução de treino, histórico | ✅ Concluída (4 fatias: Identity, Catalog, Training, Execution) |
-| **2 — Experiência** | Progressive Overload, Anamnese inteligente, gráficos de evolução, notificações push, compartilhamento social | Próxima |
+| **2 — Experiência** | Progressive Overload, Anamnese inteligente, ~~gráficos de evolução~~ ✅, notificações push, compartilhamento social | Em andamento |
 | **3 — Diferenciais** | White Label, Coach por vídeo, IA para fichas (Claude API), módulo financeiro (Asaas) | — |
 | **4 — Expansão** | Wearables (Apple Health + Google Health Connect), modo offline | — |
 
 ## Pendências de infra documentadas
 
-- [`infra/cluster/PENDING.md`](infra/cluster/PENDING.md) — JWT keys via Sealed Secrets, CoreDNS pinned, golang-test desabilitado
-- [`infra/cluster/LAB-BUGS.md`](infra/cluster/LAB-BUGS.md) — Bugs do lab base resolvidos durante a entrega
+Nenhuma pendência de infra aberta hoje (verificado em 2026-08-28). O histórico
+de troubleshooting da entrega inicial (DNS interno, CA do Harbor,
+`imagePullSecrets`, CoreDNS pinned, bugs de musl/getaddrinfo e egress do
+`k3s-worker-cicd`) foi arquivado — todos os itens estão resolvidos:
+
+- [`infra/cluster/archive/PENDING.md`](infra/cluster/archive/PENDING.md)
+- [`infra/cluster/archive/LAB-BUGS.md`](infra/cluster/archive/LAB-BUGS.md)
