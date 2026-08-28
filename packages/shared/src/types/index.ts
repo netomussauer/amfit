@@ -40,6 +40,12 @@ import {
   SessaoListResponseSchema,
   IniciarSessaoRequestSchema,
 } from '../schemas/sessao.schema';
+import {
+  PontoProgressoResponseSchema,
+  HistoricoExercicioResponseSchema,
+  HistoricoExercicioQuerySchema,
+  DashboardResponseSchema,
+} from '../schemas/progresso.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -81,3 +87,9 @@ export type TreinoHojeResponse = z.infer<typeof TreinoHojeResponseSchema>;
 export type SessaoResumoResponse = z.infer<typeof SessaoResumoResponseSchema>;
 export type SessaoListResponse = z.infer<typeof SessaoListResponseSchema>;
 export type IniciarSessaoRequest = z.infer<typeof IniciarSessaoRequestSchema>;
+
+// Progresso
+export type PontoProgressoResponse = z.infer<typeof PontoProgressoResponseSchema>;
+export type HistoricoExercicioResponse = z.infer<typeof HistoricoExercicioResponseSchema>;
+export type HistoricoExercicioQuery = z.infer<typeof HistoricoExercicioQuerySchema>;
+export type DashboardResponse = z.infer<typeof DashboardResponseSchema>;

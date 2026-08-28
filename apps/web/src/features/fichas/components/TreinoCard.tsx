@@ -12,10 +12,11 @@ import { ItemTreinoForm } from './ItemTreinoForm';
 
 type Props = {
   fichaId: string;
+  alunoId: string;
   treino: TreinoResponse;
 };
 
-export function TreinoCard({ fichaId, treino }: Props) {
+export function TreinoCard({ fichaId, alunoId, treino }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingNome, setEditingNome] = useState(false);
   const [nomeDraft, setNomeDraft] = useState(treino.nome ?? '');
@@ -208,6 +209,7 @@ export function TreinoCard({ fichaId, treino }: Props) {
               <ItemTreinoRow
                 key={item.id}
                 fichaId={fichaId}
+                alunoId={alunoId}
                 item={item}
                 index={index}
                 totalItems={itens.length}

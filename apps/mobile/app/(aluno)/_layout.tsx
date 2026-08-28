@@ -45,6 +45,13 @@ export default function AlunoLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="progresso"
+        options={{
+          // Rota acessível via push da Ficha/Histórico — não exibe entrada na tab bar.
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

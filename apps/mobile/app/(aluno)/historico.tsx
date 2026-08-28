@@ -8,7 +8,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { AlertTriangle, History as HistoryIcon } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { AlertTriangle, History as HistoryIcon, TrendingUp } from 'lucide-react-native';
 import type { SessaoResumoResponse } from '@amfit/shared';
 import { SESSAO_STATUS } from '@amfit/shared';
 import { useMinhasSessoes } from '@/features/execucao/hooks/useMinhasSessoes';
@@ -45,6 +46,7 @@ function statusColors(status: SessaoResumoResponse['status']) {
 }
 
 export default function HistoricoScreen() {
+  const router = useRouter();
   const [page] = useState(1);
   const { data, isLoading, isError, isRefetching, refetch } = useMinhasSessoes(page);
 
@@ -110,6 +112,18 @@ export default function HistoricoScreen() {
           <Text className="mt-1 text-sm text-gray-500">
             Todos os treinos que você já registrou.
           </Text>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(aluno)/progresso')}
+            className="mt-3 flex-row items-center self-start gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5"
+            accessibilityRole="button"
+            accessibilityLabel="Ver evolução de carga por exercício"
+          >
+            <TrendingUp color="#f97316" size={16} />
+            <Text className="text-sm font-medium text-primary">
+              Ver evolução por exercício
+            </Text>
+          </TouchableOpacity>
         </View>
       }
       ItemSeparatorComponent={() => <View className="h-3" />}

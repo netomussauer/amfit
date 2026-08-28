@@ -146,6 +146,7 @@ function FichaConteudo({
 }
 
 function TreinoExpandivel({ treino }: { treino: TreinoResponse }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -194,7 +195,21 @@ function TreinoExpandivel({ treino }: { treino: TreinoResponse }) {
             treino.itens
               .slice()
               .sort((a, b) => a.ordem - b.ordem)
-              .map((item) => <ExercicioItem key={item.id} item={item} />)
+              .map((item) => (
+                <ExercicioItem
+                  key={item.id}
+                  item={item}
+                  onPressEvolucao={() =>
+                    router.push({
+                      pathname: '/(aluno)/progresso',
+                      params: {
+                        exercicioId: item.exercicio.id,
+                        nome: item.exercicio.nome,
+                      },
+                    })
+                  }
+                />
+              ))
           )}
         </View>
       )}

@@ -172,7 +172,12 @@ export function FichaBuilder({ fichaId }: Props) {
           </div>
         ) : (
           treinosOrdenados.map((treino) => (
-            <TreinoCard key={treino.id} fichaId={fichaId} treino={treino} />
+            <TreinoCard
+              key={treino.id}
+              fichaId={fichaId}
+              alunoId={ficha.aluno_id}
+              treino={treino}
+            />
           ))
         )}
 

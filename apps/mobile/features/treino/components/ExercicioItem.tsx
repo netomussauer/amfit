@@ -1,9 +1,11 @@
-import { View, Text, Image } from 'react-native';
-import { Dumbbell } from 'lucide-react-native';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { Dumbbell, TrendingUp } from 'lucide-react-native';
 import type { ItemTreinoResponse } from '@amfit/shared';
 
 type Props = {
   item: ItemTreinoResponse;
+  /** Quando informado, exibe um atalho "Ver evolução" para o exercício. */
+  onPressEvolucao?: () => void;
 };
 
 function formatCarga(carga: number | null | undefined): string | null {
@@ -15,7 +17,7 @@ function formatCarga(carga: number | null | undefined): string | null {
   return `${formatted.replace('.', ',')} kg`;
 }
 
-export function ExercicioItem({ item }: Props) {
+export function ExercicioItem({ item, onPressEvolucao }: Props) {
   const { exercicio } = item;
   const isImage =
     exercicio.tipo_midia === 'IMAGEM' || exercicio.tipo_midia === 'GIF';
@@ -62,6 +64,18 @@ export function ExercicioItem({ item }: Props) {
           )}
         </View>
       </View>
+
+      {onPressEvolucao && (
+        <TouchableOpacity
+          onPress={onPressEvolucao}
+          hitSlop={8}
+          className="items-center justify-center rounded-full p-2"
+          accessibilityRole="button"
+          accessibilityLabel={`Ver evolução de ${exercicio.nome}`}
+        >
+          <TrendingUp color="#f97316" size={20} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

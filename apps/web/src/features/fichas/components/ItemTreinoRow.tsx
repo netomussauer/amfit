@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowDown, ArrowUp, Pencil, Trash2, TrendingUp } from 'lucide-react';
 import type { ItemTreinoResponse } from '@amfit/shared';
 import { MidiaPreview } from '@/features/exercicios/components/MidiaPreview';
 import { useRemoverItem } from '../hooks/useRemoverItem';
@@ -10,6 +11,7 @@ import { ItemTreinoForm } from './ItemTreinoForm';
 
 type Props = {
   fichaId: string;
+  alunoId: string;
   item: ItemTreinoResponse;
   index: number;
   totalItems: number;
@@ -20,6 +22,7 @@ type Props = {
 
 export function ItemTreinoRow({
   fichaId,
+  alunoId,
   item,
   index,
   totalItems,
@@ -74,6 +77,14 @@ export function ItemTreinoRow({
         </div>
 
         <div className="flex items-center gap-1">
+          <Link
+            href={`/alunos/${alunoId}/progresso/${item.exercicio.id}`}
+            aria-label={`Ver evolução de ${item.exercicio.nome}`}
+            title="Ver evolução"
+            className="rounded-md p-1.5 text-[--color-text-muted] transition-colors hover:bg-[--color-bg-muted] hover:text-[--color-primary] focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-primary]"
+          >
+            <TrendingUp aria-hidden="true" className="h-4 w-4" />
+          </Link>
           <IconButton
             label="Subir"
             disabled={isFirst || isReordering}
