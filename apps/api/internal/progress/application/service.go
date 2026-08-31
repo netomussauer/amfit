@@ -113,6 +113,9 @@ func (s *ProgressService) historicoCore(
 	alunoID, exercicioID uuid.UUID,
 	params HistoricoParams,
 ) (domain.HistoricoCargaExercicio, error) {
+	if s.historico == nil {
+		return domain.HistoricoCargaExercicio{}, domain.ErrRepositorioNaoConfigurado
+	}
 	now := time.Now().UTC()
 	pontos, err := s.historico.HistoricoCarga(
 		ctx, alunoID, exercicioID,
@@ -134,5 +137,8 @@ func (s *ProgressService) Dashboard(
 	ctx context.Context,
 	personalID uuid.UUID,
 ) (domain.DashboardResumo, error) {
+	if s.dashboard == nil {
+		return domain.DashboardResumo{}, domain.ErrRepositorioNaoConfigurado
+	}
 	return s.dashboard.Resumo(ctx, personalID)
 }

@@ -61,12 +61,12 @@ type HistoricoCargaExercicio struct {
 // portfolios tipicos do MVP. Migrar para materialized view quando
 // necessario.
 type DashboardResumo struct {
-	PersonalID            uuid.UUID
-	AlunosAtivos          int
-	FichasAtivas          int
-	SessoesUltimos7Dias   int
-	SessoesUltimos30Dias  int
-	AlunosSemSessao7Dias  int
+	PersonalID           uuid.UUID
+	AlunosAtivos         int
+	FichasAtivas         int
+	SessoesUltimos7Dias  int
+	SessoesUltimos30Dias int
+	AlunosSemSessao7Dias int
 }
 
 // ErrExercicioNotFound indica que o exercicio nao existe ou nao pertence
@@ -76,3 +76,11 @@ var ErrExercicioNotFound = errors.New("progress: exercicio nao encontrado")
 // ErrAlunoNotFound indica que o aluno nao existe ou nao pertence ao
 // personal autenticado (quando aplicavel).
 var ErrAlunoNotFound = errors.New("progress: aluno nao encontrado")
+
+// ErrRepositorioNaoConfigurado indica que o ProgressService foi construido
+// sem o repositorio necessario para a operacao (historico ou dashboard).
+// NewProgressService documenta aceitar nil durante o scaffolding — este
+// erro e o que efetivamente cumpre essa promessa (achado de code-review:
+// antes disso, chamar a operacao com o repositorio nil causava panic em
+// vez do erro gracioso que o doc comment prometia).
+var ErrRepositorioNaoConfigurado = errors.New("progress: repositorio nao configurado")
