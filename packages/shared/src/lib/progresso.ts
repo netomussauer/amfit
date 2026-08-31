@@ -1,4 +1,4 @@
-import type { PontoProgressoResponse } from '../schemas/progresso.schema';
+import type { PontoProgressoResponse } from '../types';
 
 export type EvolucaoCargaPoint = {
   sessaoId: string;
