@@ -9,6 +9,5 @@ export function useFichas(params: FichaListParams) {
     queryFn: () => fichaService.list(params),
     placeholderData: (prev) => prev,
     staleTime: 60 * 1000,
-    enabled: params.aluno_id ? !!params.aluno_id : true,
   });
 }

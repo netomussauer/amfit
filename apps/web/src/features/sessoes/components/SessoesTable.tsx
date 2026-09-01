@@ -89,7 +89,7 @@ export function SessoesTable({ alunoId }: Props) {
       {sessoes.length > 0 && (
         <div className="flex items-center justify-between text-sm text-[--color-text-muted]">
           <span aria-live="polite">
-            Página {page} de {totalPages} — {total} sessã{total === 1 ? 'o' : 'es'}
+            Página {page} de {totalPages} — {total} {total === 1 ? 'sessão' : 'sessões'}
           </span>
           <div className="flex items-center gap-2">
             <button
