@@ -87,3 +87,28 @@ type Pagination struct {
 	Page    int `json:"page"`
 	PerPage int `json:"per_page"`
 }
+
+// AtualizarPersonalRequest é o payload PATCH /personal/me.
+type AtualizarPersonalRequest struct {
+	Nome     *string `json:"nome,omitempty" validate:"omitempty,min=2,max=150"`
+	Email    *string `json:"email,omitempty" validate:"omitempty,email"`
+	Telefone *string `json:"telefone,omitempty" validate:"omitempty,max=20"`
+	CREF     *string `json:"cref,omitempty" validate:"omitempty,max=20"`
+}
+
+// AlterarSenhaRequest é o payload PATCH /personal/me/senha.
+type AlterarSenhaRequest struct {
+	SenhaAtual string `json:"senha_atual" validate:"required,min=8"`
+	NovaSenha  string `json:"nova_senha" validate:"required,min=8"`
+}
+
+// PersonalResponse é o DTO de saída para o personal trainer autenticado.
+type PersonalResponse struct {
+	ID       string    `json:"id"`
+	Nome     string    `json:"nome"`
+	Email    string    `json:"email"`
+	Telefone string    `json:"telefone,omitempty"`
+	CREF     string    `json:"cref,omitempty"`
+	Ativo    bool      `json:"ativo"`
+	CriadoEm time.Time `json:"criado_em"`
+}

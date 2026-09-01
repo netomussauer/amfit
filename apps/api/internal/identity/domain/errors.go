@@ -22,4 +22,8 @@ var (
 
 	// ErrRefreshTokenRevoked indica que o refresh token foi revogado previamente.
 	ErrRefreshTokenRevoked = errors.New("identity: refresh token revogado")
+
+	// ErrSenhaAtualIncorreta indica que a senha atual informada em uma troca
+	// de senha não confere com o hash armazenado.
+	ErrSenhaAtualIncorreta = errors.New("identity: senha atual incorreta")
 )

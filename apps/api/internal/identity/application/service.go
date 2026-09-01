@@ -10,8 +10,9 @@ import (
 // IdentityService agrupa os casos de uso do contexto Identity.
 // Atua como facade sobre AuthService e AlunoService para simplificar o wiring no main.go.
 type IdentityService struct {
-	Auth  *AuthService
-	Aluno *AlunoService
+	Auth     *AuthService
+	Aluno    *AlunoService
+	Personal *PersonalService
 }
 
 // NewIdentityService cria um IdentityService com as dependências fornecidas.
@@ -25,9 +26,11 @@ func NewIdentityService(
 ) *IdentityService {
 	authSvc := NewAuthService(personals, alunos, credenciais, refreshTokens, privateKey, publicKey)
 	alunoSvc := NewAlunoService(alunos, credenciais)
+	personalSvc := NewPersonalService(personals, credenciais, refreshTokens)
 
 	return &IdentityService{
-		Auth:  authSvc,
-		Aluno: alunoSvc,
+		Auth:     authSvc,
+		Aluno:    alunoSvc,
+		Personal: personalSvc,
 	}
 }

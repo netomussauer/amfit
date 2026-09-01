@@ -49,6 +49,9 @@ func (h *IdentityHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fib
 	middleware.Get(router, "/alunos/:id", mws, h.BuscarAluno)
 	middleware.Patch(router, "/alunos/:id", mws, h.AtualizarAluno)
 	middleware.Delete(router, "/alunos/:id", mws, h.DesativarAluno)
+	middleware.Get(router, "/personal/me", mws, h.BuscarMeuPerfilPersonal)
+	middleware.Patch(router, "/personal/me", mws, h.AtualizarMeuPerfilPersonal)
+	middleware.Patch(router, "/personal/me/senha", mws, h.AlterarMinhaSenha)
 }
 
 // RegisterAlunoRoutes registra rotas restritas ao role ALUNO.
@@ -327,6 +330,92 @@ func (h *IdentityHandler) DesativarAluno(c fiber.Ctx) error {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusInternalServerError, "internal", "Internal Server Error",
 			"falha ao desativar aluno",
+		))
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ── Personal (autoatendimento) ──────────────────────────────────────────────
+
+// BuscarMeuPerfilPersonal trata GET /personal/me (role=PERSONAL).
+func (h *IdentityHandler) BuscarMeuPerfilPersonal(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	resp, err := h.svc.Personal.BuscarPersonalSelf(c.Context(), personalID)
+	if err != nil {
+		if errors.Is(err, domain.ErrPersonalNotFound) {
+			return middleware.WriteProblem(c, middleware.NewProblem(
+				fiber.StatusNotFound, "not-found", "Not Found",
+				"personal não encontrado",
+			))
+		}
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao buscar perfil",
+		))
+	}
+	return c.JSON(resp)
+}
+
+// AtualizarMeuPerfilPersonal trata PATCH /personal/me (role=PERSONAL).
+func (h *IdentityHandler) AtualizarMeuPerfilPersonal(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	var req application.AtualizarPersonalRequest
+	if !h.bindAndValidate(c, &req) {
+		return nil
+	}
+
+	resp, err := h.svc.Personal.AtualizarPersonal(c.Context(), personalID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrPersonalNotFound):
+			return middleware.WriteProblem(c, middleware.NewProblem(
+				fiber.StatusNotFound, "not-found", "Not Found",
+				"personal não encontrado",
+			))
+		case errors.Is(err, domain.ErrEmailAlreadyExists):
+			return middleware.WriteProblem(c, middleware.NewProblem(
+				fiber.StatusConflict, "conflict", "Conflict",
+				"email já cadastrado",
+			))
+		}
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao atualizar perfil",
+		))
+	}
+	return c.JSON(resp)
+}
+
+// AlterarMinhaSenha trata PATCH /personal/me/senha (role=PERSONAL).
+func (h *IdentityHandler) AlterarMinhaSenha(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	var req application.AlterarSenhaRequest
+	if !h.bindAndValidate(c, &req) {
+		return nil
+	}
+
+	if err := h.svc.Personal.AlterarSenha(c.Context(), personalID, req); err != nil {
+		if errors.Is(err, domain.ErrSenhaAtualIncorreta) {
+			return middleware.WriteProblem(c, middleware.NewProblem(
+				fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+				"senha atual incorreta",
+			))
+		}
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao alterar senha",
 		))
 	}
 	return c.SendStatus(fiber.StatusNoContent)

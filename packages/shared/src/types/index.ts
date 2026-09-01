@@ -12,6 +12,11 @@ import {
   AlunoListResponseSchema,
 } from '../schemas/aluno.schema';
 import {
+  AtualizarPersonalRequestSchema,
+  PersonalResponseSchema,
+  AlterarSenhaRequestSchema,
+} from '../schemas/personal.schema';
+import {
   GrupoMuscularSchema,
   ExercicioResponseSchema,
   ExercicioListResponseSchema,
@@ -58,6 +63,11 @@ export type CriarAlunoRequest = z.infer<typeof CriarAlunoRequestSchema>;
 export type AtualizarAlunoRequest = z.infer<typeof AtualizarAlunoRequestSchema>;
 export type AlunoResponse = z.infer<typeof AlunoResponseSchema>;
 export type AlunoListResponse = z.infer<typeof AlunoListResponseSchema>;
+
+// Personal
+export type AtualizarPersonalRequest = z.infer<typeof AtualizarPersonalRequestSchema>;
+export type PersonalResponse = z.infer<typeof PersonalResponseSchema>;
+export type AlterarSenhaRequest = z.infer<typeof AlterarSenhaRequestSchema>;
 
 // Exercicio
 export type GrupoMuscular = z.infer<typeof GrupoMuscularSchema>;
