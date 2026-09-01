@@ -7,7 +7,7 @@ Plataforma de gestão de treinos de musculação com dois perfis: **personal tra
 | Camada | Estado |
 |---|---|
 | Backend (5 bounded contexts) | ✅ Identity, Catalog, Training, Execution, Progress |
-| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga, configurações de conta |
+| Web admin (Next.js) | ✅ Personal: auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga, configurações de conta. ✅ Aluno (portal próprio, roteado por perfil): treino de hoje, execução de treino (com timer de descanso), histórico, progresso, perfil |
 | Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico, evolução de carga) + Personal (dashboard, exercícios) |
 | Testes automatizados | ✅ Backend Go: todos os 5 contextos têm testes de application (Identity 59.2%, Catalog 65.3%, Training 46.8%, Execution 76.9%, Progress 17 testes). Frontend: só Progress (web Vitest+RTL 39 testes, mobile Jest+jest-expo+RTL 24 testes, lib compartilhada Vitest 12 testes) — demais features do web/mobile ainda sem teste |
 | Build CI (Tekton) | ✅ Pipelines API + Web ativos (`golang-test` reativado: `go vet` + `go test -race`) |
