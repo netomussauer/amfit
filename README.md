@@ -7,7 +7,7 @@ Plataforma de gestão de treinos de musculação com dois perfis: **personal tra
 | Camada | Estado |
 |---|---|
 | Backend (5 bounded contexts) | ✅ Identity, Catalog, Training, Execution, Progress |
-| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga |
+| Web admin (Next.js) | ✅ Auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga, configurações de conta |
 | Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico, evolução de carga) + Personal (dashboard, exercícios) |
 | Testes automatizados | ✅ Progress: backend (Go, 17 testes) + web (Vitest+RTL, 39 testes) + mobile (Jest+jest-expo+RTL, 24 testes) + lib compartilhada (Vitest, 12 testes). Demais contextos/features ainda sem cobertura |
 | Build CI (Tekton) | ✅ Pipelines API + Web ativos (`golang-test` reativado: `go vet` + `go test -race`) |
@@ -197,10 +197,31 @@ Ver [`docs/SDD.md`](docs/SDD.md) para:
 
 ## Pendências de infra documentadas
 
-Nenhuma pendência de infra aberta hoje (verificado em 2026-08-28). O histórico
-de troubleshooting da entrega inicial (DNS interno, CA do Harbor,
-`imagePullSecrets`, CoreDNS pinned, bugs de musl/getaddrinfo e egress do
-`k3s-worker-cicd`) foi arquivado — todos os itens estão resolvidos:
+Encontradas em 2026-09-01 ao investigar por que o fix de `/configuracoes`
+não aparecia no lab mesmo já commitado — nenhuma bloqueia o dia a dia, mas
+ambas custaram tempo real de deploy e vale corrigir:
+
+- **Sem auto-trigger de CI/CD**: só existia 1 PipelineRun do AMFIT desde
+  sempre (manual, de 11/05) — nenhum push subsequente disparou build/deploy
+  automaticamente, apesar do EventListener (`el-gitea-event-listener`)
+  existir no namespace `cicd`. O mirror Gitea (`labadmin/amfit.git`) sincroniza
+  do GitHub automaticamente (com algum lag), mas isso não parece disparar o
+  webhook do Trigger. Resultado: toda a sessão de trabalho anterior (Progress
+  UI, testes P3) ficou meses sem chegar ao lab até este fix ser deployado
+  manualmente. Precisa investigar a configuração do Trigger/EventListener.
+- **Limite de memória do kaniko-build-push é baixo para builds Node**: a Task
+  compartilhada `kaniko-build-push` (namespace `cicd`) tem `limits.memory: 1Gi`,
+  suficiente para o build Go da API mas insuficiente para o build Next.js do
+  Web (OOMKilled, exit 137, durante `next build`). O deploy de 2026-09-01
+  contornou isso com um override pontual (`taskRunSpecs` no PipelineRun,
+  2.5Gi) sem alterar a Task compartilhada — outros PipelineRuns que a
+  reutilizam (incluindo REALTPMSYS) ainda estão no limite de 1Gi. Vale subir
+  o limite da Task para todos, dado que a API também roda bem com folga em
+  2Gi+.
+
+Histórico da entrega inicial (DNS interno, CA do Harbor, `imagePullSecrets`,
+CoreDNS pinned, bugs de musl/getaddrinfo e egress do `k3s-worker-cicd`) segue
+arquivado — esses itens estão resolvidos:
 
 - [`infra/cluster/archive/PENDING.md`](infra/cluster/archive/PENDING.md)
 - [`infra/cluster/archive/LAB-BUGS.md`](infra/cluster/archive/LAB-BUGS.md)
