@@ -201,14 +201,28 @@ Encontradas em 2026-09-01 ao investigar por que o fix de `/configuracoes`
 não aparecia no lab mesmo já commitado — nenhuma bloqueia o dia a dia, mas
 ambas custaram tempo real de deploy e vale corrigir:
 
-- **Sem auto-trigger de CI/CD**: só existia 1 PipelineRun do AMFIT desde
-  sempre (manual, de 11/05) — nenhum push subsequente disparou build/deploy
-  automaticamente, apesar do EventListener (`el-gitea-event-listener`)
-  existir no namespace `cicd`. O mirror Gitea (`labadmin/amfit.git`) sincroniza
-  do GitHub automaticamente (com algum lag), mas isso não parece disparar o
-  webhook do Trigger. Resultado: toda a sessão de trabalho anterior (Progress
-  UI, testes P3) ficou meses sem chegar ao lab até este fix ser deployado
-  manualmente. Precisa investigar a configuração do Trigger/EventListener.
+- **Sem auto-trigger de CI/CD (causa raiz confirmada em 2026-09-01,
+  parcialmente corrigida)**: só existia 1 PipelineRun do AMFIT desde sempre
+  (manual, de 11/05). Investigação via API do Gitea encontrou duas causas:
+  1. O repo `labadmin/amfit` no Gitea nunca teve nenhum webhook configurado
+     (`GET /repos/labadmin/amfit/hooks` retornava `[]`) — criado agora,
+     apontando pro `el-amfit-event-listener` correto, com o Secret
+     `gitea-webhook-secret` (que também não existia) criado no namespace
+     `cicd` pra bater com o `secretRef` que o Trigger `amfit-gitea-push` já
+     esperava.
+  2. **Mesmo com o webhook criado, o problema de fundo continua**: o mirror
+     Gitea (`labadmin/amfit.git`) só faz *pull* periódico do GitHub — e esse
+     tipo de sincronização não passa pelo mesmo code path de um `git push`
+     real, então não dispara webhook nenhum (confirmado comparando com
+     REALTPMSYS, que tem webhook ativo há meses mas positivamente não
+     disparou nenhum PipelineRun novo desde que o fluxo de push virou
+     GitHub-only nesta sessão). O webhook novo só vai disparar quando
+     alguém empurrar direto pro Gitea (`http://192.168.1.201:3000` /
+     `ssh://...:30022`) — não resolve pushes só-pro-GitHub como os desta
+     sessão. Fix definitivo (ainda pendente, mesmo item já listado no
+     README do REALTPMSYS): inverter a direção do mirror — Gitea como
+     remoto primário, com push-mirror automático pro GitHub, em vez do
+     pull-mirror atual.
 - **Limite de memória do kaniko-build-push é baixo para builds Node**: a Task
   compartilhada `kaniko-build-push` (namespace `cicd`) tem `limits.memory: 1Gi`,
   suficiente para o build Go da API mas insuficiente para o build Next.js do
