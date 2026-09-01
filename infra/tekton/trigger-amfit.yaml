@@ -187,18 +187,18 @@ metadata:
     lab_owner: jose.mussauer
 spec:
   serviceAccountName: tekton-amfit
+  # NOTA (2026-09-01): o ClusterInterceptor "gitea" NÃO está instalado neste
+  # cluster (só existem os builtins cel, github, gitlab, bitbucket, slack —
+  # confirmado via `kubectl get clusterinterceptor`). A referência anterior
+  # a `ref: {name: gitea}` aqui fazia CADA chamada de webhook falhar antes
+  # de chegar no filtro CEL, mesmo com o webhook do Gitea configurado
+  # corretamente — bug real, nunca detectado porque não havia webhook
+  # nenhum apontando pra esse EventListener até agora. Mesma solução já
+  # adotada em infra/tekton/triggers.yaml do REALTPMSYS: validação só via
+  # CEL, aceitável em lab interno (EventListener num Service ClusterIP,
+  # não exposto à internet).
   interceptors:
-    # 1. Valida assinatura HMAC do Gitea (header X-Gitea-Signature).
-    - ref:
-        name: gitea
-      params:
-        - name: secretRef
-          value:
-            secretName: gitea-webhook-secret
-            secretKey: secretToken
-        - name: eventTypes
-          value: ["push"]
-    # 2. Filtra: só dispara em push para refs/heads/main.
+    # Filtra: só dispara em push para refs/heads/main.
     - ref:
         name: cel
       params:
