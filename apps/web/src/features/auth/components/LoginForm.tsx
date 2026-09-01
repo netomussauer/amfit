@@ -28,8 +28,8 @@ export function LoginForm() {
   function handleLogin(values: LoginRequest) {
     setServerError(null);
     mutate(values, {
-      onSuccess: () => {
-        router.replace('/dashboard');
+      onSuccess: (data) => {
+        router.replace(data.usuario.role === ROLES.ALUNO ? '/treino' : '/dashboard');
         router.refresh();
       },
       onError: (err) => {

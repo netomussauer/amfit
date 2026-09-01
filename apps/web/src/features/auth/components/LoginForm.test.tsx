@@ -102,10 +102,10 @@ describe('LoginForm', () => {
     );
   });
 
-  it('redireciona para /dashboard quando o login tem sucesso', async () => {
+  it('redireciona para /dashboard quando o login de um PERSONAL tem sucesso', async () => {
     const user = userEvent.setup();
     const mutate = vi.fn((_values, opts) => {
-      opts.onSuccess(undefined);
+      opts.onSuccess({ usuario: { role: ROLES.PERSONAL } });
     });
     mockUseLoginReturn({ mutate });
 
@@ -115,6 +115,22 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: /entrar/i }));
 
     expect(mockedReplace).toHaveBeenCalledWith('/dashboard');
+    expect(mockedRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('redireciona para /treino quando o login de um ALUNO tem sucesso', async () => {
+    const user = userEvent.setup();
+    const mutate = vi.fn((_values, opts) => {
+      opts.onSuccess({ usuario: { role: ROLES.ALUNO } });
+    });
+    mockUseLoginReturn({ mutate });
+
+    render(<LoginForm />);
+
+    await preencherFormulario(user, { email: 'maria@amfit.app', senha: 'senhaValida123' });
+    await user.click(screen.getByRole('button', { name: /entrar/i }));
+
+    expect(mockedReplace).toHaveBeenCalledWith('/treino');
     expect(mockedRefresh).toHaveBeenCalledTimes(1);
   });
 
