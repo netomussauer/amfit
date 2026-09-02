@@ -71,7 +71,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     checkAuth();
-  }, []);
+    // segments precisa estar aqui: sem isso, o guard só roda 1x no mount e
+    // nunca revalida o perfil em navegações seguintes (achado do eslint
+    // react-hooks/exhaustive-deps ao configurar lint pela primeira vez
+    // neste app) — diferente do middleware do web, que já revalida a cada
+    // navegação. router é estável entre renders (expo-router), incluí-lo
+    // aqui não muda o comportamento, só satisfaz a regra.
+  }, [router, segments]);
 
   if (!isReady) return null;
 

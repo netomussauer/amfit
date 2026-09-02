@@ -35,6 +35,10 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0",
+    "@types/node": "^20.14.11",
+    "@types/react": "^18.3.3",
+    "eslint": "^8.57.0",
+    "eslint-config-expo": "^7.1.2",
     "@babel/core": "^7.24.7",
     "babel-preset-expo": "~11.0.0",
     "@testing-library/react-native": "^12.5.2",

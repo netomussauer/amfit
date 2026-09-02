@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   useForm,
   type DefaultValues,
@@ -322,6 +322,8 @@ type ExercicioPickerProps =
 
 function ExercicioPicker(props: ExercicioPickerProps) {
   const exercicio = props.exercicio;
+  const errorId = useId();
+  const hasError = !props.readOnly && !!props.error;
 
   return (
     <div>
@@ -370,16 +372,16 @@ function ExercicioPicker(props: ExercicioPickerProps) {
         <button
           type="button"
           onClick={!props.readOnly ? props.onPick : undefined}
-          aria-invalid={!!('error' in props && props.error)}
+          aria-describedby={hasError ? errorId : undefined}
           className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-[--color-border] bg-[--color-bg] px-3 py-4 text-sm font-medium text-[--color-text-muted] transition-colors hover:border-[--color-primary] hover:text-[--color-primary] focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-primary]"
         >
           Selecionar exercício
         </button>
       )}
 
-      {!props.readOnly && props.error && (
-        <p role="alert" className="mt-1 text-xs text-[--color-danger]">
-          {props.error}
+      {hasError && (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-[--color-danger]">
+          {!props.readOnly && props.error}
         </p>
       )}
     </div>
