@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 
@@ -22,6 +23,7 @@ function SkeletonBlock({ className, style }: SkeletonBlockProps) {
       -1,
       true,
     );
+    return () => cancelAnimation(opacity);
   }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
