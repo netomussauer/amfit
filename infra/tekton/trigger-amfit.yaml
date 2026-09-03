@@ -192,12 +192,25 @@ spec:
   # confirmado via `kubectl get clusterinterceptor`). A referência anterior
   # a `ref: {name: gitea}` aqui fazia CADA chamada de webhook falhar antes
   # de chegar no filtro CEL, mesmo com o webhook do Gitea configurado
-  # corretamente — bug real, nunca detectado porque não havia webhook
-  # nenhum apontando pra esse EventListener até agora. Mesma solução já
-  # adotada em infra/tekton/triggers.yaml do REALTPMSYS: validação só via
-  # CEL, aceitável em lab interno (EventListener num Service ClusterIP,
-  # não exposto à internet).
+  # corretamente — bug real.
+  #
+  # NOTA (2026-09-03): validação de assinatura HMAC adicionada reaproveitando
+  # o ClusterInterceptor "github" já instalado — confirmado no código-fonte
+  # do Gitea 1.25.5 (services/webhook/deliver.go) que, além do
+  # X-Gitea-Signature nativo, o Gitea também envia X-Hub-Signature-256 no
+  # formato exato do GitHub (HMAC-SHA256, prefixo "sha256=", mesmo secret do
+  # webhook) especificamente para compatibilidade. Mesma solução aplicada em
+  # infra/tekton/triggers.yaml do REALTPMSYS. secretRef aponta pro Secret
+  # gitea-webhook-secret (cicd) já criado e configurado no webhook do Gitea.
   interceptors:
+    - ref:
+        kind: ClusterInterceptor
+        name: github
+      params:
+        - name: secretRef
+          value:
+            secretName: gitea-webhook-secret
+            secretKey: secretToken
     # Filtra: só dispara em push para refs/heads/main.
     - ref:
         name: cel
