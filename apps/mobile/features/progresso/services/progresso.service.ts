@@ -1,6 +1,8 @@
 import {
   HistoricoExercicioResponseSchema,
   type HistoricoExercicioResponse,
+  SugestaoProgressaoResponseSchema,
+  type SugestaoProgressaoResponse,
 } from '@amfit/shared';
 import { apiRequest } from '@/shared/lib/api-client';
 
@@ -24,5 +26,17 @@ export const progressoService = {
       { params },
     );
     return HistoricoExercicioResponseSchema.parse(data);
+  },
+
+  /**
+   * Sugestão de progressão de carga (progressive overload) do próprio
+   * aluno autenticado para um exercício específico. Espelha
+   * GET /alunos/me/progresso/exercicio/:id/sugestao.
+   */
+  async getMinhaSugestao(exercicioId: string): Promise<SugestaoProgressaoResponse> {
+    const data = await apiRequest<SugestaoProgressaoResponse>(
+      `/alunos/me/progresso/exercicio/${exercicioId}/sugestao`,
+    );
+    return SugestaoProgressaoResponseSchema.parse(data);
   },
 };

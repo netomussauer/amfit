@@ -18,6 +18,18 @@ const (
 	// historicoIntervaloPadrao e a janela default quando o caller nao
 	// passa from/to: ultimos 12 meses.
 	historicoIntervaloPadrao = 365 * 24 * time.Hour
+
+	// sugestaoJanela e o intervalo consultado para calcular a sugestao de
+	// progressao — so precisa das ~2 sessoes mais recentes, mas usa uma
+	// janela generosa (90 dias) para tolerar alunos com frequencia baixa
+	// sem precisar de uma segunda query.
+	sugestaoJanela = 90 * 24 * time.Hour
+
+	// sugestaoLimitPontos so precisa cobrir as ~2 sessoes mais recentes do
+	// exercicio; 60 da folga generosa mesmo pra series longas (ate 20 por
+	// sessao, validado em RegistrarSerieRequest). Truncamento por LIMIT
+	// preserva os pontos mais recentes (vide comentario na query SQL).
+	sugestaoLimitPontos = 60
 )
 
 // ProgressService agrupa os casos de uso de acompanhamento de evolucao.
@@ -130,6 +142,60 @@ func (s *ProgressService) historicoCore(
 		ExercicioID: exercicioID,
 		Pontos:      pontos,
 	}, nil
+}
+
+// SugestaoDoAlunoLogado calcula a sugestao de progressao de carga para o
+// aluno autenticado (role=ALUNO usando o proprio sub do JWT).
+func (s *ProgressService) SugestaoDoAlunoLogado(
+	ctx context.Context,
+	alunoID uuid.UUID,
+	exercicioID uuid.UUID,
+) (domain.SugestaoProgressao, error) {
+	if s.access != nil {
+		if err := s.access.ExercicioVisivelParaAluno(ctx, alunoID, exercicioID); err != nil {
+			return domain.SugestaoProgressao{}, err
+		}
+	}
+	return s.sugestaoCore(ctx, alunoID, exercicioID)
+}
+
+// SugestaoDoAlunoVistoPeloPersonal calcula a sugestao de progressao de
+// carga para um aluno especifico, garantindo que ele pertence ao personal
+// solicitante.
+func (s *ProgressService) SugestaoDoAlunoVistoPeloPersonal(
+	ctx context.Context,
+	personalID uuid.UUID,
+	alunoID uuid.UUID,
+	exercicioID uuid.UUID,
+) (domain.SugestaoProgressao, error) {
+	if s.access != nil {
+		if err := s.access.AlunoExisteEPertenceAoPersonal(ctx, personalID, alunoID); err != nil {
+			return domain.SugestaoProgressao{}, err
+		}
+		if err := s.access.ExercicioVisivelParaPersonal(ctx, personalID, exercicioID); err != nil {
+			return domain.SugestaoProgressao{}, err
+		}
+	}
+	return s.sugestaoCore(ctx, alunoID, exercicioID)
+}
+
+func (s *ProgressService) sugestaoCore(
+	ctx context.Context,
+	alunoID, exercicioID uuid.UUID,
+) (domain.SugestaoProgressao, error) {
+	if s.historico == nil {
+		return domain.SugestaoProgressao{}, domain.ErrRepositorioNaoConfigurado
+	}
+	now := time.Now().UTC()
+	pontos, err := s.historico.HistoricoCarga(
+		ctx, alunoID, exercicioID,
+		now.Add(-sugestaoJanela), now,
+		sugestaoLimitPontos,
+	)
+	if err != nil {
+		return domain.SugestaoProgressao{}, err
+	}
+	return domain.CalcularSugestaoProgressao(exercicioID, pontos), nil
 }
 
 // Dashboard devolve o resumo agregado para o personal autenticado.

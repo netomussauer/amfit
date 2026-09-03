@@ -49,6 +49,7 @@ import {
   PontoProgressoResponseSchema,
   HistoricoExercicioResponseSchema,
   HistoricoExercicioQuerySchema,
+  SugestaoProgressaoResponseSchema,
   DashboardResponseSchema,
 } from '../schemas/progresso.schema';
 
@@ -102,4 +103,5 @@ export type IniciarSessaoRequest = z.infer<typeof IniciarSessaoRequestSchema>;
 export type PontoProgressoResponse = z.infer<typeof PontoProgressoResponseSchema>;
 export type HistoricoExercicioResponse = z.infer<typeof HistoricoExercicioResponseSchema>;
 export type HistoricoExercicioQuery = z.infer<typeof HistoricoExercicioQuerySchema>;
+export type SugestaoProgressaoResponse = z.infer<typeof SugestaoProgressaoResponseSchema>;
 export type DashboardResponse = z.infer<typeof DashboardResponseSchema>;

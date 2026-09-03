@@ -31,6 +31,21 @@ export const HistoricoExercicioQuerySchema = z.object({
   limit: z.number().int().positive().optional(),
 });
 
+// ── Sugestão de Progressão (Progressive Overload) ────────────────────
+// GET /alunos/me/progresso/exercicio/:exercicioId/sugestao (+ variante
+// /alunos/:alunoId/... para o personal). Comparação auto-referencial das
+// duas últimas sessões concluídas do exercício — sem depender da meta de
+// repetições da ficha (texto livre, não comparável numericamente).
+
+export const SugestaoProgressaoResponseSchema = z.object({
+  exercicio_id: z.string().uuid(),
+  tem_sugestao: z.boolean(),
+  direcao: z.enum(['AUMENTAR', 'MANTER']).optional(),
+  carga_sugerida: z.number().optional(),
+  ultima_carga_registrada: z.number().optional(),
+  ultima_media_repeticoes: z.number().optional(),
+});
+
 // ── Dashboard do Personal ────────────────────────────────────────────
 
 export const DashboardResponseSchema = z.object({

@@ -248,6 +248,173 @@ func TestHistoricoDoAlunoVistoPeloPersonal_PropagaErroDoRepositorio(t *testing.T
 	}
 }
 
+// ── SugestaoDoAlunoLogado ─────────────────────────────────────────────────
+
+func TestSugestaoDoAlunoLogado_ExercicioVisivel_CalculaSugestao(t *testing.T) {
+	svc, historico, _, access := newServiceForTest()
+
+	alunoID := uuid.New()
+	exercicioID := uuid.New()
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	carga20 := 20.0
+	reps10 := 10
+
+	access.exercicioVisivelParaAlunoFn = func(ctx context.Context, a, e uuid.UUID) error {
+		if a != alunoID || e != exercicioID {
+			t.Errorf("ExercicioVisivelParaAluno: argumentos errados (%v, %v)", a, e)
+		}
+		return nil
+	}
+	historico.historicoCargaFn = func(
+		ctx context.Context, a, e uuid.UUID, from, to time.Time, limit int,
+	) ([]domain.HistoricoCargaPonto, error) {
+		if a != alunoID || e != exercicioID {
+			t.Errorf("HistoricoCarga: argumentos errados (%v, %v)", a, e)
+		}
+		return []domain.HistoricoCargaPonto{
+			{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: &carga20, RepeticoesRealizadas: &reps10},
+			{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: &carga20, RepeticoesRealizadas: &reps10},
+		}, nil
+	}
+
+	resp, err := svc.SugestaoDoAlunoLogado(context.Background(), alunoID, exercicioID)
+	if err != nil {
+		t.Fatalf("SugestaoDoAlunoLogado: %v", err)
+	}
+	if !resp.TemSugestao {
+		t.Fatalf("esperava TemSugestao=true: %+v", resp)
+	}
+	if resp.Direcao != domain.DirecaoAumentar {
+		t.Errorf("esperado DirecaoAumentar, got %s", resp.Direcao)
+	}
+	if resp.ExercicioID != exercicioID {
+		t.Errorf("ExercicioID nao propagado")
+	}
+}
+
+func TestSugestaoDoAlunoLogado_ExercicioNaoVisivel_NaoConsultaHistorico(t *testing.T) {
+	svc, historico, _, access := newServiceForTest()
+
+	access.exercicioVisivelParaAlunoFn = func(ctx context.Context, a, e uuid.UUID) error {
+		return domain.ErrExercicioNotFound
+	}
+	chamouHistorico := false
+	historico.historicoCargaFn = func(
+		ctx context.Context, a, e uuid.UUID, from, to time.Time, limit int,
+	) ([]domain.HistoricoCargaPonto, error) {
+		chamouHistorico = true
+		return nil, nil
+	}
+
+	_, err := svc.SugestaoDoAlunoLogado(context.Background(), uuid.New(), uuid.New())
+	if !errors.Is(err, domain.ErrExercicioNotFound) {
+		t.Fatalf("esperado ErrExercicioNotFound, got %v", err)
+	}
+	if chamouHistorico {
+		t.Error("HistoricoCarga não deveria ter sido chamado — acesso negado antes")
+	}
+}
+
+func TestSugestaoDoAlunoLogado_HistoricoRepoNil_RetornaErroSemPanic(t *testing.T) {
+	svc := NewProgressService(nil, &mockDashboardRepo{}, &mockAccessRepo{})
+
+	_, err := svc.SugestaoDoAlunoLogado(context.Background(), uuid.New(), uuid.New())
+	if !errors.Is(err, domain.ErrRepositorioNaoConfigurado) {
+		t.Fatalf("esperado ErrRepositorioNaoConfigurado, got %v", err)
+	}
+}
+
+func TestSugestaoDoAlunoLogado_PropagaErroDoRepositorio(t *testing.T) {
+	svc, historico, _, _ := newServiceForTest()
+
+	historico.historicoCargaFn = func(
+		ctx context.Context, a, e uuid.UUID, from, to time.Time, limit int,
+	) ([]domain.HistoricoCargaPonto, error) {
+		return nil, errBoom
+	}
+
+	_, err := svc.SugestaoDoAlunoLogado(context.Background(), uuid.New(), uuid.New())
+	if !errors.Is(err, errBoom) {
+		t.Fatalf("esperado erro do repositório propagado, got %v", err)
+	}
+}
+
+// ── SugestaoDoAlunoVistoPeloPersonal ──────────────────────────────────────
+
+func TestSugestaoDoAlunoVistoPeloPersonal_TudoVisivel_CalculaSugestao(t *testing.T) {
+	svc, historico, _, access := newServiceForTest()
+
+	var ordem []string
+	access.alunoExisteEPertenceAoPersonalFn = func(ctx context.Context, p, a uuid.UUID) error {
+		ordem = append(ordem, "aluno")
+		return nil
+	}
+	access.exercicioVisivelParaPersonalFn = func(ctx context.Context, p, e uuid.UUID) error {
+		ordem = append(ordem, "exercicio")
+		return nil
+	}
+	historico.historicoCargaFn = func(
+		ctx context.Context, a, e uuid.UUID, from, to time.Time, limit int,
+	) ([]domain.HistoricoCargaPonto, error) {
+		ordem = append(ordem, "historico")
+		return nil, nil
+	}
+
+	resp, err := svc.SugestaoDoAlunoVistoPeloPersonal(
+		context.Background(), uuid.New(), uuid.New(), uuid.New(),
+	)
+	if err != nil {
+		t.Fatalf("SugestaoDoAlunoVistoPeloPersonal: %v", err)
+	}
+	if resp.TemSugestao {
+		t.Errorf("esperava sem sugestao (sem historico), veio: %+v", resp)
+	}
+
+	esperado := []string{"aluno", "exercicio", "historico"}
+	if len(ordem) != len(esperado) {
+		t.Fatalf("ordem de chamadas errada: %v", ordem)
+	}
+	for i, v := range esperado {
+		if ordem[i] != v {
+			t.Errorf("ordem de chamadas errada: esperado %v, got %v", esperado, ordem)
+			break
+		}
+	}
+}
+
+func TestSugestaoDoAlunoVistoPeloPersonal_AlunoNaoPertenceAoPersonal_NaoChecaExercicioNemHistorico(t *testing.T) {
+	svc, historico, _, access := newServiceForTest()
+
+	access.alunoExisteEPertenceAoPersonalFn = func(ctx context.Context, p, a uuid.UUID) error {
+		return domain.ErrAlunoNotFound
+	}
+	chamouExercicio := false
+	access.exercicioVisivelParaPersonalFn = func(ctx context.Context, p, e uuid.UUID) error {
+		chamouExercicio = true
+		return nil
+	}
+	chamouHistorico := false
+	historico.historicoCargaFn = func(
+		ctx context.Context, a, e uuid.UUID, from, to time.Time, limit int,
+	) ([]domain.HistoricoCargaPonto, error) {
+		chamouHistorico = true
+		return nil, nil
+	}
+
+	_, err := svc.SugestaoDoAlunoVistoPeloPersonal(
+		context.Background(), uuid.New(), uuid.New(), uuid.New(),
+	)
+	if !errors.Is(err, domain.ErrAlunoNotFound) {
+		t.Fatalf("esperado ErrAlunoNotFound, got %v", err)
+	}
+	if chamouExercicio {
+		t.Error("ExercicioVisivelParaPersonal não deveria ter sido chamado — aluno já falhou")
+	}
+	if chamouHistorico {
+		t.Error("HistoricoCarga não deveria ter sido chamado — acesso negado antes")
+	}
+}
+
 // ── HistoricoParams — defaults e resolução ───────────────────────────────
 
 func TestHistoricoParams_SemParametros_UsaJanelaEDefaultLimit(t *testing.T) {

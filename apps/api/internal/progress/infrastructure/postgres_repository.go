@@ -35,23 +35,44 @@ type historicoRepo struct {
 	pool *pgxpool.Pool
 }
 
+// Subquery ordena DESC pra que o LIMIT descarte os pontos mais ANTIGOS
+// (nao os mais recentes) quando o intervalo excede o limite — e o que o
+// doc comment de HistoricoCarga sempre prometeu ("mais recentes primeiro
+// quando excedido"), mas a query original ordenava ASC direto + LIMIT,
+// entao um historico longo o suficiente cortava exatamente os pontos mais
+// recentes em silencio. A query externa re-ordena ASC pro contrato de
+// retorno (mais antigo → mais recente) continuar o mesmo pros callers
+// existentes (grafico de evolucao).
+//
+// `s.iniciado_em` entra como desempate depois de `data_execucao`: essa
+// coluna e DATE (sem hora), entao duas sessoes CONCLUIDAS do mesmo
+// exercicio no mesmo dia calendario (ex: aluno fez o mesmo exercicio em
+// dois treinos diferentes no mesmo dia) empatam e ficam em ordem
+// indefinida sem esse desempate — o que quebraria silenciosamente
+// CalcularSugestaoProgressao (achado em code-review), que assume que a
+// ULTIMA sessao da lista e de fato a mais recente.
 const queryHistoricoCarga = `
-SELECT
-    s.id              AS sessao_id,
-    s.data_execucao   AS data_execucao,
-    r.numero_serie    AS numero_serie,
-    r.carga_realizada AS carga_realizada,
-    r.repeticoes_realizadas AS repeticoes_realizadas
-FROM registro_serie r
-JOIN sessao_treino s ON s.id = r.sessao_id
-JOIN item_treino   i ON i.id = r.item_treino_id
-WHERE s.aluno_id     = $1
-  AND i.exercicio_id = $2
-  AND s.status       = 'CONCLUIDO'
-  AND r.concluida    = TRUE
-  AND s.data_execucao BETWEEN $3 AND $4
-ORDER BY s.data_execucao ASC, r.numero_serie ASC
-LIMIT $5;
+SELECT sessao_id, data_execucao, numero_serie, carga_realizada, repeticoes_realizadas
+FROM (
+    SELECT
+        s.id              AS sessao_id,
+        s.data_execucao   AS data_execucao,
+        s.iniciado_em     AS iniciado_em,
+        r.numero_serie    AS numero_serie,
+        r.carga_realizada AS carga_realizada,
+        r.repeticoes_realizadas AS repeticoes_realizadas
+    FROM registro_serie r
+    JOIN sessao_treino s ON s.id = r.sessao_id
+    JOIN item_treino   i ON i.id = r.item_treino_id
+    WHERE s.aluno_id     = $1
+      AND i.exercicio_id = $2
+      AND s.status       = 'CONCLUIDO'
+      AND r.concluida    = TRUE
+      AND s.data_execucao BETWEEN $3 AND $4
+    ORDER BY s.data_execucao DESC, s.iniciado_em DESC, r.numero_serie DESC
+    LIMIT $5
+) mais_recentes
+ORDER BY data_execucao ASC, iniciado_em ASC, numero_serie ASC;
 `
 
 func (r *historicoRepo) HistoricoCarga(

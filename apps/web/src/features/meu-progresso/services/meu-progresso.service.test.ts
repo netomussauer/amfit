@@ -77,3 +77,60 @@ describe('meuProgressoService.getMeuProgresso', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('meuProgressoService.getMinhaSugestao', () => {
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it('busca a sugestao no endpoint /alunos/me/progresso/exercicio/:id/sugestao', async () => {
+    const payload = {
+      exercicio_id: '22222222-2222-2222-2222-222222222222',
+      tem_sugestao: true,
+      direcao: 'AUMENTAR',
+      carga_sugerida: 22.5,
+      ultima_carga_registrada: 20,
+      ultima_media_repeticoes: 10,
+    };
+    mockedGet.mockResolvedValueOnce({ data: payload });
+
+    const resultado = await meuProgressoService.getMinhaSugestao(
+      '22222222-2222-2222-2222-222222222222',
+    );
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/alunos/me/progresso/exercicio/22222222-2222-2222-2222-222222222222/sugestao',
+    );
+    expect(resultado).toEqual(payload);
+  });
+
+  it('aceita tem_sugestao=false sem os campos opcionais', async () => {
+    const payload = {
+      exercicio_id: '22222222-2222-2222-2222-222222222222',
+      tem_sugestao: false,
+    };
+    mockedGet.mockResolvedValueOnce({ data: payload });
+
+    const resultado = await meuProgressoService.getMinhaSugestao(
+      '22222222-2222-2222-2222-222222222222',
+    );
+
+    expect(resultado.tem_sugestao).toBe(false);
+    expect(resultado.carga_sugerida).toBeUndefined();
+  });
+
+  it('lanca erro de validacao quando direcao tem um valor fora do enum esperado', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: {
+        exercicio_id: '22222222-2222-2222-2222-222222222222',
+        tem_sugestao: true,
+        direcao: 'DIMINUIR',
+        carga_sugerida: 10,
+      },
+    });
+
+    await expect(
+      meuProgressoService.getMinhaSugestao('22222222-2222-2222-2222-222222222222'),
+    ).rejects.toThrow();
+  });
+});

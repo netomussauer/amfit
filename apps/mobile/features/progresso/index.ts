@@ -1,6 +1,7 @@
 export { progressoService } from './services/progresso.service';
 export { progressoKeys } from './hooks/query-keys';
 export { useMeuProgresso } from './hooks/useMeuProgresso';
+export { useSugestaoProgressao } from './hooks/useSugestaoProgressao';
 
 export { EvolucaoCargaChart } from './components/EvolucaoCargaChart';
 

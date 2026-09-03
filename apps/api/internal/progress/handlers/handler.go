@@ -29,6 +29,8 @@ func NewProgressHandler(svc *application.ProgressService) *ProgressHandler {
 func (h *ProgressHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.Handler) {
 	middleware.Get(router, "/alunos/me/progresso/exercicio/:exercicioId",
 		mws, h.HistoricoExercicioAlunoLogado)
+	middleware.Get(router, "/alunos/me/progresso/exercicio/:exercicioId/sugestao",
+		mws, h.SugestaoExercicioAlunoLogado)
 }
 
 // RegisterPersonalRoutes registra as rotas que o PERSONAL consome sobre
@@ -36,6 +38,8 @@ func (h *ProgressHandler) RegisterAlunoRoutes(router fiber.Router, mws ...fiber.
 func (h *ProgressHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
 	middleware.Get(router, "/alunos/:alunoId/progresso/exercicio/:exercicioId",
 		mws, h.HistoricoExercicioDoAluno)
+	middleware.Get(router, "/alunos/:alunoId/progresso/exercicio/:exercicioId/sugestao",
+		mws, h.SugestaoExercicioDoAluno)
 	middleware.Get(router, "/dashboard", mws, h.Dashboard)
 }
 
@@ -108,6 +112,57 @@ func (h *ProgressHandler) HistoricoExercicioDoAluno(c fiber.Ctx) error {
 	return c.JSON(toHistoricoResponse(resp))
 }
 
+// SugestaoExercicioAlunoLogado trata
+// GET /alunos/me/progresso/exercicio/:exercicioId/sugestao (role=ALUNO).
+func (h *ProgressHandler) SugestaoExercicioAlunoLogado(c fiber.Ctx) error {
+	alunoID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	exercicioID, err := uuid.Parse(c.Params("exercicioId"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"exercicioId invalido",
+		))
+	}
+
+	resp, err := h.svc.SugestaoDoAlunoLogado(c.Context(), alunoID, exercicioID)
+	if err != nil {
+		return writeProgressError(c, err, "falha ao calcular sugestao")
+	}
+	return c.JSON(toSugestaoResponse(resp))
+}
+
+// SugestaoExercicioDoAluno trata
+// GET /alunos/:alunoId/progresso/exercicio/:exercicioId/sugestao (role=PERSONAL).
+func (h *ProgressHandler) SugestaoExercicioDoAluno(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	alunoID, err := uuid.Parse(c.Params("alunoId"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"alunoId invalido",
+		))
+	}
+	exercicioID, err := uuid.Parse(c.Params("exercicioId"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"exercicioId invalido",
+		))
+	}
+
+	resp, err := h.svc.SugestaoDoAlunoVistoPeloPersonal(c.Context(), personalID, alunoID, exercicioID)
+	if err != nil {
+		return writeProgressError(c, err, "falha ao calcular sugestao")
+	}
+	return c.JSON(toSugestaoResponse(resp))
+}
+
 // ─── Personal: dashboard ───────────────────────────────────────────────────
 
 // Dashboard trata GET /dashboard (role=PERSONAL).
@@ -139,9 +194,9 @@ type historicoPontoDTO struct {
 }
 
 type historicoResponseDTO struct {
-	AlunoID     uuid.UUID            `json:"aluno_id"`
-	ExercicioID uuid.UUID            `json:"exercicio_id"`
-	Pontos      []historicoPontoDTO  `json:"pontos"`
+	AlunoID     uuid.UUID           `json:"aluno_id"`
+	ExercicioID uuid.UUID           `json:"exercicio_id"`
+	Pontos      []historicoPontoDTO `json:"pontos"`
 }
 
 func toHistoricoResponse(h domain.HistoricoCargaExercicio) historicoResponseDTO {
@@ -160,6 +215,30 @@ func toHistoricoResponse(h domain.HistoricoCargaExercicio) historicoResponseDTO 
 		ExercicioID: h.ExercicioID,
 		Pontos:      pontos,
 	}
+}
+
+type sugestaoResponseDTO struct {
+	ExercicioID           uuid.UUID `json:"exercicio_id"`
+	TemSugestao           bool      `json:"tem_sugestao"`
+	Direcao               *string   `json:"direcao,omitempty"`
+	CargaSugerida         *float64  `json:"carga_sugerida,omitempty"`
+	UltimaCargaRegistrada *float64  `json:"ultima_carga_registrada,omitempty"`
+	UltimaMediaRepeticoes *float64  `json:"ultima_media_repeticoes,omitempty"`
+}
+
+func toSugestaoResponse(s domain.SugestaoProgressao) sugestaoResponseDTO {
+	dto := sugestaoResponseDTO{
+		ExercicioID: s.ExercicioID,
+		TemSugestao: s.TemSugestao,
+	}
+	if s.TemSugestao {
+		direcao := string(s.Direcao)
+		dto.Direcao = &direcao
+		dto.CargaSugerida = s.CargaSugerida
+		dto.UltimaCargaRegistrada = s.UltimaCargaRegistrada
+		dto.UltimaMediaRepeticoes = s.UltimaMediaRepeticoes
+	}
+	return dto
 }
 
 type dashboardResponseDTO struct {

@@ -1,6 +1,7 @@
 import type {
   HistoricoExercicioResponse,
   PontoProgressoResponse,
+  SugestaoProgressaoResponse,
 } from '@amfit/shared';
 import type { EvolucaoCargaPoint } from '../lib/chart-data';
 
@@ -24,6 +25,20 @@ export function makeHistoricoExercicioResponse(
     aluno_id: '22222222-2222-2222-2222-222222222222',
     exercicio_id: '33333333-3333-3333-3333-333333333333',
     pontos: [makePontoProgresso()],
+    ...overrides,
+  };
+}
+
+export function makeSugestaoProgressaoResponse(
+  overrides: Partial<SugestaoProgressaoResponse> = {},
+): SugestaoProgressaoResponse {
+  return {
+    exercicio_id: '33333333-3333-3333-3333-333333333333',
+    tem_sugestao: true,
+    direcao: 'AUMENTAR',
+    carga_sugerida: 22.5,
+    ultima_carga_registrada: 20,
+    ultima_media_repeticoes: 10,
     ...overrides,
   };
 }

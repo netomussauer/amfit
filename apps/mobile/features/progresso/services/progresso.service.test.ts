@@ -1,6 +1,9 @@
 import { apiRequest } from '@/shared/lib/api-client';
 import { progressoService } from './progresso.service';
-import { makeHistoricoExercicioResponse } from '../__fixtures__/progresso.fixtures';
+import {
+  makeHistoricoExercicioResponse,
+  makeSugestaoProgressaoResponse,
+} from '../__fixtures__/progresso.fixtures';
 
 jest.mock('@/shared/lib/api-client', () => ({
   apiRequest: jest.fn(),
@@ -85,6 +88,65 @@ describe('progressoService.getMeuProgresso', () => {
     // Act / Assert
     await expect(
       progressoService.getMeuProgresso('33333333-3333-3333-3333-333333333333'),
+    ).rejects.toThrow();
+  });
+});
+
+describe('progressoService.getMinhaSugestao', () => {
+  beforeEach(() => {
+    mockedApiRequest.mockReset();
+  });
+
+  it('busca a sugestão no endpoint /alunos/me/progresso/exercicio/:id/sugestao', async () => {
+    const exercicioId = '33333333-3333-3333-3333-333333333333';
+    const response = makeSugestaoProgressaoResponse({ exercicio_id: exercicioId });
+    mockedApiRequest.mockResolvedValue(response);
+
+    const result = await progressoService.getMinhaSugestao(exercicioId);
+
+    expect(mockedApiRequest).toHaveBeenCalledWith(
+      `/alunos/me/progresso/exercicio/${exercicioId}/sugestao`,
+    );
+    expect(result).toEqual(response);
+  });
+
+  it('valida e retorna quando tem_sugestao=false sem os campos opcionais', async () => {
+    const response = makeSugestaoProgressaoResponse({
+      tem_sugestao: false,
+      direcao: undefined,
+      carga_sugerida: undefined,
+      ultima_carga_registrada: undefined,
+      ultima_media_repeticoes: undefined,
+    });
+    mockedApiRequest.mockResolvedValue(response);
+
+    const result = await progressoService.getMinhaSugestao('33333333-3333-3333-3333-333333333333');
+
+    expect(result.tem_sugestao).toBe(false);
+    expect(result.carga_sugerida).toBeUndefined();
+  });
+
+  it('lança erro quando a resposta não corresponde ao schema (exercicio_id inválido)', async () => {
+    mockedApiRequest.mockResolvedValue({
+      exercicio_id: 'nao-e-um-uuid',
+      tem_sugestao: false,
+    });
+
+    await expect(
+      progressoService.getMinhaSugestao('33333333-3333-3333-3333-333333333333'),
+    ).rejects.toThrow();
+  });
+
+  it('lança erro quando direcao tem um valor fora do enum esperado', async () => {
+    mockedApiRequest.mockResolvedValue({
+      exercicio_id: '33333333-3333-3333-3333-333333333333',
+      tem_sugestao: true,
+      direcao: 'DIMINUIR',
+      carga_sugerida: 10,
+    });
+
+    await expect(
+      progressoService.getMinhaSugestao('33333333-3333-3333-3333-333333333333'),
     ).rejects.toThrow();
   });
 });

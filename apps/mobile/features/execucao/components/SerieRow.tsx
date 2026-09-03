@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Check } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,8 @@ type Props = {
   item: ItemTreinoResponse;
   numeroSerie: number;
   registro: RegistroSerieResponse | undefined;
+  /** Carga sugerida pelo cálculo de progressão (progressive overload), se houver. */
+  cargaSugeridaProgressao?: number;
   onConcluir: (input: {
     numero_serie: number;
     item_treino_id: string;
@@ -35,11 +37,21 @@ function formatCarga(value: number | null | undefined): string {
   return Number.isInteger(value) ? String(value) : String(value).replace('.', ',');
 }
 
-export function SerieRow({ item, numeroSerie, registro, onConcluir }: Props) {
+export function SerieRow({
+  item,
+  numeroSerie,
+  registro,
+  cargaSugeridaProgressao,
+  onConcluir,
+}: Props) {
   const concluida = registro?.concluida ?? false;
+  // A sugestão de progressão chega por um useQuery separado (resolve
+  // depois do primeiro render) — se o aluno já editou o campo de carga
+  // manualmente antes dela chegar, não sobrescreve o que ele digitou.
+  const usuarioEditouCargaRef = useRef(false);
 
   const [carga, setCarga] = useState<string>(() =>
-    formatCarga(registro?.carga_realizada ?? item.carga_sugerida ?? null),
+    formatCarga(registro?.carga_realizada ?? cargaSugeridaProgressao ?? item.carga_sugerida ?? null),
   );
   const [reps, setReps] = useState<string>(() =>
     registro?.repeticoes_realizadas != null
@@ -47,17 +59,40 @@ export function SerieRow({ item, numeroSerie, registro, onConcluir }: Props) {
       : '',
   );
 
-  // Sincroniza inputs quando o registro vindo do servidor muda (ex: refetch).
+  // Dois efeitos separados de propósito (achado de code-review): se um único
+  // efeito reagisse tanto a `registro` quanto a `cargaSugeridaProgressao`,
+  // uma revalidação em background da sugestão (staleTime curto, useQuery
+  // independente) reexecutaria o branch "sincroniza com o registro" e
+  // resetaria pro último valor SALVO — descartando uma edição que o aluno
+  // esteja fazendo numa série já persistida (ex: desmarcou pra corrigir o
+  // valor antes de reenviar).
   useEffect(() => {
     if (registro) {
-      setCarga(formatCarga(registro.carga_realizada ?? item.carga_sugerida ?? null));
+      setCarga(
+        formatCarga(registro.carga_realizada ?? cargaSugeridaProgressao ?? item.carga_sugerida ?? null),
+      );
       setReps(
         registro.repeticoes_realizadas != null
           ? String(registro.repeticoes_realizadas)
           : '',
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registro, item.carga_sugerida]);
+
+  // Reage só a cargaSugeridaProgressao chegando/mudando — nunca a `registro`
+  // mudando sozinho, que é tratado no efeito acima.
+  useEffect(() => {
+    if (!registro && !usuarioEditouCargaRef.current && cargaSugeridaProgressao != null) {
+      setCarga(formatCarga(cargaSugeridaProgressao));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargaSugeridaProgressao]);
+
+  function handleCargaChange(value: string) {
+    usuarioEditouCargaRef.current = true;
+    setCarga(value);
+  }
 
   function handleToggle() {
     const novaCondicao = !concluida;
@@ -102,7 +137,7 @@ export function SerieRow({ item, numeroSerie, registro, onConcluir }: Props) {
           </Text>
           <TextInput
             value={carga}
-            onChangeText={setCarga}
+            onChangeText={handleCargaChange}
             keyboardType="decimal-pad"
             placeholder="--"
             editable={!concluida}

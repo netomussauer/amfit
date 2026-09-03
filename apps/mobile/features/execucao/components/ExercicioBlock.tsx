@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { View, Text, Image, TouchableOpacity } from 'react-native';
-import { ChevronDown, ChevronUp, Dumbbell } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Dumbbell, TrendingUp } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { ItemTreinoResponse, RegistroSerieResponse } from '@amfit/shared';
+import { useSugestaoProgressao } from '@/features/progresso';
 import { SerieRow } from './SerieRow';
 
 type Props = {
@@ -28,7 +29,9 @@ function formatCarga(carga: number | null | undefined): string | null {
 export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
   const [expanded, setExpanded] = useState(false);
   const { exercicio } = item;
-  const carga = formatCarga(item.carga_sugerida);
+  const sugestao = useSugestaoProgressao(exercicio.id);
+  const cargaProgressao = sugestao.data?.tem_sugestao ? sugestao.data.carga_sugerida : undefined;
+  const carga = formatCarga(cargaProgressao ?? item.carga_sugerida);
   const concluidas = registros.filter((r) => r.concluida).length;
   const totalSeries = item.series;
 
@@ -69,9 +72,14 @@ export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
               </Text>
             </View>
             {carga && (
-              <Text className="text-[11px] text-gray-500">
-                Sugerida: {carga}
-              </Text>
+              <View className="flex-row items-center gap-0.5">
+                {sugestao.data?.direcao === 'AUMENTAR' && (
+                  <TrendingUp color="#059669" size={11} />
+                )}
+                <Text className="text-[11px] text-gray-500">
+                  Sugerida: {carga}
+                </Text>
+              </View>
             )}
           </View>
         </View>
@@ -109,6 +117,7 @@ export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
               item={item}
               numeroSerie={numero}
               registro={registro}
+              cargaSugeridaProgressao={cargaProgressao}
               onConcluir={onRegistrarSerie}
             />
           );

@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ExercicioBlock } from './ExercicioBlock';
+import { useSugestaoProgressao } from '@/features/progresso';
 import {
   makeItemTreinoResponse,
   makeRegistroSerieResponse,
@@ -17,7 +18,30 @@ jest.mock('expo-video', () => ({
   VideoView: 'VideoView',
 }));
 
+// ExercicioBlock chama useSugestaoProgressao (useQuery por baixo) — mockado
+// aqui pra não exigir um QueryClientProvider real nestes testes, que focam
+// no layout/composição do bloco. O comportamento do hook em si é coberto
+// em useSugestaoProgressao.test.tsx; a integração completa (dado real
+// vindo da query influenciando o prefill de carga) é coberta abaixo nos
+// testes que configuram um retorno específico.
+jest.mock('@/features/progresso', () => ({
+  useSugestaoProgressao: jest.fn(),
+}));
+
+const mockedUseSugestaoProgressao = useSugestaoProgressao as jest.MockedFunction<
+  typeof useSugestaoProgressao
+>;
+
+function semSugestao() {
+  return { data: undefined, isLoading: false } as ReturnType<typeof useSugestaoProgressao>;
+}
+
 describe('ExercicioBlock', () => {
+  beforeEach(() => {
+    mockedUseSugestaoProgressao.mockReset();
+    mockedUseSugestaoProgressao.mockReturnValue(semSugestao());
+  });
+
   it('exibe nome, grupo muscular, série×repetições e carga sugerida do exercício', () => {
     // Arrange
     const item = makeItemTreinoResponse({
@@ -103,6 +127,44 @@ describe('ExercicioBlock', () => {
 
     // Assert
     expect(screen.getByText('Manter cotovelos alinhados')).toBeTruthy();
+  });
+
+  it('usa a carga sugerida pelo cálculo de progressão no lugar da carga_sugerida estática, quando disponível', () => {
+    // Arrange
+    const item = makeItemTreinoResponse({ carga_sugerida: 40 });
+    mockedUseSugestaoProgressao.mockReturnValue({
+      data: {
+        exercicio_id: item.exercicio.id,
+        tem_sugestao: true,
+        direcao: 'AUMENTAR',
+        carga_sugerida: 22.5,
+        ultima_carga_registrada: 20,
+        ultima_media_repeticoes: 10,
+      },
+      isLoading: false,
+    } as ReturnType<typeof useSugestaoProgressao>);
+
+    // Act
+    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+
+    // Assert — a carga computada (22,5) prevalece sobre a estática (40)
+    expect(screen.getByText('Sugerida: 22,5 kg')).toBeTruthy();
+    expect(screen.queryByText('Sugerida: 40 kg')).toBeNull();
+  });
+
+  it('cai de volta pra carga_sugerida estática quando tem_sugestao=false', () => {
+    // Arrange
+    const item = makeItemTreinoResponse({ carga_sugerida: 40 });
+    mockedUseSugestaoProgressao.mockReturnValue({
+      data: { exercicio_id: item.exercicio.id, tem_sugestao: false },
+      isLoading: false,
+    } as ReturnType<typeof useSugestaoProgressao>);
+
+    // Act
+    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+
+    // Assert
+    expect(screen.getByText('Sugerida: 40 kg')).toBeTruthy();
   });
 
   it('exibe o vídeo do exercício quando expandido e tipo_midia é VIDEO', () => {

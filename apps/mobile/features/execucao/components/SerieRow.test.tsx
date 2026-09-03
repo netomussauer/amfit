@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { SerieRow } from './SerieRow';
 import {
@@ -106,6 +106,106 @@ describe('SerieRow', () => {
       expect.objectContaining({ concluida: false }),
     );
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  it('prioriza a carga sugerida por progressão sobre a carga_sugerida estática do item', () => {
+    // Arrange
+    const item = makeItemTreinoResponse({ carga_sugerida: 40 });
+
+    // Act
+    render(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={undefined}
+        cargaSugeridaProgressao={22.5}
+        onConcluir={jest.fn()}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByLabelText('Carga da série 1').props.value).toBe('22,5');
+  });
+
+  it('prioriza a carga do registro já salvo sobre a sugestão de progressão', () => {
+    // Arrange
+    const item = makeItemTreinoResponse();
+    const registro = makeRegistroSerieResponse({ carga_realizada: 60 });
+
+    // Act
+    render(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={registro}
+        cargaSugeridaProgressao={22.5}
+        onConcluir={jest.fn()}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByLabelText('Carga da série 1').props.value).toBe('60');
+  });
+
+  it('aplica a sugestão de progressão quando ela chega depois do primeiro render (query assíncrona)', async () => {
+    // Arrange — cargaSugeridaProgressao chega undefined no primeiro render
+    // (query ainda não resolveu) e só depois é passada com valor.
+    const item = makeItemTreinoResponse({ carga_sugerida: 40 });
+    const { rerender } = render(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={undefined}
+        cargaSugeridaProgressao={undefined}
+        onConcluir={jest.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Carga da série 1').props.value).toBe('40');
+
+    // Act
+    rerender(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={undefined}
+        cargaSugeridaProgressao={22.5}
+        onConcluir={jest.fn()}
+      />,
+    );
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByLabelText('Carga da série 1').props.value).toBe('22,5'),
+    );
+  });
+
+  it('não sobrescreve a carga que o aluno já editou quando a sugestão chega depois', async () => {
+    // Arrange
+    const item = makeItemTreinoResponse({ carga_sugerida: 40 });
+    const { rerender } = render(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={undefined}
+        cargaSugeridaProgressao={undefined}
+        onConcluir={jest.fn()}
+      />,
+    );
+    fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '35');
+
+    // Act — a sugestão chega DEPOIS do aluno já ter digitado um valor
+    rerender(
+      <SerieRow
+        item={item}
+        numeroSerie={1}
+        registro={undefined}
+        cargaSugeridaProgressao={22.5}
+        onConcluir={jest.fn()}
+      />,
+    );
+
+    // Assert — o valor digitado pelo aluno não é sobrescrito
+    expect(screen.getByLabelText('Carga da série 1').props.value).toBe('35');
   });
 
   it('desabilita os campos de edição quando a série já está concluída', () => {

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Dumbbell } from 'lucide-react';
+import { ChevronDown, ChevronUp, Dumbbell, TrendingUp } from 'lucide-react';
 import type { ItemTreinoResponse, RegistroSerieResponse } from '@amfit/shared';
 import { MidiaPreview } from '@/features/exercicios/components/MidiaPreview';
+import { useSugestaoProgressao } from '@/features/meu-progresso';
 import { SerieRow } from './SerieRow';
 
 type Props = {
@@ -29,7 +30,9 @@ function formatCarga(carga: number | null | undefined): string | null {
 export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
   const [expanded, setExpanded] = useState(false);
   const { exercicio } = item;
-  const carga = formatCarga(item.carga_sugerida);
+  const sugestao = useSugestaoProgressao(exercicio.id);
+  const cargaProgressao = sugestao.data?.tem_sugestao ? sugestao.data.carga_sugerida : undefined;
+  const carga = formatCarga(cargaProgressao ?? item.carga_sugerida);
   const concluidas = registros.filter((r) => r.concluida).length;
   const totalSeries = item.series;
 
@@ -68,7 +71,10 @@ export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
               {item.series}×{item.repeticoes}
             </span>
             {carga && (
-              <span className="text-[11px] text-[--color-text-muted]">
+              <span className="flex items-center gap-0.5 text-[11px] text-[--color-text-muted]">
+                {sugestao.data?.direcao === 'AUMENTAR' && (
+                  <TrendingUp aria-hidden="true" className="h-3 w-3 text-emerald-600" />
+                )}
                 Sugerida: {carga}
               </span>
             )}
@@ -102,6 +108,7 @@ export function ExercicioBlock({ item, registros, onRegistrarSerie }: Props) {
               item={item}
               numeroSerie={numero}
               registro={registro}
+              cargaSugeridaProgressao={cargaProgressao}
               onConcluir={onRegistrarSerie}
             />
           );
