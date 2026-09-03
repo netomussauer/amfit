@@ -198,12 +198,14 @@ Ver [`docs/SDD.md`](docs/SDD.md) para:
 ## Pendências de infra documentadas
 
 Encontradas em 2026-09-01 ao investigar por que o fix de `/configuracoes`
-não aparecia no lab mesmo já commitado — nenhuma bloqueia o dia a dia, mas
-ambas custaram tempo real de deploy e vale corrigir:
+não aparecia no lab mesmo já commitado. Já resolvidas (registro histórico
+abaixo); nenhuma bloqueava o dia a dia, mas ambas custaram tempo real de
+deploy:
 
 - **Sem auto-trigger de CI/CD (causa raiz totalmente confirmada em
-  2026-09-01, 2 bugs corrigidos, 1 causa de fundo ainda pendente)**: só
-  existia 1 PipelineRun do AMFIT desde sempre (manual, de 11/05).
+  2026-09-01, resolvida em 2026-09-04 — 3 causas encontradas e
+  corrigidas)**: só existia 1 PipelineRun do AMFIT desde sempre (manual,
+  de 11/05).
   Investigação via API do Gitea e teste direto no EventListener encontrou
   três causas empilhadas:
   1. O repo `labadmin/amfit` no Gitea nunca teve nenhum webhook configurado
@@ -219,29 +221,30 @@ ambas custaram tempo real de deploy e vale corrigir:
      de webhook falharia aí, mesmo com webhook e secret corretos. Corrigido
      em `infra/tekton/trigger-amfit.yaml`: validação só via CEL, mesma
      solução já usada (e documentada) no REALTPMSYS.
-  3. **A causa de fundo, ainda pendente**: o mirror Gitea
-     (`labadmin/amfit.git`) só faz *pull* periódico do GitHub, e esse tipo
-     de sincronização não passa pelo mesmo code path de um `git push` real
-     — não dispara webhook nenhum. Testado e confirmado isso na prática no
-     REALTPMSYS (não no AMFIT): um POST sintético do formato exato que o
-     Gitea manda, direto no EventListener, criou um PipelineRun genuíno
-     (`trigger: gitea-push`, não `manual`) que rodou build+push com
-     sucesso — a cadeia toda funciona quando recebe um evento de push de
-     verdade. Só falta esse evento acontecer, e ele só acontece com push
-     direto pro Gitea (`http://192.168.1.201:3000` / `ssh://...:30022`),
-     não com pushes só-pro-GitHub como os desta sessão. Fix definitivo
-     (mesmo item já listado no README do REALTPMSYS): inverter a direção
-     do mirror — Gitea como remoto primário, com push-mirror automático
-     pro GitHub, em vez do pull-mirror atual.
-- **Limite de memória do kaniko-build-push é baixo para builds Node**: a Task
-  compartilhada `kaniko-build-push` (namespace `cicd`) tem `limits.memory: 1Gi`,
-  suficiente para o build Go da API mas insuficiente para o build Next.js do
-  Web (OOMKilled, exit 137, durante `next build`). O deploy de 2026-09-01
-  contornou isso com um override pontual (`taskRunSpecs` no PipelineRun,
-  2.5Gi) sem alterar a Task compartilhada — outros PipelineRuns que a
-  reutilizam (incluindo REALTPMSYS) ainda estão no limite de 1Gi. Vale subir
-  o limite da Task para todos, dado que a API também roda bem com folga em
-  2Gi+.
+  3. **A causa de fundo, resolvida em 2026-09-04**: o mirror Gitea
+     (`labadmin/amfit.git`) só fazia *pull* periódico do GitHub, e esse
+     tipo de sincronização não passa pelo mesmo code path de um `git push`
+     real — não disparava webhook nenhum. Testado e confirmado isso na
+     prática no REALTPMSYS antes da correção: um POST sintético do
+     formato exato que o Gitea manda, direto no EventListener, criou um
+     PipelineRun genuíno (`trigger: gitea-push`, não `manual`) que rodou
+     build+push com sucesso — a cadeia toda funciona quando recebe um
+     evento de push de verdade. Resolvido invertendo a direção do mirror:
+     o repo Gitea foi convertido de mirror (pull) para repositório
+     regular com um *push mirror* configurado pro GitHub — o Gitea agora
+     é o remoto primário (`origin`) e o GitHub é sincronizado
+     automaticamente a cada push.
+- [x] **Limite de memória do kaniko-build-push era baixo para builds
+  Node** (resolvido em 2026-09-02): a Task compartilhada
+  `kaniko-build-push` (namespace `cicd`) tinha `limits.memory: 1Gi`,
+  suficiente para o build Go da API mas insuficiente para o build Next.js
+  do Web (OOMKilled, exit 137, durante `next build`). O deploy de
+  2026-09-01 contornou isso com um override pontual (`taskRunSpecs` no
+  PipelineRun, 2.5Gi) sem alterar a Task compartilhada; o valor 2.5Gi foi
+  então promovido a default da Task em si
+  (`infra-lab/kubernetes/cicd/tekton/pipeline-build-push.yaml`), então
+  novos PipelineRuns de qualquer app Next.js/Node (incluindo REALTPMSYS)
+  não precisam mais descobrir isso de novo.
 
 Histórico da entrega inicial (DNS interno, CA do Harbor, `imagePullSecrets`,
 CoreDNS pinned, bugs de musl/getaddrinfo e egress do `k3s-worker-cicd`) segue
