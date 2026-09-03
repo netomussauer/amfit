@@ -191,7 +191,7 @@ Ver [`docs/SDD.md`](docs/SDD.md) para:
 |---|---|---|
 | **0 — Fundação** | Monorepo, infra K8s, migrations, scaffolding | ✅ Concluída |
 | **1 — MVP Core** | Auth, CRUD alunos/exercícios, fichas, app mobile funcional, execução de treino, histórico | ✅ Concluída (4 fatias: Identity, Catalog, Training, Execution) |
-| **2 — Experiência** | Progressive Overload, Anamnese inteligente, ~~gráficos de evolução~~ ✅, notificações push, compartilhamento social | Em andamento |
+| **2 — Experiência** | ~~Progressive Overload~~ ✅, Anamnese inteligente, ~~gráficos de evolução~~ ✅, notificações push, compartilhamento social | Em andamento |
 | **3 — Diferenciais** | White Label, Coach por vídeo, IA para fichas (Claude API), módulo financeiro (Asaas) | — |
 | **4 — Expansão** | Wearables (Apple Health + Google Health Connect), modo offline | — |
 
