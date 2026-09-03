@@ -28,8 +28,26 @@ func newServiceForTest() (
 	treinoHoje := &mockTreinoHojeRepo{}
 	alunos := &mockAlunoLookup{}
 
-	svc := NewTrainingService(fichas, treinos, itens, fichaCompleta, treinoHoje, alunos)
+	svc := NewTrainingService(fichas, treinos, itens, fichaCompleta, treinoHoje, alunos, &mockTemplateTreinoRepo{})
 	return svc, fichas, treinos, itens, fichaCompleta, treinoHoje, alunos
+}
+
+// newTemplateServiceForTest expõe também o mock de TemplateTreinoRepository e
+// o de AlunoLookup — testes de ListarTemplates/CriarFichaFromTemplate usam
+// este helper em vez do newServiceForTest genérico.
+func newTemplateServiceForTest() (
+	*TrainingService,
+	*mockTemplateTreinoRepo,
+	*mockAlunoLookup,
+) {
+	alunos := &mockAlunoLookup{}
+	templates := &mockTemplateTreinoRepo{}
+
+	svc := NewTrainingService(
+		&mockFichaRepo{}, &mockTreinoRepo{}, &mockItemRepo{},
+		&mockFichaCompletaRepo{}, &mockTreinoHojeRepo{}, alunos, templates,
+	)
+	return svc, templates, alunos
 }
 
 // ── CriarFicha ────────────────────────────────────────────────────────────

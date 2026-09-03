@@ -43,4 +43,13 @@ var (
 	// com os itens efetivamente persistidos no treino — evita atualizações
 	// parciais que deixariam o estado inconsistente.
 	ErrReorderInconsistente = errors.New("training: lista de itens para reordenação inconsistente")
+
+	// ErrTemplateNotFound indica que o template não existe, está inativo,
+	// ou não é visível para o personal (não é global nem é dele).
+	ErrTemplateNotFound = errors.New("training: template de treino não encontrado")
+
+	// ErrTemplateSemItens indica que o template não tem nenhum item —
+	// aplicá-lo criaria uma ficha vazia, o que não faz sentido para o
+	// fluxo "aceitar sugestão".
+	ErrTemplateSemItens = errors.New("training: template de treino sem itens")
 )

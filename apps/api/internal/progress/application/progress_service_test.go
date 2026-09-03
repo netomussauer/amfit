@@ -22,8 +22,25 @@ func newServiceForTest() (
 	dashboard := &mockDashboardRepo{}
 	access := &mockAccessRepo{}
 
-	svc := NewProgressService(historico, dashboard, access)
+	svc := NewProgressService(historico, dashboard, access, &mockAnamneseRepo{}, &mockTemplateMatcher{})
 	return svc, historico, dashboard, access
+}
+
+// newAnamneseServiceForTest expõe também os mocks de Anamnese/TemplateMatcher
+// — testes de RegistrarAnamnese/ObterAnamnese usam este helper em vez do
+// newServiceForTest genérico.
+func newAnamneseServiceForTest() (
+	*ProgressService,
+	*mockAccessRepo,
+	*mockAnamneseRepo,
+	*mockTemplateMatcher,
+) {
+	access := &mockAccessRepo{}
+	anamnese := &mockAnamneseRepo{}
+	templateMatcher := &mockTemplateMatcher{}
+
+	svc := NewProgressService(&mockHistoricoRepo{}, &mockDashboardRepo{}, access, anamnese, templateMatcher)
+	return svc, access, anamnese, templateMatcher
 }
 
 var errBoom = errors.New("erro simulado")
@@ -94,7 +111,7 @@ func TestHistoricoDoAlunoLogado_AccessNil_PulaChecagemEChamaHistorico(t *testing
 	// durante o scaffolding — confirma que esse caminho realmente funciona
 	// (sem panic de nil pointer) e consulta o histórico direto.
 	historico := &mockHistoricoRepo{}
-	svc := NewProgressService(historico, nil, nil)
+	svc := NewProgressService(historico, nil, nil, nil, nil)
 
 	chamouHistorico := false
 	historico.historicoCargaFn = func(
@@ -118,7 +135,7 @@ func TestHistoricoDoAlunoLogado_HistoricoRepoNil_RetornaErroSemPanic(t *testing.
 	// historico/dashboard/access durante o scaffolding, mas só `access` era
 	// de fato nil-safe — historico/dashboard nil causavam panic. Este teste
 	// (e o próximo, para Dashboard) cobrem o caminho que faltava.
-	svc := NewProgressService(nil, &mockDashboardRepo{}, &mockAccessRepo{})
+	svc := NewProgressService(nil, &mockDashboardRepo{}, &mockAccessRepo{}, nil, nil)
 
 	_, err := svc.HistoricoDoAlunoLogado(context.Background(), uuid.New(), uuid.New(), HistoricoParams{})
 	if !errors.Is(err, domain.ErrRepositorioNaoConfigurado) {
@@ -316,7 +333,7 @@ func TestSugestaoDoAlunoLogado_ExercicioNaoVisivel_NaoConsultaHistorico(t *testi
 }
 
 func TestSugestaoDoAlunoLogado_HistoricoRepoNil_RetornaErroSemPanic(t *testing.T) {
-	svc := NewProgressService(nil, &mockDashboardRepo{}, &mockAccessRepo{})
+	svc := NewProgressService(nil, &mockDashboardRepo{}, &mockAccessRepo{}, nil, nil)
 
 	_, err := svc.SugestaoDoAlunoLogado(context.Background(), uuid.New(), uuid.New())
 	if !errors.Is(err, domain.ErrRepositorioNaoConfigurado) {
@@ -565,7 +582,7 @@ func TestDashboard_PropagaErroDoRepositorio(t *testing.T) {
 }
 
 func TestDashboard_DashboardRepoNil_RetornaErroSemPanic(t *testing.T) {
-	svc := NewProgressService(&mockHistoricoRepo{}, nil, &mockAccessRepo{})
+	svc := NewProgressService(&mockHistoricoRepo{}, nil, &mockAccessRepo{}, nil, nil)
 
 	_, err := svc.Dashboard(context.Background(), uuid.New())
 	if !errors.Is(err, domain.ErrRepositorioNaoConfigurado) {

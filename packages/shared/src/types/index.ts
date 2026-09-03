@@ -35,6 +35,7 @@ import {
   CriarItemTreinoRequestSchema,
   AtualizarItemTreinoRequestSchema,
   ReordenarItensRequestSchema,
+  CriarFichaFromTemplateRequestSchema,
 } from '../schemas/ficha.schema';
 import {
   RegistrarSerieRequestSchema,
@@ -52,6 +53,13 @@ import {
   SugestaoProgressaoResponseSchema,
   DashboardResponseSchema,
 } from '../schemas/progresso.schema';
+import {
+  AnamneseRespostasRequestSchema,
+  RegistrarAnamneseRequestSchema,
+  RespostaAnamneseResponseSchema,
+  RespostasAnamneseResponseSchema,
+  AnamneseResponseSchema,
+} from '../schemas/anamnese.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -89,6 +97,7 @@ export type AtualizarTreinoRequest = z.infer<typeof AtualizarTreinoRequestSchema
 export type CriarItemTreinoRequest = z.infer<typeof CriarItemTreinoRequestSchema>;
 export type AtualizarItemTreinoRequest = z.infer<typeof AtualizarItemTreinoRequestSchema>;
 export type ReordenarItensRequest = z.infer<typeof ReordenarItensRequestSchema>;
+export type CriarFichaFromTemplateRequest = z.infer<typeof CriarFichaFromTemplateRequestSchema>;
 
 // Sessao
 export type RegistrarSerieRequest = z.infer<typeof RegistrarSerieRequestSchema>;
@@ -105,3 +114,10 @@ export type HistoricoExercicioResponse = z.infer<typeof HistoricoExercicioRespon
 export type HistoricoExercicioQuery = z.infer<typeof HistoricoExercicioQuerySchema>;
 export type SugestaoProgressaoResponse = z.infer<typeof SugestaoProgressaoResponseSchema>;
 export type DashboardResponse = z.infer<typeof DashboardResponseSchema>;
+
+// Anamnese
+export type AnamneseRespostasRequest = z.infer<typeof AnamneseRespostasRequestSchema>;
+export type RegistrarAnamneseRequest = z.infer<typeof RegistrarAnamneseRequestSchema>;
+export type RespostaAnamneseResponse = z.infer<typeof RespostaAnamneseResponseSchema>;
+export type RespostasAnamneseResponse = z.infer<typeof RespostasAnamneseResponseSchema>;
+export type AnamneseResponse = z.infer<typeof AnamneseResponseSchema>;

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -61,4 +62,48 @@ type FichaCompletaRepository interface {
 // Execution (sessao_treino) e merece testes/otimização independentes.
 type TreinoHojeRepository interface {
 	GetTreinoHoje(ctx context.Context, alunoID uuid.UUID) (*TreinoCompleto, error)
+}
+
+// TemplateComItens agrega um template com seus itens — usado tanto para
+// listagem (GET /templates-treino) quanto como origem da cópia em
+// CriarFichaFromTemplate.
+type TemplateComItens struct {
+	Template TemplateTreino
+	Itens    []TemplateItem
+}
+
+// ListTemplatesFilter parametriza a busca de templates. PersonalID é
+// sempre obrigatório — a listagem sempre mistura templates globais
+// (personal_id IS NULL) com os custom do personal autenticado.
+type ListTemplatesFilter struct {
+	PersonalID uuid.UUID
+	Nivel      *string
+	Objetivo   *string
+}
+
+// TemplateTreinoRepository define o contrato de leitura do catálogo de
+// templates. Não há escrita aqui nesta entrega — templates do sistema são
+// seedados via migration (ver 000007_anamnese_scoring); CRUD de templates
+// custom por personal fica para uma entrega futura.
+type TemplateTreinoRepository interface {
+	List(ctx context.Context, filter ListTemplatesFilter) ([]TemplateComItens, error)
+
+	// MelhorMatch devolve o melhor template para nivel/objetivo, priorizando
+	// os custom do personal sobre os globais do sistema. nil (sem erro)
+	// quando não há nenhum match — é o backing da consulta descrita no
+	// fluxo principal do SDD §20.2.
+	MelhorMatch(ctx context.Context, personalID uuid.UUID, nivel, objetivo string) (*TemplateTreino, error)
+
+	// AplicarTemplate cria uma ficha nova para o aluno copiando os itens do
+	// template (agrupados por treino_letra em um Treino cada) em uma única
+	// transação. Vive aqui (não em FichaRepository) porque precisa dos
+	// itens do template já carregados e a cópia é atômica — abrir a
+	// transação em outro repositório exigiria expor client de transação
+	// entre repos, mais complexo do que o ganho de separação.
+	AplicarTemplate(
+		ctx context.Context,
+		templateID, alunoID, personalID uuid.UUID,
+		nome string,
+		vigenciaInicio time.Time,
+	) (*FichaCompleta, error)
 }

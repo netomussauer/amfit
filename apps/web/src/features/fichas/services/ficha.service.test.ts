@@ -186,6 +186,44 @@ describe('fichaService.deactivate', () => {
   });
 });
 
+describe('fichaService.fromTemplate', () => {
+  beforeEach(() => {
+    mockedPost.mockReset();
+  });
+
+  const templateId = '77777777-7777-7777-7777-777777777777';
+
+  it('valida e envia POST /fichas/from-template removendo campos vazios do payload', async () => {
+    mockedPost.mockResolvedValueOnce({ data: fichaFixture });
+
+    const resultado = await fichaService.fromTemplate({
+      template_id: templateId,
+      aluno_id: alunoId,
+      nome: '',
+      vigencia_inicio: '2026-05-01',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith('/fichas/from-template', {
+      template_id: templateId,
+      aluno_id: alunoId,
+      vigencia_inicio: '2026-05-01',
+    });
+    expect(resultado).toEqual(fichaFixture);
+  });
+
+  it('lanca erro de validacao antes de enviar quando o payload e invalido', async () => {
+    await expect(
+      fichaService.fromTemplate({
+        template_id: 'nao-e-um-uuid',
+        aluno_id: alunoId,
+        vigencia_inicio: '2026-05-01',
+      }),
+    ).rejects.toThrow();
+
+    expect(mockedPost).not.toHaveBeenCalled();
+  });
+});
+
 describe('fichaService.createTreino', () => {
   beforeEach(() => {
     mockedPost.mockReset();

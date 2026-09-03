@@ -60,8 +60,33 @@ type MedidaCorporalRepository interface {
 	Save(ctx context.Context, medida *MedidaCorporal) error
 }
 
-// AnamneseRepository — stub para fase 2 (mantido por compat).
+// AnamneseRepository persiste a anamnese com scoring de um aluno.
+// aluno_id e UNIQUE no schema — Upsert cobre tanto o primeiro preenchimento
+// quanto reavaliacoes futuras.
 type AnamneseRepository interface {
 	FindByAlunoID(ctx context.Context, alunoID uuid.UUID) (*Anamnese, error)
-	Save(ctx context.Context, anamnese *Anamnese) error
+	Upsert(ctx context.Context, anamnese *Anamnese) error
+}
+
+// TemplateMatch e a projecao minima de um template de treino usada pela
+// sugestao pos-anamnese — so o suficiente para o response e para acionar
+// POST /fichas/from-template.
+type TemplateMatch struct {
+	ID   uuid.UUID
+	Nome string
+}
+
+// TemplateMatcher e um port cross-context: Progress consulta o catalogo de
+// templates (que vive no bounded context Training, junto de FichaTreino)
+// sem importar o pacote Training — mesmo padrao de AccessRepository e do
+// AlunoLookup de Training, para manter os contextos desacoplados.
+type TemplateMatcher interface {
+	// MelhorMatch devolve o melhor template para o nivel/objetivo apurados
+	// na anamnese, priorizando templates custom do personal sobre os
+	// globais do sistema. nil (sem erro) quando nao ha nenhum match.
+	//
+	// nivel e string (nao NivelAnamnese) deliberadamente — a implementacao
+	// deste port mora em training/infrastructure, que assim nao precisa
+	// importar progress/domain so por causa do tipo do enum.
+	MelhorMatch(ctx context.Context, personalID uuid.UUID, nivel string, objetivo string) (*TemplateMatch, error)
 }

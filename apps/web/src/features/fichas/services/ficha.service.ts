@@ -3,6 +3,7 @@ import {
   AtualizarItemTreinoRequestSchema,
   AtualizarTreinoRequestSchema,
   CriarFichaRequestSchema,
+  CriarFichaFromTemplateRequestSchema,
   CriarItemTreinoRequestSchema,
   CriarTreinoRequestSchema,
   FichaListResponseSchema,
@@ -14,6 +15,7 @@ import {
   type AtualizarItemTreinoRequest,
   type AtualizarTreinoRequest,
   type CriarFichaRequest,
+  type CriarFichaFromTemplateRequest,
   type CriarItemTreinoRequest,
   type CriarTreinoRequest,
   type FichaListResponse,
@@ -23,16 +25,8 @@ import {
   type TreinoResponse,
 } from '@amfit/shared';
 import { apiClient } from '@/shared/lib/api-client';
+import { stripEmpty } from '@/shared/lib/strip-empty';
 import type { FichaListParams } from '../hooks/query-keys';
-
-function stripEmpty<T extends Record<string, unknown>>(input: T): Partial<T> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(input)) {
-    if (value === '' || value === undefined) continue;
-    out[key] = value;
-  }
-  return out as Partial<T>;
-}
 
 function buildListQuery(
   params: FichaListParams,
@@ -75,6 +69,17 @@ export const fichaService = {
 
   async deactivate(id: string): Promise<void> {
     await apiClient.delete(`/fichas/${id}`);
+  },
+
+  /**
+   * Aplica um template de ficha (sugerido pela anamnese inteligente ou
+   * escolhido livremente) a um aluno, copiando treinos/itens para uma
+   * ficha real — POST /fichas/from-template.
+   */
+  async fromTemplate(payload: CriarFichaFromTemplateRequest): Promise<FichaResponse> {
+    const body = CriarFichaFromTemplateRequestSchema.parse(stripEmpty(payload));
+    const { data } = await apiClient.post('/fichas/from-template', body);
+    return FichaResponseSchema.parse(data);
   },
 
   // ── Treinos ─────────────────────────────────────────────────────────

@@ -23,19 +23,7 @@ type MedidaCorporal struct {
 	Observacao      *string
 }
 
-// Anamnese registra o historico clinico inicial do aluno.
-// (Stub para fase 2 — CRUD nao implementado nesta entrega.)
-type Anamnese struct {
-	ID             uuid.UUID
-	AlunoID        uuid.UUID
-	Objetivos      string
-	HistoricoSaude string
-	Lesoes         string
-	Medicamentos   string
-	NivelAtividade string
-	CriadoEm       time.Time
-	AtualizadoEm   time.Time
-}
+// Anamnese esta definida em anamnese.go (design com scoring, SDD §20.2).
 
 // HistoricoCargaPonto representa um ponto da serie temporal de carga
 // realizada em um exercicio para um aluno. Um ponto = uma serie executada

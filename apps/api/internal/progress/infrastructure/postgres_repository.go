@@ -3,6 +3,7 @@ package infrastructure
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -18,6 +19,7 @@ type PostgresRepositories struct {
 	Historico domain.HistoricoQueryRepository
 	Dashboard domain.DashboardQueryRepository
 	Access    domain.AccessRepository
+	Anamnese  domain.AnamneseRepository
 }
 
 // NewPostgresRepositories cria os repositorios sobre o pool compartilhado.
@@ -26,6 +28,7 @@ func NewPostgresRepositories(pool *pgxpool.Pool) *PostgresRepositories {
 		Historico: &historicoRepo{pool: pool},
 		Dashboard: &dashboardRepo{pool: pool},
 		Access:    &accessRepo{pool: pool},
+		Anamnese:  &anamneseRepo{pool: pool},
 	}
 }
 
@@ -245,4 +248,124 @@ func (r *accessRepo) ExercicioVisivelParaAluno(
 		return fmt.Errorf("exercicio-aluno check: %w", err)
 	}
 	return nil
+}
+
+// ─── Anamnese ──────────────────────────────────────────────────────────────
+
+type anamneseRepo struct {
+	pool *pgxpool.Pool
+}
+
+// respostaJSON e o shape persistido em `respostas_json` — espelha
+// exatamente o exemplo do SDD §20.2 (chave por pergunta, {opcao, pontos}).
+type respostaJSON struct {
+	Opcao  string `json:"opcao"`
+	Pontos int    `json:"pontos"`
+}
+
+type respostasJSON struct {
+	FrequenciaSemanal respostaJSON `json:"frequencia_semanal"`
+	ExperienciaMeses  respostaJSON `json:"experiencia_meses"`
+	Objetivo          respostaJSON `json:"objetivo"`
+	Restricoes        respostaJSON `json:"restricoes"`
+	Disponibilidade   respostaJSON `json:"disponibilidade"`
+}
+
+func respostasToJSON(r domain.RespostasAnamnese) respostasJSON {
+	return respostasJSON{
+		FrequenciaSemanal: respostaJSON{Opcao: r.FrequenciaSemanal.Opcao, Pontos: r.FrequenciaSemanal.Pontos},
+		ExperienciaMeses:  respostaJSON{Opcao: r.ExperienciaMeses.Opcao, Pontos: r.ExperienciaMeses.Pontos},
+		Objetivo:          respostaJSON{Opcao: r.Objetivo.Opcao, Pontos: r.Objetivo.Pontos},
+		Restricoes:        respostaJSON{Opcao: r.Restricoes.Opcao, Pontos: r.Restricoes.Pontos},
+		Disponibilidade:   respostaJSON{Opcao: r.Disponibilidade.Opcao, Pontos: r.Disponibilidade.Pontos},
+	}
+}
+
+func respostasFromJSON(j respostasJSON) domain.RespostasAnamnese {
+	return domain.RespostasAnamnese{
+		FrequenciaSemanal: domain.RespostaAnamnese{Opcao: j.FrequenciaSemanal.Opcao, Pontos: j.FrequenciaSemanal.Pontos},
+		ExperienciaMeses:  domain.RespostaAnamnese{Opcao: j.ExperienciaMeses.Opcao, Pontos: j.ExperienciaMeses.Pontos},
+		Objetivo:          domain.RespostaAnamnese{Opcao: j.Objetivo.Opcao, Pontos: j.Objetivo.Pontos},
+		Restricoes:        domain.RespostaAnamnese{Opcao: j.Restricoes.Opcao, Pontos: j.Restricoes.Pontos},
+		Disponibilidade:   domain.RespostaAnamnese{Opcao: j.Disponibilidade.Opcao, Pontos: j.Disponibilidade.Pontos},
+	}
+}
+
+// Upsert insere ou atualiza por aluno_id (UNIQUE). Em conflito, o id e
+// preenchido_em originais sao preservados — so os dados e atualizado_em
+// mudam, porque uma reavaliacao edita a MESMA anamnese, nao cria outra.
+const queryUpsertAnamnese = `
+INSERT INTO anamnese (
+    aluno_id, objetivo, lesoes, doencas_preexistentes, medicamentos,
+    pratica_outro_esporte, outro_esporte, frequencia_semanas_anterior,
+    observacoes_gerais, respostas_json, score_calculado, nivel_sugerido
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+ON CONFLICT (aluno_id) DO UPDATE SET
+    objetivo                    = EXCLUDED.objetivo,
+    lesoes                      = EXCLUDED.lesoes,
+    doencas_preexistentes       = EXCLUDED.doencas_preexistentes,
+    medicamentos                = EXCLUDED.medicamentos,
+    pratica_outro_esporte       = EXCLUDED.pratica_outro_esporte,
+    outro_esporte                = EXCLUDED.outro_esporte,
+    frequencia_semanas_anterior = EXCLUDED.frequencia_semanas_anterior,
+    observacoes_gerais           = EXCLUDED.observacoes_gerais,
+    respostas_json                = EXCLUDED.respostas_json,
+    score_calculado                = EXCLUDED.score_calculado,
+    nivel_sugerido                  = EXCLUDED.nivel_sugerido,
+    atualizado_em                    = NOW()
+RETURNING id, preenchido_em, atualizado_em;
+`
+
+func (r *anamneseRepo) Upsert(ctx context.Context, a *domain.Anamnese) error {
+	payload, err := json.Marshal(respostasToJSON(a.Respostas))
+	if err != nil {
+		return fmt.Errorf("marshal respostas_json: %w", err)
+	}
+
+	err = r.pool.QueryRow(ctx, queryUpsertAnamnese,
+		a.AlunoID, a.Objetivo, a.Lesoes, a.DoencasPreexistentes, a.Medicamentos,
+		a.PraticaOutroEsporte, a.OutroEsporte, a.FrequenciaSemanasAnterior,
+		a.ObservacoesGerais, payload, a.ScoreCalculado, a.NivelSugerido,
+	).Scan(&a.ID, &a.PreenchidoEm, &a.AtualizadoEm)
+	if err != nil {
+		return fmt.Errorf("upsert anamnese: %w", err)
+	}
+	return nil
+}
+
+const queryFindAnamnese = `
+SELECT id, aluno_id, objetivo, lesoes, doencas_preexistentes, medicamentos,
+       pratica_outro_esporte, outro_esporte, frequencia_semanas_anterior,
+       observacoes_gerais, respostas_json, score_calculado, nivel_sugerido,
+       preenchido_em, atualizado_em
+FROM anamnese
+WHERE aluno_id = $1;
+`
+
+func (r *anamneseRepo) FindByAlunoID(ctx context.Context, alunoID uuid.UUID) (*domain.Anamnese, error) {
+	var a domain.Anamnese
+	var payload []byte
+	var nivel string
+
+	err := r.pool.QueryRow(ctx, queryFindAnamnese, alunoID).Scan(
+		&a.ID, &a.AlunoID, &a.Objetivo, &a.Lesoes, &a.DoencasPreexistentes, &a.Medicamentos,
+		&a.PraticaOutroEsporte, &a.OutroEsporte, &a.FrequenciaSemanasAnterior,
+		&a.ObservacoesGerais, &payload, &a.ScoreCalculado, &nivel,
+		&a.PreenchidoEm, &a.AtualizadoEm,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrAnamneseNotFound
+		}
+		return nil, fmt.Errorf("find anamnese: %w", err)
+	}
+	a.NivelSugerido = domain.NivelAnamnese(nivel)
+
+	var j respostasJSON
+	if err := json.Unmarshal(payload, &j); err != nil {
+		return nil, fmt.Errorf("unmarshal respostas_json: %w", err)
+	}
+	a.Respostas = respostasFromJSON(j)
+
+	return &a, nil
 }

@@ -12,6 +12,7 @@ export { Modal } from './components/Modal';
 export { useFichas } from './hooks/useFichas';
 export { useFicha } from './hooks/useFicha';
 export { useCriarFicha } from './hooks/useCriarFicha';
+export { useCriarFichaFromTemplate } from './hooks/useCriarFichaFromTemplate';
 export { useAtualizarFicha } from './hooks/useAtualizarFicha';
 export { useDesativarFicha } from './hooks/useDesativarFicha';
 export { useCriarTreino } from './hooks/useCriarTreino';

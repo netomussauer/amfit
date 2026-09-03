@@ -6,6 +6,7 @@ export * from './schemas/exercicio.schema';
 export * from './schemas/ficha.schema';
 export * from './schemas/sessao.schema';
 export * from './schemas/progresso.schema';
+export * from './schemas/anamnese.schema';
 
 // Types
 export * from './types/index';

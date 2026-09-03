@@ -17,9 +17,11 @@ import (
 	identityhandlers "github.com/amfit/api/internal/identity/handlers"
 	identityinfra "github.com/amfit/api/internal/identity/infrastructure"
 	progressapplication "github.com/amfit/api/internal/progress/application"
+	progressdomain "github.com/amfit/api/internal/progress/domain"
 	progresshandlers "github.com/amfit/api/internal/progress/handlers"
 	progressinfra "github.com/amfit/api/internal/progress/infrastructure"
 	trainingapplication "github.com/amfit/api/internal/training/application"
+	trainingdomain "github.com/amfit/api/internal/training/domain"
 	traininghandlers "github.com/amfit/api/internal/training/handlers"
 	traininginfra "github.com/amfit/api/internal/training/infrastructure"
 	"github.com/amfit/api/pkg/auth"
@@ -30,6 +32,7 @@ import (
 	"github.com/amfit/api/pkg/storage"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -139,6 +142,7 @@ func main() {
 		trainingRepos.FichaCompleta,
 		trainingRepos.TreinoHoje,
 		trainingRepos.AlunoLookup,
+		trainingRepos.Templates,
 	)
 	trainingH := traininghandlers.NewTrainingHandler(trainingSvc)
 
@@ -158,6 +162,8 @@ func main() {
 		progressRepos.Historico,
 		progressRepos.Dashboard,
 		progressRepos.Access,
+		progressRepos.Anamnese,
+		templateMatcherAdapter{templates: trainingRepos.Templates},
 	)
 	progressH := progresshandlers.NewProgressHandler(progressSvc)
 
@@ -264,4 +270,28 @@ func main() {
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatal().Err(err).Msg("server error")
 	}
+}
+
+// templateMatcherAdapter implementa progressdomain.TemplateMatcher em cima
+// de trainingdomain.TemplateTreinoRepository. Vive aqui (não em nenhum dos
+// dois pacotes de infrastructure) porque é o único lugar que já importa
+// ambos os bounded contexts — nem Progress nem Training precisam conhecer
+// o tipo de retorno um do outro.
+type templateMatcherAdapter struct {
+	templates trainingdomain.TemplateTreinoRepository
+}
+
+func (a templateMatcherAdapter) MelhorMatch(
+	ctx context.Context,
+	personalID uuid.UUID,
+	nivel, objetivo string,
+) (*progressdomain.TemplateMatch, error) {
+	t, err := a.templates.MelhorMatch(ctx, personalID, nivel, objetivo)
+	if err != nil {
+		return nil, err
+	}
+	if t == nil {
+		return nil, nil
+	}
+	return &progressdomain.TemplateMatch{ID: t.ID, Nome: t.Nome}, nil
 }

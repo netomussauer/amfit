@@ -34,24 +34,30 @@ const (
 
 // ProgressService agrupa os casos de uso de acompanhamento de evolucao.
 type ProgressService struct {
-	historico domain.HistoricoQueryRepository
-	dashboard domain.DashboardQueryRepository
-	access    domain.AccessRepository
+	historico       domain.HistoricoQueryRepository
+	dashboard       domain.DashboardQueryRepository
+	access          domain.AccessRepository
+	anamnese        domain.AnamneseRepository
+	templateMatcher domain.TemplateMatcher
 }
 
 // NewProgressService monta o servico com as dependencias necessarias.
-// Pode receber nil para historico/dashboard/access — nesse caso os
-// metodos correspondentes retornarao erro de operacao nao suportada.
-// Util durante o scaffolding inicial enquanto repos sao plumbados.
+// Pode receber nil para qualquer dependencia — nesse caso os metodos
+// correspondentes retornarao erro de operacao nao suportada. Util durante
+// o scaffolding inicial enquanto repos sao plumbados.
 func NewProgressService(
 	historico domain.HistoricoQueryRepository,
 	dashboard domain.DashboardQueryRepository,
 	access domain.AccessRepository,
+	anamnese domain.AnamneseRepository,
+	templateMatcher domain.TemplateMatcher,
 ) *ProgressService {
 	return &ProgressService{
-		historico: historico,
-		dashboard: dashboard,
-		access:    access,
+		historico:       historico,
+		dashboard:       dashboard,
+		access:          access,
+		anamnese:        anamnese,
+		templateMatcher: templateMatcher,
 	}
 }
 

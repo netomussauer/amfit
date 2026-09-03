@@ -32,10 +32,13 @@ func NewTrainingHandler(svc *application.TrainingService) *TrainingHandler {
 // mws é a chain aplicada por rota (tipicamente: auth + RequireRole("PERSONAL")).
 func (h *TrainingHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fiber.Handler) {
 	middleware.Post(router, "/fichas", mws, h.CriarFicha)
+	middleware.Post(router, "/fichas/from-template", mws, h.CriarFichaFromTemplate)
 	middleware.Get(router, "/fichas", mws, h.ListarFichas)
 	middleware.Get(router, "/fichas/:id", mws, h.BuscarFicha)
 	middleware.Patch(router, "/fichas/:id", mws, h.AtualizarFicha)
 	middleware.Delete(router, "/fichas/:id", mws, h.DesativarFicha)
+
+	middleware.Get(router, "/templates-treino", mws, h.ListarTemplates)
 
 	middleware.Post(router, "/fichas/:fichaId/treinos", mws, h.CriarTreino)
 	middleware.Patch(router, "/treinos/:id", mws, h.AtualizarTreino)
@@ -186,6 +189,56 @@ func (h *TrainingHandler) DesativarFicha(c fiber.Ctx) error {
 		return writeFichaError(c, err, "falha ao desativar ficha")
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ── Templates ──────────────────────────────────────────────────────────────
+
+// ListarTemplates trata GET /templates-treino (role=PERSONAL).
+//
+// Query opcional: nivel (INICIANTE|INTERMEDIARIO|AVANCADO), objetivo
+// (hipertrofia|emagrecimento|forca|condicionamento).
+func (h *TrainingHandler) ListarTemplates(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	var nivel *string
+	if v := c.Query("nivel", ""); v != "" {
+		nivel = &v
+	}
+	var objetivo *string
+	if v := c.Query("objetivo", ""); v != "" {
+		objetivo = &v
+	}
+
+	resp, err := h.svc.ListarTemplates(c.Context(), personalID, nivel, objetivo)
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao listar templates",
+		))
+	}
+	return c.JSON(resp)
+}
+
+// CriarFichaFromTemplate trata POST /fichas/from-template (role=PERSONAL).
+func (h *TrainingHandler) CriarFichaFromTemplate(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	var req application.CriarFichaFromTemplateRequest
+	if !h.bindAndValidate(c, &req) {
+		return nil
+	}
+
+	resp, err := h.svc.CriarFichaFromTemplate(c.Context(), personalID, req)
+	if err != nil {
+		return writeTemplateError(c, err, "falha ao criar ficha a partir de template")
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 // ── Treinos ────────────────────────────────────────────────────────────────
@@ -542,6 +595,34 @@ func writeItemError(c fiber.Ctx, err error, fallback string) error {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusNotFound, "not-found", "Not Found",
 			"treino não encontrado",
+		))
+	}
+	return middleware.WriteProblem(c, middleware.NewProblem(
+		fiber.StatusInternalServerError, "internal", "Internal Server Error",
+		fallback,
+	))
+}
+
+// writeTemplateError traduz erros do fluxo de aplicar template (POST
+// /fichas/from-template). ErrFichaForbidden aparece aqui porque a checagem
+// de ownership do aluno é compartilhada com CriarFicha — 404 genérico
+// (anti-enumeration), igual writeFichaError.
+func writeTemplateError(c fiber.Ctx, err error, fallback string) error {
+	switch {
+	case errors.Is(err, domain.ErrTemplateNotFound):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusNotFound, "not-found", "Not Found",
+			"template não encontrado",
+		))
+	case errors.Is(err, domain.ErrTemplateSemItens):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+			"template sem itens não pode ser aplicado",
+		))
+	case errors.Is(err, domain.ErrFichaForbidden):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusNotFound, "not-found", "Not Found",
+			"aluno não encontrado",
 		))
 	}
 	return middleware.WriteProblem(c, middleware.NewProblem(

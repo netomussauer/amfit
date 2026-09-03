@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"time"
 
 	"github.com/amfit/api/internal/training/domain"
 	"github.com/google/uuid"
@@ -10,12 +11,12 @@ import (
 // ── Ficha mock ─────────────────────────────────────────────────────────────
 
 type mockFichaRepo struct {
-	createFn          func(ctx context.Context, f *domain.FichaTreino) error
-	findByIDFn        func(ctx context.Context, id uuid.UUID) (*domain.FichaTreino, error)
-	listFn            func(ctx context.Context, filter domain.ListFichasFilter) ([]*domain.FichaTreino, error)
+	createFn           func(ctx context.Context, f *domain.FichaTreino) error
+	findByIDFn         func(ctx context.Context, id uuid.UUID) (*domain.FichaTreino, error)
+	listFn             func(ctx context.Context, filter domain.ListFichasFilter) ([]*domain.FichaTreino, error)
 	findAtivaByAlunoFn func(ctx context.Context, alunoID uuid.UUID) (*domain.FichaTreino, error)
-	updateFn          func(ctx context.Context, f *domain.FichaTreino) error
-	deactivateFn      func(ctx context.Context, id uuid.UUID) error
+	updateFn           func(ctx context.Context, f *domain.FichaTreino) error
+	deactivateFn       func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *mockFichaRepo) Create(ctx context.Context, f *domain.FichaTreino) error {
@@ -203,4 +204,47 @@ func (m *mockAlunoLookup) BelongsToPersonal(
 	// Por padrão considera que pertence — testes de "ownership negativo"
 	// devem sobrescrever explicitamente.
 	return true, nil
+}
+
+// ── TemplateTreino mock ─────────────────────────────────────────────────────
+
+type mockTemplateTreinoRepo struct {
+	listFn            func(ctx context.Context, filter domain.ListTemplatesFilter) ([]domain.TemplateComItens, error)
+	melhorMatchFn     func(ctx context.Context, personalID uuid.UUID, nivel, objetivo string) (*domain.TemplateTreino, error)
+	aplicarTemplateFn func(
+		ctx context.Context,
+		templateID, alunoID, personalID uuid.UUID,
+		nome string,
+		vigenciaInicio time.Time,
+	) (*domain.FichaCompleta, error)
+}
+
+func (m *mockTemplateTreinoRepo) List(
+	ctx context.Context, filter domain.ListTemplatesFilter,
+) ([]domain.TemplateComItens, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, filter)
+	}
+	return nil, nil
+}
+
+func (m *mockTemplateTreinoRepo) MelhorMatch(
+	ctx context.Context, personalID uuid.UUID, nivel, objetivo string,
+) (*domain.TemplateTreino, error) {
+	if m.melhorMatchFn != nil {
+		return m.melhorMatchFn(ctx, personalID, nivel, objetivo)
+	}
+	return nil, nil
+}
+
+func (m *mockTemplateTreinoRepo) AplicarTemplate(
+	ctx context.Context,
+	templateID, alunoID, personalID uuid.UUID,
+	nome string,
+	vigenciaInicio time.Time,
+) (*domain.FichaCompleta, error) {
+	if m.aplicarTemplateFn != nil {
+		return m.aplicarTemplateFn(ctx, templateID, alunoID, personalID, nome, vigenciaInicio)
+	}
+	return nil, domain.ErrTemplateNotFound
 }

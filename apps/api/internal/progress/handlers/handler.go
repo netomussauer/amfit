@@ -4,11 +4,13 @@ package handlers
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/amfit/api/internal/progress/application"
 	"github.com/amfit/api/internal/progress/domain"
 	"github.com/amfit/api/pkg/middleware"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -16,12 +18,16 @@ import (
 
 // ProgressHandler expoe os endpoints de progresso e dashboard.
 type ProgressHandler struct {
-	svc *application.ProgressService
+	svc      *application.ProgressService
+	validate *validator.Validate
 }
 
 // NewProgressHandler cria o handler com o servico injetado.
 func NewProgressHandler(svc *application.ProgressService) *ProgressHandler {
-	return &ProgressHandler{svc: svc}
+	return &ProgressHandler{
+		svc:      svc,
+		validate: validator.New(validator.WithRequiredStructEnabled()),
+	}
 }
 
 // RegisterAlunoRoutes registra as rotas que o ALUNO consome sobre seu
@@ -40,6 +46,8 @@ func (h *ProgressHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fib
 		mws, h.HistoricoExercicioDoAluno)
 	middleware.Get(router, "/alunos/:alunoId/progresso/exercicio/:exercicioId/sugestao",
 		mws, h.SugestaoExercicioDoAluno)
+	middleware.Post(router, "/alunos/:alunoId/anamnese", mws, h.RegistrarAnamnese)
+	middleware.Get(router, "/alunos/:alunoId/anamnese", mws, h.ObterAnamnese)
 	middleware.Get(router, "/dashboard", mws, h.Dashboard)
 }
 
@@ -183,6 +191,58 @@ func (h *ProgressHandler) Dashboard(c fiber.Ctx) error {
 	return c.JSON(toDashboardResponse(resumo))
 }
 
+// ─── Personal: anamnese inteligente ────────────────────────────────────────
+
+// RegistrarAnamnese trata POST /alunos/:alunoId/anamnese (role=PERSONAL).
+// Calcula score/nivel no backend (nunca confia em pontos do cliente) e
+// devolve, junto com a anamnese salva, o template de ficha sugerido —
+// SDD §20.2.
+func (h *ProgressHandler) RegistrarAnamnese(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	alunoID, err := uuid.Parse(c.Params("alunoId"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"alunoId invalido",
+		))
+	}
+
+	var req registrarAnamneseRequestDTO
+	if !h.bindAndValidate(c, &req) {
+		return nil
+	}
+
+	resultado, err := h.svc.RegistrarAnamnese(c.Context(), personalID, alunoID, req.toParams())
+	if err != nil {
+		return writeProgressError(c, err, "falha ao registrar anamnese")
+	}
+	return c.Status(fiber.StatusCreated).JSON(toAnamneseResponse(resultado))
+}
+
+// ObterAnamnese trata GET /alunos/:alunoId/anamnese (role=PERSONAL).
+func (h *ProgressHandler) ObterAnamnese(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	alunoID, err := uuid.Parse(c.Params("alunoId"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"alunoId invalido",
+		))
+	}
+
+	anamnese, err := h.svc.ObterAnamnese(c.Context(), personalID, alunoID)
+	if err != nil {
+		return writeProgressError(c, err, "falha ao buscar anamnese")
+	}
+	return c.JSON(toAnamneseResponse(application.AnamneseComTemplate{Anamnese: anamnese}))
+}
+
 // ─── DTOs de saida ─────────────────────────────────────────────────────────
 
 type historicoPontoDTO struct {
@@ -259,7 +319,170 @@ func toDashboardResponse(r domain.DashboardResumo) dashboardResponseDTO {
 	}
 }
 
+// ─── Anamnese: DTOs de entrada ──────────────────────────────────────────────
+
+// respostasAnamneseRequestDTO carrega as 5 chaves de opcao das perguntas
+// padronizadas (SDD §20.2) — o backend resolve pontos e nivel, nunca aceita
+// esses campos vindos prontos do cliente.
+type respostasAnamneseRequestDTO struct {
+	FrequenciaSemanal string `json:"frequencia_semanal" validate:"required"`
+	ExperienciaMeses  string `json:"experiencia_meses" validate:"required"`
+	Objetivo          string `json:"objetivo" validate:"required"`
+	Restricoes        string `json:"restricoes" validate:"required"`
+	Disponibilidade   string `json:"disponibilidade" validate:"required"`
+}
+
+type registrarAnamneseRequestDTO struct {
+	Objetivo                  string                      `json:"objetivo" validate:"required,min=2,max=200"`
+	Lesoes                    *string                     `json:"lesoes,omitempty" validate:"omitempty,max=1000"`
+	DoencasPreexistentes      *string                     `json:"doencas_preexistentes,omitempty" validate:"omitempty,max=1000"`
+	Medicamentos              *string                     `json:"medicamentos,omitempty" validate:"omitempty,max=1000"`
+	PraticaOutroEsporte       bool                        `json:"pratica_outro_esporte"`
+	OutroEsporte              *string                     `json:"outro_esporte,omitempty" validate:"omitempty,max=200"`
+	FrequenciaSemanasAnterior *int                        `json:"frequencia_semanas_anterior,omitempty" validate:"omitempty,min=0,max=7"`
+	ObservacoesGerais         *string                     `json:"observacoes_gerais,omitempty" validate:"omitempty,max=2000"`
+	Respostas                 respostasAnamneseRequestDTO `json:"respostas"`
+}
+
+func (r registrarAnamneseRequestDTO) toParams() application.RegistrarAnamneseParams {
+	return application.RegistrarAnamneseParams{
+		Objetivo:                  r.Objetivo,
+		Lesoes:                    r.Lesoes,
+		DoencasPreexistentes:      r.DoencasPreexistentes,
+		Medicamentos:              r.Medicamentos,
+		PraticaOutroEsporte:       r.PraticaOutroEsporte,
+		OutroEsporte:              r.OutroEsporte,
+		FrequenciaSemanasAnterior: r.FrequenciaSemanasAnterior,
+		ObservacoesGerais:         r.ObservacoesGerais,
+		Respostas: domain.AnamneseRespostasInput{
+			FrequenciaSemanal: r.Respostas.FrequenciaSemanal,
+			ExperienciaMeses:  r.Respostas.ExperienciaMeses,
+			Objetivo:          r.Respostas.Objetivo,
+			Restricoes:        r.Respostas.Restricoes,
+			Disponibilidade:   r.Respostas.Disponibilidade,
+		},
+	}
+}
+
+// ─── Anamnese: DTOs de saida ────────────────────────────────────────────────
+
+type respostaAnamneseResponseDTO struct {
+	Opcao  string `json:"opcao"`
+	Pontos int    `json:"pontos"`
+}
+
+type respostasAnamneseResponseDTO struct {
+	FrequenciaSemanal respostaAnamneseResponseDTO `json:"frequencia_semanal"`
+	ExperienciaMeses  respostaAnamneseResponseDTO `json:"experiencia_meses"`
+	Objetivo          respostaAnamneseResponseDTO `json:"objetivo"`
+	Restricoes        respostaAnamneseResponseDTO `json:"restricoes"`
+	Disponibilidade   respostaAnamneseResponseDTO `json:"disponibilidade"`
+}
+
+type anamneseResponseDTO struct {
+	ID                        uuid.UUID                    `json:"id"`
+	AlunoID                   uuid.UUID                    `json:"aluno_id"`
+	Objetivo                  string                       `json:"objetivo"`
+	Lesoes                    *string                      `json:"lesoes,omitempty"`
+	DoencasPreexistentes      *string                      `json:"doencas_preexistentes,omitempty"`
+	Medicamentos              *string                      `json:"medicamentos,omitempty"`
+	PraticaOutroEsporte       bool                         `json:"pratica_outro_esporte"`
+	OutroEsporte              *string                      `json:"outro_esporte,omitempty"`
+	FrequenciaSemanasAnterior *int                         `json:"frequencia_semanas_anterior,omitempty"`
+	ObservacoesGerais         *string                      `json:"observacoes_gerais,omitempty"`
+	Respostas                 respostasAnamneseResponseDTO `json:"respostas"`
+	ScoreCalculado            int                          `json:"score_calculado"`
+	NivelSugerido             string                       `json:"nivel_sugerido"`
+	TemplateFichaID           *string                      `json:"template_ficha_id,omitempty"`
+	TemplateFichaNome         *string                      `json:"template_ficha_nome,omitempty"`
+	PreenchidoEm              string                       `json:"preenchido_em"`
+	AtualizadoEm              string                       `json:"atualizado_em"`
+}
+
+func toAnamneseResponse(r application.AnamneseComTemplate) anamneseResponseDTO {
+	a := r.Anamnese
+	dto := anamneseResponseDTO{
+		ID:                        a.ID,
+		AlunoID:                   a.AlunoID,
+		Objetivo:                  a.Objetivo,
+		Lesoes:                    a.Lesoes,
+		DoencasPreexistentes:      a.DoencasPreexistentes,
+		Medicamentos:              a.Medicamentos,
+		PraticaOutroEsporte:       a.PraticaOutroEsporte,
+		OutroEsporte:              a.OutroEsporte,
+		FrequenciaSemanasAnterior: a.FrequenciaSemanasAnterior,
+		ObservacoesGerais:         a.ObservacoesGerais,
+		Respostas: respostasAnamneseResponseDTO{
+			FrequenciaSemanal: respostaAnamneseResponseDTO{Opcao: a.Respostas.FrequenciaSemanal.Opcao, Pontos: a.Respostas.FrequenciaSemanal.Pontos},
+			ExperienciaMeses:  respostaAnamneseResponseDTO{Opcao: a.Respostas.ExperienciaMeses.Opcao, Pontos: a.Respostas.ExperienciaMeses.Pontos},
+			Objetivo:          respostaAnamneseResponseDTO{Opcao: a.Respostas.Objetivo.Opcao, Pontos: a.Respostas.Objetivo.Pontos},
+			Restricoes:        respostaAnamneseResponseDTO{Opcao: a.Respostas.Restricoes.Opcao, Pontos: a.Respostas.Restricoes.Pontos},
+			Disponibilidade:   respostaAnamneseResponseDTO{Opcao: a.Respostas.Disponibilidade.Opcao, Pontos: a.Respostas.Disponibilidade.Pontos},
+		},
+		ScoreCalculado: a.ScoreCalculado,
+		NivelSugerido:  string(a.NivelSugerido),
+		PreenchidoEm:   a.PreenchidoEm.Format(time.RFC3339),
+		AtualizadoEm:   a.AtualizadoEm.Format(time.RFC3339),
+	}
+	if r.Template != nil {
+		id := r.Template.ID.String()
+		nome := r.Template.Nome
+		dto.TemplateFichaID = &id
+		dto.TemplateFichaNome = &nome
+	}
+	return dto
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+// bindAndValidate parseia o body JSON e roda as tags de validacao do struct.
+// Quando ok=false a resposta de erro (400/422) ja foi escrita.
+func (h *ProgressHandler) bindAndValidate(c fiber.Ctx, dst any) bool {
+	if err := c.Bind().Body(dst); err != nil {
+		_ = middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"corpo da requisicao invalido",
+		))
+		return false
+	}
+	if err := h.validate.Struct(dst); err != nil {
+		_ = middleware.WriteProblem(c, validationProblem(err))
+		return false
+	}
+	return true
+}
+
+func validationProblem(err error) middleware.ProblemDetail {
+	p := middleware.NewProblem(
+		fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+		"dados invalidos",
+	)
+
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) {
+		p.Errors = make([]middleware.ProblemFieldError, 0, len(ve))
+		for _, fe := range ve {
+			p.Errors = append(p.Errors, middleware.ProblemFieldError{
+				Field:   strings.ToLower(fe.Field()),
+				Message: validationMessage(fe),
+			})
+		}
+	}
+	return p
+}
+
+func validationMessage(fe validator.FieldError) string {
+	switch fe.Tag() {
+	case "required":
+		return "campo obrigatorio"
+	case "min":
+		return "valor abaixo do minimo (" + fe.Param() + ")"
+	case "max":
+		return "valor acima do maximo (" + fe.Param() + ")"
+	default:
+		return "valor invalido"
+	}
+}
 
 func userIDFromCtx(c fiber.Ctx) (uuid.UUID, bool) {
 	raw, _ := c.Locals("user_id").(string)
@@ -316,10 +539,16 @@ func parseHistoricoParams(c fiber.Ctx) (application.HistoricoParams, *middleware
 func writeProgressError(c fiber.Ctx, err error, fallback string) error {
 	switch {
 	case errors.Is(err, domain.ErrAlunoNotFound),
-		errors.Is(err, domain.ErrExercicioNotFound):
+		errors.Is(err, domain.ErrExercicioNotFound),
+		errors.Is(err, domain.ErrAnamneseNotFound):
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusNotFound, "not-found", "Not Found",
 			"recurso nao encontrado",
+		))
+	case errors.Is(err, domain.ErrOpcaoAnamneseInvalida):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+			"opcao de resposta invalida",
 		))
 	}
 	log.Error().Err(err).Str("path", c.Path()).Msg("progress handler error")

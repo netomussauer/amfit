@@ -34,6 +34,7 @@ type TrainingService struct {
 	fichaLeitura domain.FichaCompletaRepository
 	treinoHoje   domain.TreinoHojeRepository
 	alunos       AlunoLookup
+	templates    domain.TemplateTreinoRepository
 }
 
 // NewTrainingService monta o service com todas as suas dependências.
@@ -44,6 +45,7 @@ func NewTrainingService(
 	fichaLeitura domain.FichaCompletaRepository,
 	treinoHoje domain.TreinoHojeRepository,
 	alunos AlunoLookup,
+	templates domain.TemplateTreinoRepository,
 ) *TrainingService {
 	return &TrainingService{
 		fichas:       fichas,
@@ -52,6 +54,7 @@ func NewTrainingService(
 		fichaLeitura: fichaLeitura,
 		treinoHoje:   treinoHoje,
 		alunos:       alunos,
+		templates:    templates,
 	}
 }
 
@@ -487,6 +490,81 @@ func (s *TrainingService) ObterTreinoHoje(
 	}, nil
 }
 
+// ── Templates ──────────────────────────────────────────────────────────────
+
+// ListarTemplates devolve os templates de ficha disponíveis pro personal
+// (globais do sistema + custom dele), com filtros opcionais de
+// nivel/objetivo — usado pra popular a tela de "escolher template" quando
+// o personal não quer aceitar a sugestão automática da anamnese.
+func (s *TrainingService) ListarTemplates(
+	ctx context.Context,
+	personalID uuid.UUID,
+	nivel, objetivo *string,
+) (*TemplateListResponse, error) {
+	rows, err := s.templates.List(ctx, domain.ListTemplatesFilter{
+		PersonalID: personalID,
+		Nivel:      nivel,
+		Objetivo:   objetivo,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("application: list templates: %w", err)
+	}
+
+	out := make([]TemplateResponse, 0, len(rows))
+	for _, t := range rows {
+		out = append(out, templateComItensToResponse(t))
+	}
+	return &TemplateListResponse{Data: out}, nil
+}
+
+// CriarFichaFromTemplate aplica um template a um aluno, criando uma ficha
+// nova com treinos/itens copiados do template (SDD §20.2, "Personal aceita
+// o template"). Verifica ownership do aluno antes de copiar.
+func (s *TrainingService) CriarFichaFromTemplate(
+	ctx context.Context,
+	personalID uuid.UUID,
+	req CriarFichaFromTemplateRequest,
+) (*FichaResponse, error) {
+	templateID, err := uuid.Parse(req.TemplateID)
+	if err != nil {
+		return nil, fmt.Errorf("application: parse template_id: %w", err)
+	}
+	alunoID, err := uuid.Parse(req.AlunoID)
+	if err != nil {
+		return nil, fmt.Errorf("application: parse aluno_id: %w", err)
+	}
+
+	owns, err := s.alunos.BelongsToPersonal(ctx, alunoID, personalID)
+	if err != nil {
+		return nil, fmt.Errorf("application: verificar ownership do aluno: %w", err)
+	}
+	if !owns {
+		return nil, domain.ErrFichaForbidden
+	}
+
+	inicio, err := time.Parse(dateLayout, req.VigenciaInicio)
+	if err != nil {
+		return nil, fmt.Errorf("application: parse vigencia_inicio: %w", err)
+	}
+
+	completa, err := s.templates.AplicarTemplate(
+		ctx, templateID, alunoID, personalID, strings.TrimSpace(req.Nome), inicio,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("application: aplicar template: %w", err)
+	}
+
+	log.Info().
+		Str("template_id", templateID.String()).
+		Str("ficha_id", completa.Ficha.ID.String()).
+		Str("aluno_id", alunoID.String()).
+		Str("personal_id", personalID.String()).
+		Msg("ficha criada a partir de template")
+
+	resp := fichaCompletaToResponse(completa)
+	return &resp, nil
+}
+
 // ── Helpers de autorização ────────────────────────────────────────────────
 
 // requireFichaOfPersonal carrega a ficha e verifica ownership. Quando a ficha
@@ -633,6 +711,36 @@ func itemSimplesToResponse(i *domain.ItemTreino) ItemTreinoResponse {
 		resp.Observacao = &obs
 	}
 	return resp
+}
+
+// templateComItensToResponse mapeia um template com seus itens para o DTO
+// de saída. Os itens não trazem dados completos do exercício (só o ID) —
+// diferente de ItemTreinoResponse, o catálogo de templates não faz JOIN com
+// exercicio/grupo_muscular; o cliente já tem o catálogo de exercícios em
+// cache para exibir nome/mídia quando necessário.
+func templateComItensToResponse(t domain.TemplateComItens) TemplateResponse {
+	itens := make([]TemplateItemResponse, 0, len(t.Itens))
+	for _, i := range t.Itens {
+		item := TemplateItemResponse{
+			ID:               i.ID.String(),
+			Exercicio:        ExercicioResumoResponse{ID: i.ExercicioID.String()},
+			TreinoLetra:      i.TreinoLetra,
+			Ordem:            i.Ordem,
+			Series:           i.Series,
+			Repeticoes:       i.Repeticoes,
+			CargaSugerida:    i.CargaSugerida,
+			DescansoSegundos: i.DescansoSegundos,
+		}
+		itens = append(itens, item)
+	}
+	return TemplateResponse{
+		ID:        t.Template.ID.String(),
+		Nome:      t.Template.Nome,
+		Nivel:     t.Template.Nivel,
+		Objetivo:  t.Template.Objetivo,
+		CriadoPor: string(t.Template.CriadoPor),
+		Itens:     itens,
+	}
 }
 
 // itemComExercicioToResponse mapeia o read-model com dados do exercício/grupo.

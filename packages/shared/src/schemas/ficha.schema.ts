@@ -112,5 +112,22 @@ export const ReordenarItensRequestSchema = z.object({
   ids: z.array(z.string().uuid()).min(1, 'Lista de itens vazia'),
 });
 
+// ── Ficha a partir de template (Anamnese Inteligente — SDD §20.2) ──────
+// POST /fichas/from-template aplica um template de ficha (sugerido a partir
+// do nível apurado na anamnese, ou escolhido livremente) a um aluno,
+// copiando treinos/itens para uma ficha real. A resposta reaproveita
+// FichaResponseSchema (mesmo shape de POST /fichas e GET /fichas/:id).
+export const CriarFichaFromTemplateRequestSchema = z.object({
+  template_id: z.string().uuid('Template inválido'),
+  aluno_id: z.string().uuid('ID do aluno inválido'),
+  nome: z
+    .string()
+    .min(2, 'Nome deve ter ao menos 2 caracteres')
+    .max(150, 'Nome muito longo')
+    .optional()
+    .or(z.literal('')),
+  vigencia_inicio: dataIsoSchema,
+});
+
 // Types inferidos sao exportados centralmente em ../types/index.ts
 // para evitar conflito de re-export em src/index.ts.

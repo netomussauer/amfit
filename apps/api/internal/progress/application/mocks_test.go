@@ -85,3 +85,40 @@ func (m *mockAccessRepo) ExercicioVisivelParaAluno(
 	}
 	return nil
 }
+
+// ── AnamneseRepository mock ─────────────────────────────────────────────────
+
+type mockAnamneseRepo struct {
+	upsertFn        func(ctx context.Context, a *domain.Anamnese) error
+	findByAlunoIDFn func(ctx context.Context, alunoID uuid.UUID) (*domain.Anamnese, error)
+}
+
+func (m *mockAnamneseRepo) Upsert(ctx context.Context, a *domain.Anamnese) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, a)
+	}
+	a.ID = uuid.New()
+	return nil
+}
+
+func (m *mockAnamneseRepo) FindByAlunoID(ctx context.Context, alunoID uuid.UUID) (*domain.Anamnese, error) {
+	if m.findByAlunoIDFn != nil {
+		return m.findByAlunoIDFn(ctx, alunoID)
+	}
+	return nil, domain.ErrAnamneseNotFound
+}
+
+// ── TemplateMatcher mock ────────────────────────────────────────────────────
+
+type mockTemplateMatcher struct {
+	melhorMatchFn func(ctx context.Context, personalID uuid.UUID, nivel, objetivo string) (*domain.TemplateMatch, error)
+}
+
+func (m *mockTemplateMatcher) MelhorMatch(
+	ctx context.Context, personalID uuid.UUID, nivel, objetivo string,
+) (*domain.TemplateMatch, error) {
+	if m.melhorMatchFn != nil {
+		return m.melhorMatchFn(ctx, personalID, nivel, objetivo)
+	}
+	return nil, nil
+}

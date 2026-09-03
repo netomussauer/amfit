@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/amfit/api/internal/training/application"
 	"github.com/amfit/api/internal/training/domain"
@@ -27,6 +28,7 @@ type PostgresRepositories struct {
 	FichaCompleta domain.FichaCompletaRepository
 	TreinoHoje    domain.TreinoHojeRepository
 	AlunoLookup   application.AlunoLookup
+	Templates     domain.TemplateTreinoRepository
 }
 
 // NewPostgresRepositories cria a instância com o pool compartilhado e expõe
@@ -40,6 +42,7 @@ func NewPostgresRepositories(pool *pgxpool.Pool) *PostgresRepositories {
 		FichaCompleta: &fichaCompletaRepo{pool: pool},
 		TreinoHoje:    &treinoHojeRepo{pool: pool},
 		AlunoLookup:   &alunoLookup{pool: pool},
+		Templates:     &templateTreinoRepo{pool: pool},
 	}
 }
 
@@ -752,4 +755,238 @@ func (l *alunoLookup) BelongsToPersonal(
 		return false, fmt.Errorf("infrastructure: aluno lookup: %w", err)
 	}
 	return ok, nil
+}
+
+// ── TemplateTreino ─────────────────────────────────────────────────────────
+
+type templateTreinoRepo struct {
+	pool *pgxpool.Pool
+}
+
+func (r *templateTreinoRepo) List(
+	ctx context.Context,
+	filter domain.ListTemplatesFilter,
+) ([]domain.TemplateComItens, error) {
+	const q = `
+		SELECT id, nome, nivel::text, objetivo, criado_por::text, personal_id, ativo, criado_em
+		FROM template_treino
+		WHERE ativo = TRUE
+		  AND (personal_id IS NULL OR personal_id = $1)
+		  AND ($2::text IS NULL OR nivel::text = $2)
+		  AND ($3::text IS NULL OR objetivo = $3)
+		ORDER BY (criado_por = 'PERSONAL') DESC, criado_em DESC`
+
+	rows, err := r.pool.Query(ctx, q, filter.PersonalID, filter.Nivel, filter.Objetivo)
+	if err != nil {
+		return nil, fmt.Errorf("infrastructure: list templates: %w", err)
+	}
+	defer rows.Close()
+
+	templates := make([]domain.TemplateTreino, 0)
+	templateIDs := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var t domain.TemplateTreino
+		var criadoPor string
+		if err := rows.Scan(
+			&t.ID, &t.Nome, &t.Nivel, &t.Objetivo, &criadoPor, &t.PersonalID, &t.Ativo, &t.CriadoEm,
+		); err != nil {
+			return nil, fmt.Errorf("infrastructure: scan template: %w", err)
+		}
+		t.CriadoPor = domain.OrigemTemplate(criadoPor)
+		templates = append(templates, t)
+		templateIDs = append(templateIDs, t.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("infrastructure: iterate templates: %w", err)
+	}
+
+	itensPorTemplate, err := r.loadItensPorTemplate(ctx, templateIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]domain.TemplateComItens, 0, len(templates))
+	for _, t := range templates {
+		out = append(out, domain.TemplateComItens{Template: t, Itens: itensPorTemplate[t.ID]})
+	}
+	return out, nil
+}
+
+func (r *templateTreinoRepo) loadItensPorTemplate(
+	ctx context.Context,
+	templateIDs []uuid.UUID,
+) (map[uuid.UUID][]domain.TemplateItem, error) {
+	out := map[uuid.UUID][]domain.TemplateItem{}
+	if len(templateIDs) == 0 {
+		return out, nil
+	}
+
+	const q = `
+		SELECT id, template_id, exercicio_id, treino_letra, ordem,
+		       series, repeticoes, carga_sugerida, descanso_segundos
+		FROM template_item
+		WHERE template_id = ANY($1::uuid[])
+		ORDER BY treino_letra ASC, ordem ASC`
+
+	rows, err := r.pool.Query(ctx, q, templateIDs)
+	if err != nil {
+		return nil, fmt.Errorf("infrastructure: list template itens: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var i domain.TemplateItem
+		if err := rows.Scan(
+			&i.ID, &i.TemplateID, &i.ExercicioID, &i.TreinoLetra, &i.Ordem,
+			&i.Series, &i.Repeticoes, &i.CargaSugerida, &i.DescansoSegundos,
+		); err != nil {
+			return nil, fmt.Errorf("infrastructure: scan template item: %w", err)
+		}
+		out[i.TemplateID] = append(out[i.TemplateID], i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("infrastructure: iterate template itens: %w", err)
+	}
+	return out, nil
+}
+
+// MelhorMatch prioriza templates custom do personal solicitante sobre os
+// globais do sistema — mesma regra de ORDER BY usada em List, aqui só com
+// LIMIT 1. Retorna nil (sem erro) quando não há nenhum template compatível;
+// "sem sugestão" é um resultado válido do fluxo de anamnese, não um erro.
+func (r *templateTreinoRepo) MelhorMatch(
+	ctx context.Context,
+	personalID uuid.UUID,
+	nivel, objetivo string,
+) (*domain.TemplateTreino, error) {
+	const q = `
+		SELECT id, nome, nivel::text, objetivo, criado_por::text, personal_id, ativo, criado_em
+		FROM template_treino
+		WHERE ativo = TRUE
+		  AND nivel::text = $1
+		  AND objetivo = $2
+		  AND (personal_id IS NULL OR personal_id = $3)
+		ORDER BY (criado_por = 'PERSONAL') DESC, criado_em DESC
+		LIMIT 1`
+
+	var t domain.TemplateTreino
+	var criadoPor string
+	err := r.pool.QueryRow(ctx, q, nivel, objetivo, personalID).Scan(
+		&t.ID, &t.Nome, &t.Nivel, &t.Objetivo, &criadoPor, &t.PersonalID, &t.Ativo, &t.CriadoEm,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("infrastructure: melhor match template: %w", err)
+	}
+	t.CriadoPor = domain.OrigemTemplate(criadoPor)
+	return &t, nil
+}
+
+// AplicarTemplate copia o template (agrupado por treino_letra) para uma
+// ficha nova em uma única transação, depois reusa fichaCompletaRepo.GetCompleta
+// pra devolver o read-model já com os dados de exercício/grupo muscular
+// enriquecidos (o template_item só guarda exercicio_id).
+func (r *templateTreinoRepo) AplicarTemplate(
+	ctx context.Context,
+	templateID, alunoID, personalID uuid.UUID,
+	nome string,
+	vigenciaInicio time.Time,
+) (*domain.FichaCompleta, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("infrastructure: begin tx aplicar template: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	const templateQ = `
+		SELECT nome
+		FROM template_treino
+		WHERE id = $1 AND ativo = TRUE AND (personal_id IS NULL OR personal_id = $2)`
+
+	var templateNome string
+	if err := tx.QueryRow(ctx, templateQ, templateID, personalID).Scan(&templateNome); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrTemplateNotFound
+		}
+		return nil, fmt.Errorf("infrastructure: find template aplicar: %w", err)
+	}
+
+	const itensQ = `
+		SELECT exercicio_id, treino_letra, ordem, series, repeticoes, carga_sugerida, descanso_segundos
+		FROM template_item
+		WHERE template_id = $1
+		ORDER BY treino_letra ASC, ordem ASC`
+
+	rows, err := tx.Query(ctx, itensQ, templateID)
+	if err != nil {
+		return nil, fmt.Errorf("infrastructure: list itens aplicar template: %w", err)
+	}
+	itens := make([]domain.TemplateItem, 0)
+	for rows.Next() {
+		var i domain.TemplateItem
+		if err := rows.Scan(
+			&i.ExercicioID, &i.TreinoLetra, &i.Ordem, &i.Series, &i.Repeticoes,
+			&i.CargaSugerida, &i.DescansoSegundos,
+		); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("infrastructure: scan item aplicar template: %w", err)
+		}
+		itens = append(itens, i)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("infrastructure: iterate itens aplicar template: %w", err)
+	}
+	if len(itens) == 0 {
+		return nil, domain.ErrTemplateSemItens
+	}
+
+	if nome == "" {
+		nome = templateNome
+	}
+
+	fichaID := uuid.New()
+	const fichaQ = `
+		INSERT INTO ficha_treino (id, aluno_id, personal_id, nome, vigencia_inicio, ativa)
+		VALUES ($1, $2, $3, $4, $5, TRUE)`
+	if _, err := tx.Exec(ctx, fichaQ, fichaID, alunoID, personalID, nome, vigenciaInicio); err != nil {
+		return nil, fmt.Errorf("infrastructure: insert ficha aplicar template: %w", err)
+	}
+
+	// Agrupa por treino_letra preservando a ordem em que a letra aparece
+	// (itens já vieram ordenados por treino_letra, ordem).
+	letraParaTreinoID := map[string]uuid.UUID{}
+	ordemTreino := 0
+	const treinoQ = `INSERT INTO treino (id, ficha_id, letra, ordem) VALUES ($1, $2, $3, $4)`
+	const itemQ = `
+		INSERT INTO item_treino (id, treino_id, exercicio_id, ordem, series, repeticoes, carga_sugerida, descanso_segundos)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+
+	for _, item := range itens {
+		treinoID, ok := letraParaTreinoID[item.TreinoLetra]
+		if !ok {
+			treinoID = uuid.New()
+			if _, err := tx.Exec(ctx, treinoQ, treinoID, fichaID, item.TreinoLetra, ordemTreino); err != nil {
+				return nil, fmt.Errorf("infrastructure: insert treino aplicar template: %w", err)
+			}
+			letraParaTreinoID[item.TreinoLetra] = treinoID
+			ordemTreino++
+		}
+
+		if _, err := tx.Exec(ctx, itemQ,
+			uuid.New(), treinoID, item.ExercicioID, item.Ordem,
+			item.Series, item.Repeticoes, item.CargaSugerida, item.DescansoSegundos,
+		); err != nil {
+			return nil, fmt.Errorf("infrastructure: insert item aplicar template: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("infrastructure: commit tx aplicar template: %w", err)
+	}
+
+	completa := &fichaCompletaRepo{pool: r.pool}
+	return completa.GetCompleta(ctx, fichaID)
 }
