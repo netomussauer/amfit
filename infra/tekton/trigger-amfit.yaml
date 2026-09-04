@@ -78,13 +78,11 @@ spec:
         taskRunTemplate:
           serviceAccountName: tekton-amfit
           podTemplate:
+            # Ver nota em infra/tekton/pipelinerun-api-manual.yaml — kaniko
+            # nesse node derruba o Postgres do Harbor (mesmo disco
+            # local-path). Movido pra ubuntu-neto (achado em 2026-09-04).
             nodeSelector:
-              workload: cicd
-            tolerations:
-              - key: workload
-                operator: Equal
-                value: cicd
-                effect: NoSchedule
+              kubernetes.io/hostname: ubuntu-neto
             securityContext:
               fsGroup: 65532
         timeouts:
@@ -139,13 +137,15 @@ spec:
         taskRunTemplate:
           serviceAccountName: tekton-amfit
           podTemplate:
+            # ubuntu-neto ja era exigido aqui por memoria (8Gi pro pnpm
+            # install — k3s-worker-cicd so tem 6Gi). Antes deste fix o
+            # nodeSelector abaixo ainda dizia workload:cicd (k3s-worker-cicd),
+            # inconsistente com o manual (pipelinerun-web-manual.yaml, que ja
+            # usava ubuntu-neto) — corrigido pra bater com o manual e evitar
+            # tanto o ExceededNodeResources quanto o crash-loop do Postgres
+            # do Harbor (achado em 2026-09-04, mesma nota do build da API).
             nodeSelector:
-              workload: cicd
-            tolerations:
-              - key: workload
-                operator: Equal
-                value: cicd
-                effect: NoSchedule
+              kubernetes.io/hostname: ubuntu-neto
             securityContext:
               fsGroup: 65532
         timeouts:

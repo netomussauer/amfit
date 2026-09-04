@@ -234,6 +234,49 @@ deploy:
      regular com um *push mirror* configurado pro GitHub — o Gitea agora
      é o remoto primário (`origin`) e o GitHub é sincronizado
      automaticamente a cada push.
+- [x] **Mesmo com o webhook disparando de verdade, os builds nunca chegavam
+  a rodar/deployar (encontrado e resolvido em 2026-09-04, mesma
+  investigação de "por que a Anamnese não aparecia no lab" mesmo já
+  commitada)**: três causas empilhadas, cada uma escondendo a próxima.
+  1. **`ROOT_URL` do Gitea sem porta**: `helm-values.yaml` tinha
+     `ROOT_URL: "http://gitea.lab.local"` (sem `:3000`, o `HTTP_PORT`
+     real). Gitea usa esse valor pra montar qualquer URL absoluta que
+     emite, inclusive o `clone_url` do payload do webhook — todo build
+     disparado por webhook tentava `git clone` na porta 80, onde não
+     existe Ingress nenhum, e falhava no passo de clone
+     ("Could not connect to server"). Os PipelineRuns manuais nunca
+     pegavam esse bug porque já hardcodavam a URL certa como workaround
+     pontual. Corrigido em
+     `infra-lab/kubernetes/cicd/gitea/helm-values.yaml` (`ROOT_URL` agora
+     inclui a porta) + `helm upgrade` pinado na versão já rodando
+     (12.5.3 — nunca fazer upgrade sem `--version` explícito aqui, ver
+     nota abaixo).
+  2. **Kaniko no mesmo node/disco do Postgres do Harbor**: o build da API
+     não tinha `nodeSelector` fixo (`workload: cicd`, que só existe em
+     `k3s-worker-cicd`) — o mesmo node onde TODO o storage `local-path`
+     do Harbor mora (database/registry/trivy/redis). O I/O pesado do
+     kaniko extraindo camadas de imagem no mesmo disco derrubava o
+     Postgres em crash-loop (`fsync` de 12–20s durante recovery,
+     "untracked child process exited with exit code 141" repetido) toda
+     vez que um build tentava rodar — sem tocar `DiskPressure` do
+     kubelet, que só olha espaço livre, não latência de I/O. Corrigido
+     movendo o build da API pra `ubuntu-neto` (mesmo node que o build do
+     Web já usava, por outro motivo — memória), tanto no PipelineRun
+     manual quanto no `TriggerTemplate` do webhook, em
+     `infra/tekton/pipelinerun-api-manual.yaml` e
+     `infra/tekton/trigger-amfit.yaml` (que também corrigido pro build do
+     Web — estava com `workload: cicd` inconsistente com o manual).
+  3. **CA do Harbor rotacionado sem re-trust nos nodes**: o certificado
+     TLS do Harbor foi reemitido em 02/09 (novo `harbor-ca`), mas o
+     trust store de cada node do K3s (instalado manualmente via
+     `infra-lab/ansible/playbooks/07-k3s-registries.yml` — containerd
+     nessa versão do K3s não lê `certs.d/`, só o trust store do SO)
+     ficou com a cópia antiga. Todo `image pull` novo (não só do AMFIT)
+     falhava com `x509: certificate signed by unknown authority`, mesmo
+     com o build+push funcionando — os pods antigos continuavam rodando
+     porque nunca precisaram re-pullar. Corrigido re-rodando o playbook
+     (reinstala o CA atual do secret `harbor-nginx` em todos os nodes,
+     reinicia k3s-server/k3s-agent pra recarregar o trust store).
 - [x] **Limite de memória do kaniko-build-push era baixo para builds
   Node** (resolvido em 2026-09-02): a Task compartilhada
   `kaniko-build-push` (namespace `cicd`) tinha `limits.memory: 1Gi`,
