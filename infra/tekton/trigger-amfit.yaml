@@ -50,7 +50,19 @@ spec:
     - name: git-ref
     - name: pusher
       default: unknown
-  resourceTemplates:
+  # ATENCAO: a API do Tekton Triggers v1beta1 espera "resourcetemplates"
+  # (tudo minusculo) — "resourceTemplates" (camelCase) e um campo
+  # desconhecido pro schema do CRD e e descartado silenciosamente pelo
+  # apiserver antes de gravar. kubectl apply reportava "configured" e a
+  # annotation last-applied-configuration acumulava o valor "certo", mas o
+  # spec.resourcetemplates de verdade nunca mudava — o objeto ficou preso
+  # no estado de quando foi criado (08/05), com harbor.infra.local e
+  # nodeSelector workload:cicd, apesar de VARIAS correcoes terem sido
+  # commitadas (e aparentemente aplicadas) desde entao. So descoberto em
+  # 2026-09-04 comparando contra o TriggerTemplate do REALTPMSYS (que usa a
+  # grafia certa e funciona) apos um push real continuar falhando mesmo
+  # com o arquivo aparentemente corrigido.
+  resourcetemplates:
     # -------------------------------------------------------------------------
     # PipelineRun — API
     # -------------------------------------------------------------------------

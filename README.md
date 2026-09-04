@@ -277,6 +277,25 @@ deploy:
      porque nunca precisaram re-pullar. Corrigido re-rodando o playbook
      (reinstala o CA atual do secret `harbor-nginx` em todos os nodes,
      reinicia k3s-server/k3s-agent pra recarregar o trust store).
+  4. **A mais traiçoeira: `infra/tekton/trigger-amfit.yaml` usava
+     `resourceTemplates` (camelCase) — o campo real da API do Tekton
+     Triggers v1beta1 é `resourcetemplates` (tudo minúsculo)**. Campo
+     desconhecido é descartado silenciosamente pelo apiserver antes de
+     gravar; `kubectl apply` reportava "configured" e a annotation
+     `last-applied-configuration` acumulava fielmente cada correção
+     commitada, mas o `spec.resourcetemplates` de verdade nunca mudava —
+     o objeto ficou preso no estado de quando foi criado (08/05), com
+     `harbor.infra.local` (já corrigido em git desde 11/05!) e
+     `nodeSelector: workload:cicd` (o item 2 acima, que eu tinha certeza
+     de ter corrigido no mesmo `kubectl apply` de hoje, mas nunca
+     chegou no objeto real). Builds manuais nunca pegavam esse bug
+     porque usam PipelineRuns standalone, sem passar pelo
+     TriggerTemplate. Só descoberto comparando contra o TriggerTemplate
+     do REALTPMSYS (que usa a grafia certa e funciona) depois que um
+     push real continuou falhando mesmo com o arquivo aparentemente
+     corrigido. Corrigido trocando a chave; validado comparando
+     `spec.resourcetemplates` do objeto ao vivo contra o arquivo antes
+     de seguir.
 - [x] **Limite de memória do kaniko-build-push era baixo para builds
   Node** (resolvido em 2026-09-02): a Task compartilhada
   `kaniko-build-push` (namespace `cicd`) tinha `limits.memory: 1Gi`,
