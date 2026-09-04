@@ -9,3 +9,6 @@ export { useMinhasSessoes } from './hooks/useMinhasSessoes';
 export { ExercicioBlock } from './components/ExercicioBlock';
 export { SerieRow } from './components/SerieRow';
 export { RestTimer } from './components/RestTimer';
+export { ShareCard, type ShareCardData } from './components/ShareCard';
+
+export { capturarCardTreino, abrirShareSheet } from './lib/compartilharTreino';
