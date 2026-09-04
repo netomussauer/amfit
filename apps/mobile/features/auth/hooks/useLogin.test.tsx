@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { useLogin } from './useLogin';
 import { apiRequest } from '@/shared/lib/api-client';
 import { setAccessToken, setRefreshToken } from '@/shared/lib/auth';
+import { registrarPushTokenExpo } from '@/features/notificacoes';
 import { makeAuthResponse, makeLoginRequest } from '../__fixtures__/auth.fixtures';
 
 jest.mock('@/shared/lib/api-client', () => ({
@@ -15,10 +16,17 @@ jest.mock('@/shared/lib/auth', () => ({
   setRefreshToken: jest.fn(),
 }));
 
+jest.mock('@/features/notificacoes', () => ({
+  registrarPushTokenExpo: jest.fn(),
+}));
+
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedSetAccessToken = setAccessToken as jest.MockedFunction<typeof setAccessToken>;
 const mockedSetRefreshToken = setRefreshToken as jest.MockedFunction<
   typeof setRefreshToken
+>;
+const mockedRegistrarPushTokenExpo = registrarPushTokenExpo as jest.MockedFunction<
+  typeof registrarPushTokenExpo
 >;
 
 function createWrapper() {
@@ -38,6 +46,7 @@ describe('useLogin', () => {
     mockedApiRequest.mockReset();
     mockedSetAccessToken.mockReset();
     mockedSetRefreshToken.mockReset();
+    mockedRegistrarPushTokenExpo.mockReset();
   });
 
   it('chama POST /auth/login com as credenciais informadas', async () => {
@@ -79,6 +88,21 @@ describe('useLogin', () => {
     expect(mockedSetRefreshToken).toHaveBeenCalledWith('novo-refresh-token');
   });
 
+  it('registra o push token do device após login bem-sucedido', async () => {
+    // Arrange
+    mockedApiRequest.mockResolvedValue(makeAuthResponse());
+    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+
+    // Act
+    act(() => {
+      result.current.mutate(makeLoginRequest());
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedRegistrarPushTokenExpo).toHaveBeenCalledTimes(1);
+  });
+
   it('expõe o estado de erro quando a API rejeita as credenciais', async () => {
     // Arrange
     const error = new Error('Credenciais inválidas');
@@ -94,5 +118,6 @@ describe('useLogin', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBe(error);
     expect(mockedSetAccessToken).not.toHaveBeenCalled();
+    expect(mockedRegistrarPushTokenExpo).not.toHaveBeenCalled();
   });
 });

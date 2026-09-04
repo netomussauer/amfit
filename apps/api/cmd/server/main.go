@@ -16,6 +16,10 @@ import (
 	identityapplication "github.com/amfit/api/internal/identity/application"
 	identityhandlers "github.com/amfit/api/internal/identity/handlers"
 	identityinfra "github.com/amfit/api/internal/identity/infrastructure"
+	notificationapplication "github.com/amfit/api/internal/notification/application"
+	notificationhandlers "github.com/amfit/api/internal/notification/handlers"
+	notificationinfra "github.com/amfit/api/internal/notification/infrastructure"
+	notificationworker "github.com/amfit/api/internal/notification/worker"
 	progressapplication "github.com/amfit/api/internal/progress/application"
 	progressdomain "github.com/amfit/api/internal/progress/domain"
 	progresshandlers "github.com/amfit/api/internal/progress/handlers"
@@ -146,6 +150,14 @@ func main() {
 	)
 	trainingH := traininghandlers.NewTrainingHandler(trainingSvc)
 
+	// Notification
+	notificationRepos := notificationinfra.NewPostgresRepositories(pool)
+	notificationSvc := notificationapplication.NewNotificationService(
+		notificationRepos.Tokens,
+		notificationRepos.Notifs,
+	)
+	notificationH := notificationhandlers.NewNotificationHandler(notificationSvc)
+
 	// Execution
 	execRepos := execinfra.NewPostgresRepositories(pool)
 	execSvc := execapplication.NewExecutionService(
@@ -153,6 +165,10 @@ func main() {
 		execRepos.Registros,
 		execRepos.TreinoLookup,
 		execRepos.AlunoLookup,
+		// notificationSvc satisfaz execapplication.Notifier por assinatura de
+		// método (mesmo padrão do templateMatcherAdapter abaixo, mas aqui não
+		// precisa de adapter — as assinaturas já batem).
+		notificationSvc,
 	)
 	execH := exechandlers.NewExecutionHandler(execSvc)
 
@@ -230,9 +246,10 @@ func main() {
 	identityH.RegisterPublic(api)
 
 	// Autenticadas (qualquer role): /auth/logout, /grupos-musculares,
-	// /exercicios (GET).
+	// /exercicios (GET), /push-token.
 	identityH.RegisterAuthenticated(api, auth)
 	catalogH.Register(api, auth)
+	notificationH.RegisterAuthenticated(api, auth)
 
 	// IMPORTANTE: registramos as rotas do ALUNO ANTES das do PERSONAL.
 	// Fiber v3 resolve rotas pela ORDEM DE REGISTRO (não por especificidade),
@@ -254,6 +271,21 @@ func main() {
 	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	progressH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
+	// ── Notification Dispatcher (worker em background) ─────────────────
+	//
+	// Primeiro processo de longa duração deste binário (todo o resto é
+	// request/response) — roda sob um contexto próprio, cancelado no
+	// graceful shutdown junto com o servidor HTTP.
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	dispatcher := notificationworker.NewDispatcher(
+		notificationRepos.Notifs,
+		notificationRepos.Tokens,
+		notificationinfra.NewExpoPushClient(),
+		30*time.Second,
+	)
+	go dispatcher.Run(workerCtx)
+	log.Info().Msg("notification dispatcher started")
+
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
@@ -261,6 +293,7 @@ func main() {
 	go func() {
 		<-quit
 		log.Info().Msg("shutting down server...")
+		cancelWorker()
 		if err := app.ShutdownWithTimeout(10 * time.Second); err != nil {
 			log.Error().Err(err).Msg("server shutdown error")
 		}

@@ -39,5 +39,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           'AMFIT precisa acessar suas fotos para você selecionar a mídia do exercício',
       },
     ],
+    // Ícone/cor de notificação usam o default do Expo — trocar quando
+    // houver asset dedicado em apps/mobile/assets/.
+    'expo-notifications',
   ],
+  // `extra.eas.projectId` ainda não existe — nenhum projeto Expo/EAS foi
+  // criado pra esse app até agora. Sem ele, Notifications.getExpoPushTokenAsync
+  // (features/notificacoes/lib/push.ts) não consegue gerar um token real e
+  // registrarPushTokenExpo() sai cedo com um warning — mecanismo pronto,
+  // mas push de verdade só funciona depois de rodar `eas init` (ou
+  // `eas build:configure`) e esse ID aparecer aqui.
 });

@@ -112,16 +112,19 @@ func (r *sessaoRepo) FindEmAndamentoHoje(
 }
 
 // UpdateStatus aplica a mudança de status com proteção contra race em
-// ConcluirSessao: o WHERE filtra por status='EM_ANDAMENTO'. Se outro processo
-// concluir antes, RowsAffected=0 — recarregamos o estado e devolvemos nil
-// quando já estiver no status alvo (idempotência); só erramos quando a
-// sessão sumiu de fato (NotFound).
+// ConcluirSessao: o WHERE filtra por status='EM_ANDAMENTO'. Se outro
+// processo concluir antes, RowsAffected=0 — recarregamos o estado e
+// devolvemos transicionou=false (sem erro) quando já estiver no status
+// alvo, para o caller (ex: ConcluirSessao) saber que NÃO foi esta chamada
+// que fez a transição — usado para não disparar efeitos colaterais
+// (notificação) duas vezes quando duas requisições concluem a mesma
+// sessão em paralelo.
 func (r *sessaoRepo) UpdateStatus(
 	ctx context.Context,
 	id uuid.UUID,
 	status domain.StatusSessao,
 	concluidoEm *time.Time,
-) error {
+) (bool, error) {
 	const q = `
 		UPDATE sessao_treino
 		   SET status = $2,
@@ -131,22 +134,24 @@ func (r *sessaoRepo) UpdateStatus(
 
 	tag, err := r.pool.Exec(ctx, q, id, string(status), concluidoEm)
 	if err != nil {
-		return fmt.Errorf("infrastructure: update status sessão: %w", err)
+		return false, fmt.Errorf("infrastructure: update status sessão: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		// Pode ser: (a) sessão não existe, (b) já estava no status alvo.
-		// Releitura para distinguir e preservar a idempotência do caller.
+		// Pode ser: (a) sessão não existe, (b) já estava no status alvo —
+		// nesta chamada (idempotência normal) ou porque uma chamada
+		// concorrente venceu a corrida (WHERE status='EM_ANDAMENTO' só
+		// deixa uma delas afetar a linha). Releitura para distinguir.
 		current, ferr := r.FindByID(ctx, id)
 		if ferr != nil {
-			return ferr
+			return false, ferr
 		}
 		if current.Status == status {
-			return nil
+			return false, nil
 		}
 		// Estado inesperado — ex.: tentar concluir uma já ABANDONADO.
-		return domain.ErrSessaoJaConcluida
+		return false, domain.ErrSessaoJaConcluida
 	}
-	return nil
+	return true, nil
 }
 
 // ListByAluno usa subquery LATERAL para agregar os contadores de séries por
@@ -411,4 +416,18 @@ func (l *alunoLookup) BelongsToPersonal(
 		return false, fmt.Errorf("infrastructure: aluno lookup: %w", err)
 	}
 	return ok, nil
+}
+
+func (l *alunoLookup) PersonalIDENome(
+	ctx context.Context,
+	alunoID uuid.UUID,
+) (uuid.UUID, string, error) {
+	const q = `SELECT personal_id, nome FROM aluno WHERE id = $1`
+
+	var personalID uuid.UUID
+	var nome string
+	if err := l.pool.QueryRow(ctx, q, alunoID).Scan(&personalID, &nome); err != nil {
+		return uuid.Nil, "", fmt.Errorf("infrastructure: personal id e nome do aluno: %w", err)
+	}
+	return personalID, nome, nil
 }

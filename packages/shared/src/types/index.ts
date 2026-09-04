@@ -60,6 +60,7 @@ import {
   RespostasAnamneseResponseSchema,
   AnamneseResponseSchema,
 } from '../schemas/anamnese.schema';
+import { RegistrarPushTokenRequestSchema } from '../schemas/notificacao.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -121,3 +122,6 @@ export type RegistrarAnamneseRequest = z.infer<typeof RegistrarAnamneseRequestSc
 export type RespostaAnamneseResponse = z.infer<typeof RespostaAnamneseResponseSchema>;
 export type RespostasAnamneseResponse = z.infer<typeof RespostasAnamneseResponseSchema>;
 export type AnamneseResponse = z.infer<typeof AnamneseResponseSchema>;
+
+// Notificações
+export type RegistrarPushTokenRequest = z.infer<typeof RegistrarPushTokenRequestSchema>;

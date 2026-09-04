@@ -27,6 +27,19 @@ const (
 // infrastructure (mesma estratégia adotada pelo Training).
 type AlunoLookup interface {
 	BelongsToPersonal(ctx context.Context, alunoID, personalID uuid.UUID) (bool, error)
+
+	// PersonalIDENome devolve o personal_id e o nome do aluno — usado só
+	// pra notificar o personal quando o aluno conclui um treino (não pelo
+	// fluxo de autorização, que usa BelongsToPersonal).
+	PersonalIDENome(ctx context.Context, alunoID uuid.UUID) (personalID uuid.UUID, nome string, err error)
+}
+
+// Notifier é o port de cross-context com o Notification. Sem barramento de
+// eventos (não existe nenhum nesse codebase) — ConcluirSessao chama esse
+// port diretamente; falha de notificação nunca reverte nem falha a
+// conclusão da sessão (é um efeito colateral, não o resultado principal).
+type Notifier interface {
+	NotificarTreinoConcluido(ctx context.Context, personalID uuid.UUID, alunoNome string) error
 }
 
 // ExecutionService implementa os casos de uso de execução de treino.
@@ -35,6 +48,7 @@ type ExecutionService struct {
 	registros domain.RegistroSerieRepository
 	treinos   domain.TreinoLookup
 	alunos    AlunoLookup
+	notifier  Notifier
 }
 
 // NewExecutionService monta o service com as dependências fornecidas.
@@ -43,12 +57,14 @@ func NewExecutionService(
 	registros domain.RegistroSerieRepository,
 	treinos domain.TreinoLookup,
 	alunos AlunoLookup,
+	notifier Notifier,
 ) *ExecutionService {
 	return &ExecutionService{
 		sessoes:   sessoes,
 		registros: registros,
 		treinos:   treinos,
 		alunos:    alunos,
+		notifier:  notifier,
 	}
 }
 
@@ -226,11 +242,12 @@ func (s *ExecutionService) ConcluirSessao(
 	}
 
 	now := time.Now().UTC()
-	if err := s.sessoes.UpdateStatus(ctx, sessaoID, domain.StatusConcluido, &now); err != nil {
+	transicionou, err := s.sessoes.UpdateStatus(ctx, sessaoID, domain.StatusConcluido, &now)
+	if err != nil {
 		// O repositório é responsável pela "concorrência segura": o UPDATE
 		// usa WHERE status='EM_ANDAMENTO' — se outro processo concluir
 		// antes, o RowsAffected vem 0 e o repo recarrega o estado e
-		// devolve nil quando já estiver CONCLUIDO (idempotência).
+		// devolve transicionou=false quando já estiver CONCLUIDO (idempotência).
 		return nil, fmt.Errorf("application: concluir sessão: %w", err)
 	}
 	// Recarrega para refletir o concluido_em final (importante quando
@@ -247,7 +264,39 @@ func (s *ExecutionService) ConcluirSessao(
 		Str("treino_id", sessao.TreinoID.String()).
 		Msg("sessão concluída")
 
+	if transicionou {
+		// Só notifica quando ESTA chamada de fato fez a transição — sem essa
+		// checagem, duas requisições concorrentes concluindo a mesma sessão
+		// (ex: duplo tap, retry após timeout) disparariam duas notificações
+		// pro personal para um único treino concluído (achado de code-review).
+		s.notificarPersonalTreinoConcluido(ctx, alunoID, sessaoID)
+	}
+
 	return s.buildSessaoResponse(ctx, sessao)
+}
+
+// notificarPersonalTreinoConcluido enfileira a notificação pro personal.
+// Best-effort: falha aqui (lookup ou criação da notificação) só é logada —
+// nunca propaga erro pro caller, porque a sessão já foi concluída com
+// sucesso e isso é um efeito colateral, não o resultado da operação.
+func (s *ExecutionService) notificarPersonalTreinoConcluido(
+	ctx context.Context,
+	alunoID, sessaoID uuid.UUID,
+) {
+	personalID, nome, err := s.alunos.PersonalIDENome(ctx, alunoID)
+	if err != nil {
+		log.Error().Err(err).
+			Str("aluno_id", alunoID.String()).
+			Str("sessao_id", sessaoID.String()).
+			Msg("falha ao buscar personal/nome do aluno para notificação")
+		return
+	}
+	if err := s.notifier.NotificarTreinoConcluido(ctx, personalID, nome); err != nil {
+		log.Error().Err(err).
+			Str("aluno_id", alunoID.String()).
+			Str("sessao_id", sessaoID.String()).
+			Msg("falha ao notificar personal sobre treino concluído")
+	}
 }
 
 // ListarMinhasSessoes devolve o histórico paginado do aluno autenticado.

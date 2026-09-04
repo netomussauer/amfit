@@ -14,7 +14,7 @@ type mockSessaoRepo struct {
 	createFn              func(ctx context.Context, s *domain.SessaoTreino) error
 	findByIDFn            func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error)
 	findEmAndamentoHojeFn func(ctx context.Context, alunoID, treinoID uuid.UUID) (*domain.SessaoTreino, error)
-	updateStatusFn        func(ctx context.Context, id uuid.UUID, status domain.StatusSessao, concluidoEm *time.Time) error
+	updateStatusFn        func(ctx context.Context, id uuid.UUID, status domain.StatusSessao, concluidoEm *time.Time) (bool, error)
 	listByAlunoFn         func(ctx context.Context, alunoID uuid.UUID, page, perPage int) ([]*domain.SessaoComResumo, int, error)
 }
 
@@ -47,11 +47,11 @@ func (m *mockSessaoRepo) UpdateStatus(
 	id uuid.UUID,
 	status domain.StatusSessao,
 	concluidoEm *time.Time,
-) error {
+) (bool, error) {
 	if m.updateStatusFn != nil {
 		return m.updateStatusFn(ctx, id, status, concluidoEm)
 	}
-	return nil
+	return true, nil
 }
 
 func (m *mockSessaoRepo) ListByAluno(
@@ -126,7 +126,8 @@ func (m *mockTreinoLookup) ValidarTreinoDoAluno(
 // ── AlunoLookup mock ──────────────────────────────────────────────────────
 
 type mockAlunoLookup struct {
-	belongsFn func(ctx context.Context, alunoID, personalID uuid.UUID) (bool, error)
+	belongsFn         func(ctx context.Context, alunoID, personalID uuid.UUID) (bool, error)
+	personalIDENomeFn func(ctx context.Context, alunoID uuid.UUID) (uuid.UUID, string, error)
 }
 
 func (m *mockAlunoLookup) BelongsToPersonal(
@@ -137,4 +138,31 @@ func (m *mockAlunoLookup) BelongsToPersonal(
 		return m.belongsFn(ctx, alunoID, personalID)
 	}
 	return true, nil
+}
+
+func (m *mockAlunoLookup) PersonalIDENome(
+	ctx context.Context,
+	alunoID uuid.UUID,
+) (uuid.UUID, string, error) {
+	if m.personalIDENomeFn != nil {
+		return m.personalIDENomeFn(ctx, alunoID)
+	}
+	return uuid.New(), "Aluno Teste", nil
+}
+
+// ── Notifier mock ─────────────────────────────────────────────────────────
+
+type mockNotifier struct {
+	notificarTreinoConcluidoFn func(ctx context.Context, personalID uuid.UUID, alunoNome string) error
+}
+
+func (m *mockNotifier) NotificarTreinoConcluido(
+	ctx context.Context,
+	personalID uuid.UUID,
+	alunoNome string,
+) error {
+	if m.notificarTreinoConcluidoFn != nil {
+		return m.notificarTreinoConcluidoFn(ctx, personalID, alunoNome)
+	}
+	return nil
 }

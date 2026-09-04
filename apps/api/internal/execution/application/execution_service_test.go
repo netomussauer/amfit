@@ -24,8 +24,24 @@ func newServiceForTest() (
 	treinos := &mockTreinoLookup{}
 	alunos := &mockAlunoLookup{}
 
-	svc := NewExecutionService(sessoes, registros, treinos, alunos)
+	svc := NewExecutionService(sessoes, registros, treinos, alunos, &mockNotifier{})
 	return svc, sessoes, registros, treinos, alunos
+}
+
+// newServiceForNotifierTest expõe também os mocks de AlunoLookup e Notifier
+// — testes do gatilho de notificação em ConcluirSessao usam este helper.
+func newServiceForNotifierTest() (
+	*ExecutionService,
+	*mockSessaoRepo,
+	*mockAlunoLookup,
+	*mockNotifier,
+) {
+	sessoes := &mockSessaoRepo{}
+	alunos := &mockAlunoLookup{}
+	notifier := &mockNotifier{}
+
+	svc := NewExecutionService(sessoes, &mockRegistroRepo{}, &mockTreinoLookup{}, alunos, notifier)
+	return svc, sessoes, alunos, notifier
 }
 
 // ── IniciarSessao ─────────────────────────────────────────────────────────
@@ -315,13 +331,13 @@ func TestConcluirSessao_ChamadaDuasVezes_NaoErra(t *testing.T) {
 	}
 
 	updateChamado := 0
-	sessoes.updateStatusFn = func(ctx context.Context, id uuid.UUID, st domain.StatusSessao, concluidoEm *time.Time) error {
+	sessoes.updateStatusFn = func(ctx context.Context, id uuid.UUID, st domain.StatusSessao, concluidoEm *time.Time) (bool, error) {
 		updateChamado++
 		if st != domain.StatusConcluido {
 			t.Errorf("esperado UpdateStatus(CONCLUIDO), got %v", st)
 		}
 		estado = domain.StatusConcluido
-		return nil
+		return true, nil
 	}
 
 	if _, err := svc.ConcluirSessao(context.Background(), alunoID, sessaoID); err != nil {
@@ -333,6 +349,140 @@ func TestConcluirSessao_ChamadaDuasVezes_NaoErra(t *testing.T) {
 
 	if updateChamado != 1 {
 		t.Errorf("UpdateStatus deveria ser chamado 1x (idempotência), got %d", updateChamado)
+	}
+}
+
+func TestConcluirSessao_ConclusaoFresca_NotificaPersonal(t *testing.T) {
+	svc, sessoes, alunos, notifier := newServiceForNotifierTest()
+
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+	personalID := uuid.New()
+
+	estado := domain.StatusEmAndamento
+	sessoes.findByIDFn = func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
+		return &domain.SessaoTreino{ID: id, AlunoID: alunoID, Status: estado}, nil
+	}
+	sessoes.updateStatusFn = func(ctx context.Context, id uuid.UUID, st domain.StatusSessao, concluidoEm *time.Time) (bool, error) {
+		estado = domain.StatusConcluido
+		return true, nil
+	}
+
+	alunos.personalIDENomeFn = func(ctx context.Context, id uuid.UUID) (uuid.UUID, string, error) {
+		if id != alunoID {
+			t.Errorf("PersonalIDENome recebeu aluno errado: %v", id)
+		}
+		return personalID, "Maria Aluna", nil
+	}
+
+	var personalRecebido uuid.UUID
+	var nomeRecebido string
+	chamadas := 0
+	notifier.notificarTreinoConcluidoFn = func(ctx context.Context, p uuid.UUID, nome string) error {
+		chamadas++
+		personalRecebido, nomeRecebido = p, nome
+		return nil
+	}
+
+	if _, err := svc.ConcluirSessao(context.Background(), alunoID, sessaoID); err != nil {
+		t.Fatalf("ConcluirSessao: %v", err)
+	}
+
+	if chamadas != 1 {
+		t.Fatalf("NotificarTreinoConcluido deveria ser chamado 1x, got %d", chamadas)
+	}
+	if personalRecebido != personalID || nomeRecebido != "Maria Aluna" {
+		t.Errorf("notificação com dados errados: personal=%v nome=%q", personalRecebido, nomeRecebido)
+	}
+}
+
+func TestConcluirSessao_JaConcluida_NaoNotificaDeNovo(t *testing.T) {
+	svc, sessoes, _, notifier := newServiceForNotifierTest()
+
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+	concluidaEm := time.Now().UTC().Add(-time.Hour)
+
+	sessoes.findByIDFn = func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
+		return &domain.SessaoTreino{
+			ID: id, AlunoID: alunoID, Status: domain.StatusConcluido, ConcluidoEm: &concluidaEm,
+		}, nil
+	}
+
+	chamadas := 0
+	notifier.notificarTreinoConcluidoFn = func(ctx context.Context, p uuid.UUID, nome string) error {
+		chamadas++
+		return nil
+	}
+
+	if _, err := svc.ConcluirSessao(context.Background(), alunoID, sessaoID); err != nil {
+		t.Fatalf("ConcluirSessao: %v", err)
+	}
+	if chamadas != 0 {
+		t.Errorf("sessão já concluída não deveria disparar notificação de novo, got %d chamadas", chamadas)
+	}
+}
+
+// TestConcluirSessao_PerdeARaceDeConclusao_NaoNotifica cobre o achado de
+// code-review: numa corrida entre duas requisições concluindo a mesma
+// sessão (ex: duplo tap), ambas leem EM_ANDAMENTO antes de qualquer commit,
+// então nenhuma cai no early-return de idempotência — a diferenciação só
+// acontece dentro de UpdateStatus (WHERE status='EM_ANDAMENTO'), que devolve
+// transicionou=false pra quem perde a corrida. Simula exatamente essa
+// resposta (nil error, transicionou=false) e confirma que só quem realmente
+// transicionou notifica.
+func TestConcluirSessao_PerdeARaceDeConclusao_NaoNotifica(t *testing.T) {
+	svc, sessoes, _, notifier := newServiceForNotifierTest()
+
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+
+	sessoes.findByIDFn = func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
+		return &domain.SessaoTreino{ID: id, AlunoID: alunoID, Status: domain.StatusEmAndamento}, nil
+	}
+	sessoes.updateStatusFn = func(ctx context.Context, id uuid.UUID, st domain.StatusSessao, concluidoEm *time.Time) (bool, error) {
+		// Simula ter perdido a corrida: outra requisição já concluiu a
+		// sessão entre o FindByID e este UpdateStatus.
+		return false, nil
+	}
+
+	chamadas := 0
+	notifier.notificarTreinoConcluidoFn = func(ctx context.Context, p uuid.UUID, nome string) error {
+		chamadas++
+		return nil
+	}
+
+	if _, err := svc.ConcluirSessao(context.Background(), alunoID, sessaoID); err != nil {
+		t.Fatalf("ConcluirSessao: %v", err)
+	}
+	if chamadas != 0 {
+		t.Errorf("quem perde a corrida de conclusão não deveria notificar, got %d chamadas", chamadas)
+	}
+}
+
+func TestConcluirSessao_FalhaAoNotificar_NaoQuebraConclusao(t *testing.T) {
+	svc, sessoes, alunos, notifier := newServiceForNotifierTest()
+
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+
+	sessoes.findByIDFn = func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
+		return &domain.SessaoTreino{ID: id, AlunoID: alunoID, Status: domain.StatusEmAndamento}, nil
+	}
+	alunos.personalIDENomeFn = func(ctx context.Context, id uuid.UUID) (uuid.UUID, string, error) {
+		return uuid.Nil, "", errors.New("lookup indisponível")
+	}
+	notifier.notificarTreinoConcluidoFn = func(ctx context.Context, p uuid.UUID, nome string) error {
+		t.Error("NotificarTreinoConcluido não deveria ser chamado quando o lookup do personal falha")
+		return nil
+	}
+
+	resp, err := svc.ConcluirSessao(context.Background(), alunoID, sessaoID)
+	if err != nil {
+		t.Fatalf("ConcluirSessao não deveria falhar por causa de erro na notificação: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("resposta não deveria ser nil")
 	}
 }
 

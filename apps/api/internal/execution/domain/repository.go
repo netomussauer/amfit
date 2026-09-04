@@ -23,8 +23,13 @@ type SessaoRepository interface {
 
 	// UpdateStatus atualiza o status e (opcionalmente) o concluido_em.
 	// Quando concluidoEm == nil o campo NÃO é alterado (UPDATE seletivo).
-	// Retorna ErrSessaoNotFound se nenhuma linha foi afetada.
-	UpdateStatus(ctx context.Context, id uuid.UUID, status StatusSessao, concluidoEm *time.Time) error
+	// O UPDATE só afeta a linha se ela ainda estiver EM_ANDAMENTO — se duas
+	// chamadas concorrentes tentarem concluir a mesma sessão, só uma
+	// "vence" (transicionou=true); a outra encontra o alvo já atingido e
+	// devolve transicionou=false, err=nil (idempotente, não é erro).
+	// Retorna ErrSessaoJaConcluida se a sessão estiver num status terminal
+	// diferente do alvo (ex: ABANDONADO).
+	UpdateStatus(ctx context.Context, id uuid.UUID, status StatusSessao, concluidoEm *time.Time) (transicionou bool, err error)
 
 	// ListByAluno devolve as sessões do aluno paginadas, em ordem decrescente
 	// de data_execucao + iniciado_em, junto com o total para a paginação.

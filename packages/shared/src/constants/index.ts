@@ -70,3 +70,11 @@ export const ANAMNESE_DISPONIBILIDADE = {
 } as const;
 export type AnamneseDisponibilidade =
   (typeof ANAMNESE_DISPONIBILIDADE)[keyof typeof ANAMNESE_DISPONIBILIDADE];
+
+// ── Notificações push (SDD §13.2) ───────────────────────────────────
+export const PLATAFORMA_DISPOSITIVO = {
+  ANDROID: 'ANDROID',
+  IOS: 'IOS',
+} as const;
+export type PlataformaDispositivo =
+  (typeof PLATAFORMA_DISPOSITIVO)[keyof typeof PLATAFORMA_DISPOSITIVO];

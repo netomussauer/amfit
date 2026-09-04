@@ -7,6 +7,7 @@ export * from './schemas/ficha.schema';
 export * from './schemas/sessao.schema';
 export * from './schemas/progresso.schema';
 export * from './schemas/anamnese.schema';
+export * from './schemas/notificacao.schema';
 
 // Types
 export * from './types/index';
