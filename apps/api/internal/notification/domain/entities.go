@@ -45,10 +45,14 @@ type PushToken struct {
 // Gamification) forem implementados, sem exigir migration a cada um.
 type TipoNotificacao string
 
-// TipoTreinoConcluido é o único tipo com gatilho real implementado nesta
-// entrega — os demais do SDD (PR_BATIDO, MENSALIDADE_*, MENSAGEM_RECEBIDA,
+// TipoTreinoConcluido, TipoMensalidadePaga e TipoMensalidadeVencendo têm
+// gatilho real implementado — os demais do SDD (PR_BATIDO, MENSAGEM_RECEBIDA,
 // BADGE_DESBLOQUEADO) dependem de lógica/contextos que ainda não existem.
-const TipoTreinoConcluido TipoNotificacao = "TREINO_CONCLUIDO"
+const (
+	TipoTreinoConcluido     TipoNotificacao = "TREINO_CONCLUIDO"
+	TipoMensalidadePaga     TipoNotificacao = "MENSALIDADE_PAGA"
+	TipoMensalidadeVencendo TipoNotificacao = "MENSALIDADE_VENCENDO"
+)
 
 // StatusEntrega é o estado de despacho de uma notificação, avançado pelo
 // worker (internal/notification/worker).

@@ -65,6 +65,16 @@ import {
   TenantConfigResponseSchema,
   AtualizarTenantConfigRequestSchema,
 } from '../schemas/tenant.schema';
+import {
+  CriarPlanoRequestSchema,
+  AtualizarPlanoRequestSchema,
+  PlanoResponseSchema,
+  MarcarPagaRequestSchema,
+  AtualizarStatusMensalidadeRequestSchema,
+  MensalidadeResponseSchema,
+  MensalidadeListResponseSchema,
+  DashboardFinanceiroResponseSchema,
+} from '../schemas/financial.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -133,3 +143,15 @@ export type RegistrarPushTokenRequest = z.infer<typeof RegistrarPushTokenRequest
 // White Label
 export type TenantConfigResponse = z.infer<typeof TenantConfigResponseSchema>;
 export type AtualizarTenantConfigRequest = z.infer<typeof AtualizarTenantConfigRequestSchema>;
+
+// Financial
+export type CriarPlanoRequest = z.infer<typeof CriarPlanoRequestSchema>;
+export type AtualizarPlanoRequest = z.infer<typeof AtualizarPlanoRequestSchema>;
+export type PlanoResponse = z.infer<typeof PlanoResponseSchema>;
+export type MarcarPagaRequest = z.infer<typeof MarcarPagaRequestSchema>;
+export type AtualizarStatusMensalidadeRequest = z.infer<
+  typeof AtualizarStatusMensalidadeRequestSchema
+>;
+export type MensalidadeResponse = z.infer<typeof MensalidadeResponseSchema>;
+export type MensalidadeListResponse = z.infer<typeof MensalidadeListResponseSchema>;
+export type DashboardFinanceiroResponse = z.infer<typeof DashboardFinanceiroResponseSchema>;

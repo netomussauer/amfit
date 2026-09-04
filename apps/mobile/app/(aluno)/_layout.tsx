@@ -52,6 +52,13 @@ export default function AlunoLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="mensalidade"
+        options={{
+          // Rota acessível via push do Perfil — não exibe entrada na tab bar.
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

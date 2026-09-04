@@ -13,6 +13,10 @@ import (
 	execapplication "github.com/amfit/api/internal/execution/application"
 	exechandlers "github.com/amfit/api/internal/execution/handlers"
 	execinfra "github.com/amfit/api/internal/execution/infrastructure"
+	financialapplication "github.com/amfit/api/internal/financial/application"
+	financialhandlers "github.com/amfit/api/internal/financial/handlers"
+	financialinfra "github.com/amfit/api/internal/financial/infrastructure"
+	financialworker "github.com/amfit/api/internal/financial/worker"
 	identityapplication "github.com/amfit/api/internal/identity/application"
 	identityhandlers "github.com/amfit/api/internal/identity/handlers"
 	identityinfra "github.com/amfit/api/internal/identity/infrastructure"
@@ -178,6 +182,18 @@ func main() {
 	)
 	execH := exechandlers.NewExecutionHandler(execSvc)
 
+	// Financial
+	financialRepos := financialinfra.NewPostgresRepositories(pool)
+	financialSvc := financialapplication.NewFinancialService(
+		financialRepos.Planos,
+		financialRepos.Mensalidades,
+		financialRepos.AlunoLookup,
+		// notificationSvc satisfaz financialapplication.Notifier por
+		// assinatura de método (mesmo padrão do execSvc acima).
+		notificationSvc,
+	)
+	financialH := financialhandlers.NewFinancialHandler(financialSvc)
+
 	// Progress
 	progressRepos := progressinfra.NewPostgresRepositories(pool)
 	progressSvc := progressapplication.NewProgressService(
@@ -269,13 +285,16 @@ func main() {
 	trainingH.RegisterAlunoRoutes(api, auth, requireAluno)
 	execH.RegisterAlunoRoutes(api, auth, requireAluno)
 	progressH.RegisterAlunoRoutes(api, auth, requireAluno)
+	financialH.RegisterAlunoRoutes(api, auth, requireAluno)
 
 	// Restritas a PERSONAL: CRUD de alunos + gestao de fichas/treinos +
-	// /alunos/:id/progresso/* + /dashboard.
+	// /alunos/:id/progresso/* + /dashboard + /alunos/:id/plano + /mensalidades/*
+	// + /financeiro/dashboard.
 	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	progressH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	financialH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
 	// ── Notification Dispatcher (worker em background) ─────────────────
 	//
@@ -291,6 +310,15 @@ func main() {
 	)
 	go dispatcher.Run(workerCtx)
 	log.Info().Msg("notification dispatcher started")
+
+	// ── Financial Worker (worker em background) ────────────────────────
+	//
+	// Substitui o pg_cron do SDD (ver migration 000010) — gera mensalidades
+	// da competência corrente, marca vencidas como atrasadas e dispara
+	// lembretes de vencimento. Roda no mesmo workerCtx do dispatcher acima.
+	financialW := financialworker.NewWorker(financialSvc, time.Hour)
+	go financialW.Run(workerCtx)
+	log.Info().Msg("financial worker started")
 
 	// ── Graceful shutdown ─────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)

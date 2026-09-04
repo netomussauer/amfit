@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AlunoDetalhe } from '@/features/alunos/components/AlunoDetalhe';
 import { AnamneseSection } from '@/features/anamnese';
 import { FichaList } from '@/features/fichas/components/FichaList';
+import { PlanoSection } from '@/features/financeiro';
 
 type Props = {
   params: { id: string };
@@ -15,6 +16,7 @@ export default function AlunoDetalhePage({ params }: Props) {
   return (
     <div className="max-w-3xl space-y-10">
       <AlunoDetalhe alunoId={params.id} />
+      <PlanoSection alunoId={params.id} />
       <AnamneseSection alunoId={params.id} />
       <FichaList alunoId={params.id} />
 

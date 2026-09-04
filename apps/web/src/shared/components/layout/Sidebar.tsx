@@ -7,6 +7,7 @@ const NAV_ITEMS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/alunos', label: 'Alunos' },
   { href: '/exercicios', label: 'Exercícios' },
+  { href: '/financeiro', label: 'Financeiro' },
   { href: '/configuracoes', label: 'Configurações' },
 ];
 

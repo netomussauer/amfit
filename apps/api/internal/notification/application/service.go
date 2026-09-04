@@ -86,3 +86,60 @@ func (s *NotificationService) NotificarTreinoConcluido(
 	}
 	return nil
 }
+
+// NotificarMensalidadePaga enfileira uma notificação pro aluno quando o
+// personal confirma manualmente o pagamento de uma mensalidade (SDD §13.1,
+// evento mensalidade.paga — adaptado aqui pro fluxo de cobrança manual:
+// quem confirma é o próprio personal, então quem precisa saber é o aluno,
+// não o personal como no fluxo original de webhook do gateway). Satisfaz o
+// port Notifier definido em financial/application.
+func (s *NotificationService) NotificarMensalidadePaga(
+	ctx context.Context,
+	alunoID uuid.UUID,
+	competencia string,
+	valor float64,
+) error {
+	n := &domain.Notificacao{
+		ID:               uuid.New(),
+		DestinatarioID:   alunoID,
+		DestinatarioTipo: domain.OwnerAluno,
+		Titulo:           "Pagamento confirmado",
+		Corpo:            fmt.Sprintf("Sua mensalidade de %s foi confirmada. Valor: R$ %.2f.", competencia, valor),
+		Tipo:             domain.TipoMensalidadePaga,
+		Status:           domain.StatusPendente,
+	}
+	if err := s.notifs.Criar(ctx, n); err != nil {
+		return fmt.Errorf("application: criar notificacao mensalidade paga: %w", err)
+	}
+	return nil
+}
+
+// NotificarMensalidadeVencendo enfileira um lembrete pro aluno quando uma
+// mensalidade entra na janela de vencimento (SDD §13.1, evento
+// mensalidade.vencendo). Satisfaz o port Notifier definido em
+// financial/application.
+func (s *NotificationService) NotificarMensalidadeVencendo(
+	ctx context.Context,
+	alunoID uuid.UUID,
+	diasRestantes int,
+	valor float64,
+) error {
+	corpo := fmt.Sprintf("Sua mensalidade de R$ %.2f vence hoje.", valor)
+	if diasRestantes > 0 {
+		corpo = fmt.Sprintf("Sua mensalidade de R$ %.2f vence em %d dia(s).", valor, diasRestantes)
+	}
+
+	n := &domain.Notificacao{
+		ID:               uuid.New(),
+		DestinatarioID:   alunoID,
+		DestinatarioTipo: domain.OwnerAluno,
+		Titulo:           "Mensalidade vencendo",
+		Corpo:            corpo,
+		Tipo:             domain.TipoMensalidadeVencendo,
+		Status:           domain.StatusPendente,
+	}
+	if err := s.notifs.Criar(ctx, n); err != nil {
+		return fmt.Errorf("application: criar notificacao mensalidade vencendo: %w", err)
+	}
+	return nil
+}

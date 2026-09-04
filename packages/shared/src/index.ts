@@ -9,6 +9,7 @@ export * from './schemas/progresso.schema';
 export * from './schemas/anamnese.schema';
 export * from './schemas/notificacao.schema';
 export * from './schemas/tenant.schema';
+export * from './schemas/financial.schema';
 
 // Types
 export * from './types/index';
