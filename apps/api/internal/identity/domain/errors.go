@@ -26,4 +26,16 @@ var (
 	// ErrSenhaAtualIncorreta indica que a senha atual informada em uma troca
 	// de senha não confere com o hash armazenado.
 	ErrSenhaAtualIncorreta = errors.New("identity: senha atual incorreta")
+
+	// ErrCorInvalida indica que cor_primaria/cor_secundaria não é um
+	// hexadecimal de 6 dígitos válido.
+	ErrCorInvalida = errors.New("identity: cor deve ser um hexadecimal de 6 dígitos")
+
+	// ErrTipoLogoInvalido indica que o content-type do logo enviado não é
+	// suportado (só jpeg/png).
+	ErrTipoLogoInvalido = errors.New("identity: tipo de logo inválido")
+
+	// ErrLogoTamanhoExcedido indica que o logo enviado excede o limite de
+	// tamanho permitido.
+	ErrLogoTamanhoExcedido = errors.New("identity: tamanho do logo excede o limite")
 )

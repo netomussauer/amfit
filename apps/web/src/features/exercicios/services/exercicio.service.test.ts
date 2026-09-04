@@ -128,7 +128,10 @@ describe('exercicioService.create', () => {
     expect((body as FormData).get('grupo_muscular_id')).toBe(grupoFixture.id);
     expect((body as FormData).get('descricao')).toBe('Instruções');
     expect((body as FormData).get('midia')).toBe(midia);
-    expect(config).toEqual({ headers: { 'Content-Type': 'multipart/form-data' } });
+    // undefined (não um valor fixo) — deixa o browser gerar o boundary do
+    // multipart sozinho (achado de code-review: um valor fixo sem
+    // boundary quebrava o parse no backend).
+    expect(config).toEqual({ headers: { 'Content-Type': undefined } });
     expect(resultado).toEqual(exercicioFixture);
   });
 

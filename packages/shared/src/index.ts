@@ -8,6 +8,7 @@ export * from './schemas/sessao.schema';
 export * from './schemas/progresso.schema';
 export * from './schemas/anamnese.schema';
 export * from './schemas/notificacao.schema';
+export * from './schemas/tenant.schema';
 
 // Types
 export * from './types/index';

@@ -52,8 +52,12 @@ export const exercicioService = {
     if (midia) {
       fd.append('midia', midia);
     }
+    // Ver comentário equivalente em tenant.service.ts — 'Content-Type'
+    // fixo sem boundary quebra o parse multipart no backend; `undefined`
+    // deixa o browser gerar o header certo (achado de code-review ao
+    // implementar White Label, mesmo bug preexistia aqui).
     const { data } = await apiClient.post('/exercicios', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     });
     return ExercicioResponseSchema.parse(data);
   },

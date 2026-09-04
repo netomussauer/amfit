@@ -46,3 +46,14 @@ type RefreshTokenRepository interface {
 	RevokeByJTI(ctx context.Context, jti string) error
 	RevokeAllByOwner(ctx context.Context, ownerID uuid.UUID) error
 }
+
+// TenantConfigRepository define o contrato de persistência para TenantConfig.
+type TenantConfigRepository interface {
+	// FindByPersonalID devolve (nil, nil) quando o personal nunca configurou
+	// nenhum branding — não é um erro, é o estado normal de "sem
+	// customização ainda" (o caller aplica os defaults visuais do app).
+	FindByPersonalID(ctx context.Context, personalID uuid.UUID) (*TenantConfig, error)
+
+	// Upsert insere ou atualiza a config (uma linha por personal_id).
+	Upsert(ctx context.Context, cfg *TenantConfig) error
+}

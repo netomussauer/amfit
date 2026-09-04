@@ -1,5 +1,6 @@
 import { ContaForm } from '@/features/configuracoes/components/ContaForm';
 import { AlterarSenhaForm } from '@/features/configuracoes/components/AlterarSenhaForm';
+import { BrandingForm } from '@/features/configuracoes/components/BrandingForm';
 
 export const metadata = {
   title: 'Configurações — AMFIT',
@@ -28,6 +29,20 @@ export default function ConfiguracoesPage() {
           </p>
           <div className="mt-4">
             <ContaForm />
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="marca-heading" className="space-y-4">
+        <div className="rounded-lg border border-[--color-border] bg-[--color-bg] p-6 shadow-sm">
+          <h2 id="marca-heading" className="text-lg font-semibold text-[--color-text]">
+            Marca (White Label)
+          </h2>
+          <p className="mt-1 text-sm text-[--color-text-muted]">
+            Personalize o logo e as cores que seus alunos veem no app.
+          </p>
+          <div className="mt-4">
+            <BrandingForm />
           </div>
         </div>
       </section>

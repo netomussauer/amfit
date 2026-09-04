@@ -84,3 +84,18 @@ type RefreshToken struct {
 func (rt *RefreshToken) IsExpired(now time.Time) bool {
 	return now.After(rt.ExpiraEm)
 }
+
+// TenantConfig guarda a identidade visual customizada de um personal
+// (White Label — SDD §20.4). Relação 1:1 com PersonalTrainer; PersonalID
+// é a própria PK. Não confundir com "sem branding configurado" (nenhuma
+// linha na tabela — ver TenantConfigRepository.FindByPersonalID): uma vez
+// criada, a linha sempre tem CorPrimaria/CorSecundaria preenchidas (nunca
+// ficam vazias), só LogoURL/NomeApp podem estar em branco.
+type TenantConfig struct {
+	PersonalID    uuid.UUID
+	LogoURL       string
+	CorPrimaria   string
+	CorSecundaria string
+	NomeApp       string
+	AtualizadoEm  time.Time
+}

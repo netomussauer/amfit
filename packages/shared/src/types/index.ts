@@ -61,6 +61,10 @@ import {
   AnamneseResponseSchema,
 } from '../schemas/anamnese.schema';
 import { RegistrarPushTokenRequestSchema } from '../schemas/notificacao.schema';
+import {
+  TenantConfigResponseSchema,
+  AtualizarTenantConfigRequestSchema,
+} from '../schemas/tenant.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -125,3 +129,7 @@ export type AnamneseResponse = z.infer<typeof AnamneseResponseSchema>;
 
 // Notificações
 export type RegistrarPushTokenRequest = z.infer<typeof RegistrarPushTokenRequestSchema>;
+
+// White Label
+export type TenantConfigResponse = z.infer<typeof TenantConfigResponseSchema>;
+export type AtualizarTenantConfigRequest = z.infer<typeof AtualizarTenantConfigRequestSchema>;

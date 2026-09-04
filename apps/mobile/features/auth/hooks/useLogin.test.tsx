@@ -5,6 +5,7 @@ import { useLogin } from './useLogin';
 import { apiRequest } from '@/shared/lib/api-client';
 import { setAccessToken, setRefreshToken } from '@/shared/lib/auth';
 import { registrarPushTokenExpo } from '@/features/notificacoes';
+import { requestThemeRefresh } from '@/features/tenant';
 import { makeAuthResponse, makeLoginRequest } from '../__fixtures__/auth.fixtures';
 
 jest.mock('@/shared/lib/api-client', () => ({
@@ -20,6 +21,10 @@ jest.mock('@/features/notificacoes', () => ({
   registrarPushTokenExpo: jest.fn(),
 }));
 
+jest.mock('@/features/tenant', () => ({
+  requestThemeRefresh: jest.fn(),
+}));
+
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedSetAccessToken = setAccessToken as jest.MockedFunction<typeof setAccessToken>;
 const mockedSetRefreshToken = setRefreshToken as jest.MockedFunction<
@@ -27,6 +32,9 @@ const mockedSetRefreshToken = setRefreshToken as jest.MockedFunction<
 >;
 const mockedRegistrarPushTokenExpo = registrarPushTokenExpo as jest.MockedFunction<
   typeof registrarPushTokenExpo
+>;
+const mockedRequestThemeRefresh = requestThemeRefresh as jest.MockedFunction<
+  typeof requestThemeRefresh
 >;
 
 function createWrapper() {
@@ -47,6 +55,7 @@ describe('useLogin', () => {
     mockedSetAccessToken.mockReset();
     mockedSetRefreshToken.mockReset();
     mockedRegistrarPushTokenExpo.mockReset();
+    mockedRequestThemeRefresh.mockReset();
   });
 
   it('chama POST /auth/login com as credenciais informadas', async () => {
@@ -103,6 +112,21 @@ describe('useLogin', () => {
     expect(mockedRegistrarPushTokenExpo).toHaveBeenCalledTimes(1);
   });
 
+  it('pede pro ThemeProvider buscar a marca do personal após login bem-sucedido', async () => {
+    // Arrange
+    mockedApiRequest.mockResolvedValue(makeAuthResponse());
+    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+
+    // Act
+    act(() => {
+      result.current.mutate(makeLoginRequest());
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedRequestThemeRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('expõe o estado de erro quando a API rejeita as credenciais', async () => {
     // Arrange
     const error = new Error('Credenciais inválidas');
@@ -119,5 +143,6 @@ describe('useLogin', () => {
     expect(result.current.error).toBe(error);
     expect(mockedSetAccessToken).not.toHaveBeenCalled();
     expect(mockedRegistrarPushTokenExpo).not.toHaveBeenCalled();
+    expect(mockedRequestThemeRefresh).not.toHaveBeenCalled();
   });
 });

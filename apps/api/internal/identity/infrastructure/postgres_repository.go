@@ -25,6 +25,7 @@ type PostgresRepositories struct {
 	Aluno         domain.AlunoRepository
 	Credencial    domain.CredencialRepository
 	RefreshTokens domain.RefreshTokenRepository
+	TenantConfig  domain.TenantConfigRepository
 }
 
 // NewPostgresRepositories cria a instância com o pool compartilhado e expõe os repositórios.
@@ -35,6 +36,7 @@ func NewPostgresRepositories(pool *pgxpool.Pool) *PostgresRepositories {
 		Aluno:         &alunoRepo{pool: pool},
 		Credencial:    &credencialRepo{pool: pool},
 		RefreshTokens: &refreshTokenRepo{pool: pool},
+		TenantConfig:  &tenantConfigRepo{pool: pool},
 	}
 }
 
@@ -458,4 +460,59 @@ func isUniqueViolation(err error) bool {
 		return pgErr.Code == pgUniqueViolation
 	}
 	return false
+}
+
+// ── TenantConfig ───────────────────────────────────────────────────────────
+
+type tenantConfigRepo struct {
+	pool *pgxpool.Pool
+}
+
+const queryFindTenantConfig = `
+SELECT personal_id, COALESCE(logo_url, ''), cor_primaria, cor_secundaria,
+       COALESCE(nome_app, ''), atualizado_em
+FROM tenant_config
+WHERE personal_id = $1;
+`
+
+func (r *tenantConfigRepo) FindByPersonalID(
+	ctx context.Context,
+	personalID uuid.UUID,
+) (*domain.TenantConfig, error) {
+	var cfg domain.TenantConfig
+	err := r.pool.QueryRow(ctx, queryFindTenantConfig, personalID).Scan(
+		&cfg.PersonalID, &cfg.LogoURL, &cfg.CorPrimaria, &cfg.CorSecundaria,
+		&cfg.NomeApp, &cfg.AtualizadoEm,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Não é um erro — "sem config ainda" é um estado normal (ver
+			// doc do TenantConfigRepository).
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find tenant config: %w", err)
+	}
+	return &cfg, nil
+}
+
+const queryUpsertTenantConfig = `
+INSERT INTO tenant_config (personal_id, logo_url, cor_primaria, cor_secundaria, nome_app)
+VALUES ($1, NULLIF($2, ''), $3, $4, NULLIF($5, ''))
+ON CONFLICT (personal_id) DO UPDATE SET
+    logo_url       = NULLIF(EXCLUDED.logo_url, ''),
+    cor_primaria   = EXCLUDED.cor_primaria,
+    cor_secundaria = EXCLUDED.cor_secundaria,
+    nome_app       = NULLIF(EXCLUDED.nome_app, ''),
+    atualizado_em  = NOW()
+RETURNING atualizado_em;
+`
+
+func (r *tenantConfigRepo) Upsert(ctx context.Context, cfg *domain.TenantConfig) error {
+	err := r.pool.QueryRow(ctx, queryUpsertTenantConfig,
+		cfg.PersonalID, cfg.LogoURL, cfg.CorPrimaria, cfg.CorSecundaria, cfg.NomeApp,
+	).Scan(&cfg.AtualizadoEm)
+	if err != nil {
+		return fmt.Errorf("upsert tenant config: %w", err)
+	}
+	return nil
 }

@@ -25,6 +25,10 @@ type Config struct {
 	// próprio MinIO via 9000; no lab K3s passa pelo Traefik (minio.amfit.local).
 	MidiaPublicURL string
 
+	// TenantLogoPublicURL é o mesmo conceito de MidiaPublicURL, mas pro
+	// bucket "tenant-logos" (White Label — SDD §20.4).
+	TenantLogoPublicURL string
+
 	// JWT
 	JWTPrivateKeyPath string
 	JWTPublicKeyPath  string
@@ -45,7 +49,8 @@ func Load() *Config {
 		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "amfit-minio-secret"),
 		MinioUseSSL:    getEnvBool("MINIO_USE_SSL", false),
 
-		MidiaPublicURL: getEnv("MIDIA_PUBLIC_URL", "http://localhost:9000/exercicios"),
+		MidiaPublicURL:      getEnv("MIDIA_PUBLIC_URL", "http://localhost:9000/exercicios"),
+		TenantLogoPublicURL: getEnv("TENANT_LOGO_PUBLIC_URL", "http://localhost:9000/tenant-logos"),
 
 		JWTPrivateKeyPath: getEnv("JWT_PRIVATE_KEY_PATH", "keys/private.pem"),
 		JWTPublicKeyPath:  getEnv("JWT_PUBLIC_KEY_PATH", "keys/public.pem"),

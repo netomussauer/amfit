@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ROLES } from '@amfit/shared';
 import { setAuthFailedHandler } from '@/shared/lib/api-client';
 import { clearAll, getAccessToken, parseJwt } from '@/shared/lib/auth';
+import { ThemeProvider } from '@/shared/providers/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -87,9 +88,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthGuard>
-        <Stack screenOptions={{ headerShown: false }} />
-      </AuthGuard>
+      <ThemeProvider>
+        <AuthGuard>
+          <Stack screenOptions={{ headerShown: false }} />
+        </AuthGuard>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

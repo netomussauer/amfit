@@ -112,3 +112,26 @@ type PersonalResponse struct {
 	Ativo    bool      `json:"ativo"`
 	CriadoEm time.Time `json:"criado_em"`
 }
+
+// AtualizarTenantConfigRequest é o payload de campos de texto de
+// PUT /tenants/me/config. O logo (opcional) chega separado como
+// *LogoUpload — o corpo é multipart/form-data, então o handler monta este
+// struct a partir de form.Value em vez de bind de JSON.
+// CorPrimaria/CorSecundaria validam formato (hex de 6 dígitos, sem "#") no
+// service — não aqui — porque o formato aceito (sem "#") não bate com a tag
+// "hexcolor" do validator (que exige "#RRGGBB").
+type AtualizarTenantConfigRequest struct {
+	CorPrimaria   *string
+	CorSecundaria *string
+	NomeApp       *string `validate:"omitempty,max=100"`
+}
+
+// TenantConfigResponse é o DTO de saída de GET/PUT /tenants/me/config.
+// CorPrimaria/CorSecundaria nunca ficam vazias — sem config customizada,
+// o service devolve os defaults (idênticos ao visual atual do app).
+type TenantConfigResponse struct {
+	LogoURL       *string `json:"logo_url,omitempty"`
+	CorPrimaria   string  `json:"cor_primaria"`
+	CorSecundaria string  `json:"cor_secundaria"`
+	NomeApp       *string `json:"nome_app,omitempty"`
+}

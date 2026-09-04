@@ -212,3 +212,41 @@ func (m *mockRefreshTokenRepo) RevokeAllByOwner(ctx context.Context, ownerID uui
 	}
 	return nil
 }
+
+// ── TenantConfig mock ──────────────────────────────────────────────────────
+
+type mockTenantConfigRepo struct {
+	findByPersonalIDFn func(ctx context.Context, personalID uuid.UUID) (*domain.TenantConfig, error)
+	upsertFn           func(ctx context.Context, cfg *domain.TenantConfig) error
+}
+
+func (m *mockTenantConfigRepo) FindByPersonalID(
+	ctx context.Context, personalID uuid.UUID,
+) (*domain.TenantConfig, error) {
+	if m.findByPersonalIDFn != nil {
+		return m.findByPersonalIDFn(ctx, personalID)
+	}
+	return nil, nil
+}
+
+func (m *mockTenantConfigRepo) Upsert(ctx context.Context, cfg *domain.TenantConfig) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, cfg)
+	}
+	return nil
+}
+
+// ── LogoStorage mock ───────────────────────────────────────────────────────
+
+type mockLogoStorage struct {
+	uploadLogoFn func(ctx context.Context, personalID uuid.UUID, logo *LogoUpload) (string, error)
+}
+
+func (m *mockLogoStorage) UploadLogo(
+	ctx context.Context, personalID uuid.UUID, logo *LogoUpload,
+) (string, error) {
+	if m.uploadLogoFn != nil {
+		return m.uploadLogoFn(ctx, personalID, logo)
+	}
+	return "https://minio.test/tenant-logos/" + personalID.String() + ".png", nil
+}

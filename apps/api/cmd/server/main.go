@@ -93,17 +93,20 @@ func main() {
 	startupCtx, startupCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer startupCancel()
 
-	for _, b := range []string{"exercicios", "evolucao", "coach-videos"} {
+	for _, b := range []string{"exercicios", "evolucao", "coach-videos", "tenant-logos"} {
 		if err := minioClient.EnsureBucket(startupCtx, b, "us-east-1"); err != nil {
 			log.Fatal().Err(err).Str("bucket", b).Msg("failed to ensure MinIO bucket")
 		}
 	}
 	log.Info().Msg("MinIO connected and buckets ensured")
 
-	// Apenas o bucket de exercícios é público — evolucao e coach-videos
+	// exercicios e tenant-logos são públicos (mídia demonstrativa e logo de
+	// White Label, ambos servidos direto por URL) — evolucao e coach-videos
 	// permanecem privados (acesso via presigned URL nas próximas fatias).
-	if err := minioClient.SetBucketPublicRead(startupCtx, "exercicios"); err != nil {
-		log.Warn().Err(err).Msg("falha ao aplicar policy public-read em exercicios — continuando")
+	for _, b := range []string{"exercicios", "tenant-logos"} {
+		if err := minioClient.SetBucketPublicRead(startupCtx, b); err != nil {
+			log.Warn().Err(err).Str("bucket", b).Msg("falha ao aplicar policy public-read — continuando")
+		}
 	}
 
 	// ── JWT keys ──────────────────────────────────────────────────────
@@ -117,11 +120,14 @@ func main() {
 
 	// Identity
 	identityRepos := identityinfra.NewPostgresRepositories(pool)
+	identityLogoStorage := identityinfra.NewMinioLogoStorage(minioClient, cfg.TenantLogoPublicURL)
 	identitySvc := identityapplication.NewIdentityService(
 		identityRepos.Personal,
 		identityRepos.Aluno,
 		identityRepos.Credencial,
 		identityRepos.RefreshTokens,
+		identityRepos.TenantConfig,
+		identityLogoStorage,
 		privateKey,
 		publicKey,
 	)
