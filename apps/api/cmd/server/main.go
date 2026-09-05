@@ -10,6 +10,9 @@ import (
 	catalogapplication "github.com/amfit/api/internal/catalog/application"
 	cataloghandlers "github.com/amfit/api/internal/catalog/handlers"
 	cataloginfra "github.com/amfit/api/internal/catalog/infrastructure"
+	coachapplication "github.com/amfit/api/internal/coach/application"
+	coachhandlers "github.com/amfit/api/internal/coach/handlers"
+	coachinfra "github.com/amfit/api/internal/coach/infrastructure"
 	execapplication "github.com/amfit/api/internal/execution/application"
 	exechandlers "github.com/amfit/api/internal/execution/handlers"
 	execinfra "github.com/amfit/api/internal/execution/infrastructure"
@@ -106,7 +109,9 @@ func main() {
 
 	// exercicios e tenant-logos são públicos (mídia demonstrativa e logo de
 	// White Label, ambos servidos direto por URL) — evolucao e coach-videos
-	// permanecem privados (acesso via presigned URL nas próximas fatias).
+	// permanecem privados. coach-videos já usa presigned URL (ver
+	// coach/infrastructure/minio_storage.go); evolucao fica pra uma
+	// próxima fatia.
 	for _, b := range []string{"exercicios", "tenant-logos"} {
 		if err := minioClient.SetBucketPublicRead(startupCtx, b); err != nil {
 			log.Warn().Err(err).Str("bucket", b).Msg("falha ao aplicar policy public-read — continuando")
@@ -193,6 +198,20 @@ func main() {
 		notificationSvc,
 	)
 	financialH := financialhandlers.NewFinancialHandler(financialSvc)
+
+	// Coach
+	coachRepos := coachinfra.NewPostgresRepositories(pool)
+	coachVideoStorage := coachinfra.NewMinioVideoStorage(minioClient)
+	coachSvc := coachapplication.NewCoachService(
+		coachRepos.Videos,
+		coachRepos.Feedbacks,
+		coachRepos.AlunoLookup,
+		coachVideoStorage,
+		// notificationSvc satisfaz coachapplication.Notifier por assinatura
+		// de método (mesmo padrão do financialSvc acima).
+		notificationSvc,
+	)
+	coachH := coachhandlers.NewCoachHandler(coachSvc)
 
 	// Progress
 	progressRepos := progressinfra.NewPostgresRepositories(pool)
@@ -286,15 +305,17 @@ func main() {
 	execH.RegisterAlunoRoutes(api, auth, requireAluno)
 	progressH.RegisterAlunoRoutes(api, auth, requireAluno)
 	financialH.RegisterAlunoRoutes(api, auth, requireAluno)
+	coachH.RegisterAlunoRoutes(api, auth, requireAluno)
 
 	// Restritas a PERSONAL: CRUD de alunos + gestao de fichas/treinos +
 	// /alunos/:id/progresso/* + /dashboard + /alunos/:id/plano + /mensalidades/*
-	// + /financeiro/dashboard.
+	// + /financeiro/dashboard + /coach/videos/*.
 	identityH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	trainingH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	execH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	progressH.RegisterPersonalRoutes(api, auth, requirePersonal)
 	financialH.RegisterPersonalRoutes(api, auth, requirePersonal)
+	coachH.RegisterPersonalRoutes(api, auth, requirePersonal)
 
 	// ── Notification Dispatcher (worker em background) ─────────────────
 	//

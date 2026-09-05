@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Wallet } from 'lucide-react-native';
+import { ChevronRight, Film, Wallet } from 'lucide-react-native';
 import { useLogout } from '@/features/auth/hooks/useLogout';
 import { useAlunoMe } from '@/features/perfil/hooks/useAlunoMe';
 
@@ -94,6 +94,20 @@ export default function PerfilScreen() {
             <View className="flex-row items-center gap-2">
               <Wallet color="#f97316" size={18} />
               <Text className="text-sm font-medium text-gray-900">Minha mensalidade</Text>
+            </View>
+            <ChevronRight color="#94a3b8" size={18} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(aluno)/coach-video')}
+            activeOpacity={0.7}
+            className="mt-3 flex-row items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Enviar vídeo pro coach"
+          >
+            <View className="flex-row items-center gap-2">
+              <Film color="#f97316" size={18} />
+              <Text className="text-sm font-medium text-gray-900">Enviar vídeo pro coach</Text>
             </View>
             <ChevronRight color="#94a3b8" size={18} />
           </TouchableOpacity>

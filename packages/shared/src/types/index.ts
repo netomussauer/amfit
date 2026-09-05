@@ -75,6 +75,11 @@ import {
   MensalidadeListResponseSchema,
   DashboardFinanceiroResponseSchema,
 } from '../schemas/financial.schema';
+import {
+  EnviarFeedbackRequestSchema,
+  CoachVideoResponseSchema,
+  CoachVideoListResponseSchema,
+} from '../schemas/coach.schema';
 
 // Auth
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
@@ -155,3 +160,8 @@ export type AtualizarStatusMensalidadeRequest = z.infer<
 export type MensalidadeResponse = z.infer<typeof MensalidadeResponseSchema>;
 export type MensalidadeListResponse = z.infer<typeof MensalidadeListResponseSchema>;
 export type DashboardFinanceiroResponse = z.infer<typeof DashboardFinanceiroResponseSchema>;
+
+// Coach
+export type EnviarFeedbackRequest = z.infer<typeof EnviarFeedbackRequestSchema>;
+export type CoachVideoResponse = z.infer<typeof CoachVideoResponseSchema>;
+export type CoachVideoListResponse = z.infer<typeof CoachVideoListResponseSchema>;

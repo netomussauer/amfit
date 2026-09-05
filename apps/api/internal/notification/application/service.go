@@ -143,3 +143,45 @@ func (s *NotificationService) NotificarMensalidadeVencendo(
 	}
 	return nil
 }
+
+// NotificarCoachVideoEnviado enfileira uma notificação pro personal quando
+// um aluno envia um clipe pedindo revisão (SDD §20.5). Satisfaz o port
+// Notifier definido em coach/application.
+func (s *NotificationService) NotificarCoachVideoEnviado(
+	ctx context.Context,
+	personalID uuid.UUID,
+	alunoNome string,
+) error {
+	n := &domain.Notificacao{
+		ID:               uuid.New(),
+		DestinatarioID:   personalID,
+		DestinatarioTipo: domain.OwnerPersonal,
+		Titulo:           "Novo vídeo para revisão",
+		Corpo:            fmt.Sprintf("%s enviou um vídeo pedindo feedback.", alunoNome),
+		Tipo:             domain.TipoCoachVideoEnviado,
+		Status:           domain.StatusPendente,
+	}
+	if err := s.notifs.Criar(ctx, n); err != nil {
+		return fmt.Errorf("application: criar notificacao coach video enviado: %w", err)
+	}
+	return nil
+}
+
+// NotificarCoachFeedbackEnviado enfileira uma notificação pro aluno quando
+// o personal responde ao vídeo com feedback (SDD §20.5). Satisfaz o port
+// Notifier definido em coach/application.
+func (s *NotificationService) NotificarCoachFeedbackEnviado(ctx context.Context, alunoID uuid.UUID) error {
+	n := &domain.Notificacao{
+		ID:               uuid.New(),
+		DestinatarioID:   alunoID,
+		DestinatarioTipo: domain.OwnerAluno,
+		Titulo:           "Feedback do personal",
+		Corpo:            "Seu personal enviou feedback no vídeo que você mandou.",
+		Tipo:             domain.TipoCoachFeedbackEnviado,
+		Status:           domain.StatusPendente,
+	}
+	if err := s.notifs.Criar(ctx, n); err != nil {
+		return fmt.Errorf("application: criar notificacao coach feedback enviado: %w", err)
+	}
+	return nil
+}

@@ -45,13 +45,16 @@ type PushToken struct {
 // Gamification) forem implementados, sem exigir migration a cada um.
 type TipoNotificacao string
 
-// TipoTreinoConcluido, TipoMensalidadePaga e TipoMensalidadeVencendo têm
-// gatilho real implementado — os demais do SDD (PR_BATIDO, MENSAGEM_RECEBIDA,
+// TipoTreinoConcluido, TipoMensalidadePaga, TipoMensalidadeVencendo,
+// TipoCoachVideoEnviado e TipoCoachFeedbackEnviado têm gatilho real
+// implementado — os demais do SDD (PR_BATIDO, MENSAGEM_RECEBIDA,
 // BADGE_DESBLOQUEADO) dependem de lógica/contextos que ainda não existem.
 const (
-	TipoTreinoConcluido     TipoNotificacao = "TREINO_CONCLUIDO"
-	TipoMensalidadePaga     TipoNotificacao = "MENSALIDADE_PAGA"
-	TipoMensalidadeVencendo TipoNotificacao = "MENSALIDADE_VENCENDO"
+	TipoTreinoConcluido      TipoNotificacao = "TREINO_CONCLUIDO"
+	TipoMensalidadePaga      TipoNotificacao = "MENSALIDADE_PAGA"
+	TipoMensalidadeVencendo  TipoNotificacao = "MENSALIDADE_VENCENDO"
+	TipoCoachVideoEnviado    TipoNotificacao = "COACH_VIDEO_ENVIADO"
+	TipoCoachFeedbackEnviado TipoNotificacao = "COACH_FEEDBACK_ENVIADO"
 )
 
 // StatusEntrega é o estado de despacho de uma notificação, avançado pelo
