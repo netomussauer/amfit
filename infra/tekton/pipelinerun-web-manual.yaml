@@ -22,9 +22,11 @@ spec:
   taskRunTemplate:
     serviceAccountName: tekton-amfit
     podTemplate:
-      # Build do Web exige 8Gi pelo pnpm install. k3s-worker-cicd so tem 6Gi
-      # (ExceededNodeResources). ubuntu-neto tem 8Gi. Sem tolerations porque
-      # o no nao tem taint.
+      # Build do Web exige 8Gi pelo pnpm install/kaniko snapshot.
+      # k3s-worker-cicd so tem ~6Gi (ExceededNodeResources) — ubuntu-neto e
+      # o unico node com 8Gi (ver nota completa em
+      # infra/tekton/trigger-amfit.yaml). Sem tolerations porque o no nao
+      # tem taint.
       nodeSelector:
         kubernetes.io/hostname: ubuntu-neto
       securityContext:

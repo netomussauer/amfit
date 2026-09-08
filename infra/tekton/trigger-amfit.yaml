@@ -90,9 +90,22 @@ spec:
         taskRunTemplate:
           serviceAccountName: tekton-amfit
           podTemplate:
-            # Ver nota em infra/tekton/pipelinerun-api-manual.yaml — kaniko
-            # nesse node derruba o Postgres do Harbor (mesmo disco
-            # local-path). Movido pra ubuntu-neto (achado em 2026-09-04).
+            # REVERTIDO em 2026-09-08 apos teste ao vivo: tentei mover pra
+            # workload:cicd (k3s-worker-cicd) + workspace em nfs-storage,
+            # pensando que trocar o workspace do disco local pro NFS tiraria
+            # a disputa de disco do kaniko com os PVs do Harbor
+            # (Postgres/registry/trivy/redis, tambem em local-path nesse
+            # node). ERRADO: o snapshotting de camadas do kaniko usa a
+            # propria camada gravavel do container (containerd/overlay2),
+            # que fica SEMPRE no disco local do node onde o pod roda —
+            # totalmente independente de qual storageClass o workspace
+            # Tekton usa. Confirmado ao vivo: harbor-database-0 reiniciou de
+            # novo (restart 5->6) durante o kaniko-build-push mesmo com
+            # nfs-storage. Voltou pra ubuntu-neto (unico node sem esse
+            # risco). O ganho real desta rodada de fixes foi outro: os
+            # timeouts intermitentes de rede (proxy.golang.org, Harbor
+            # token service) — mitigados com retries no pipeline (ver
+            # pipeline-api.yaml/pipeline-web.yaml), nao com troca de node.
             nodeSelector:
               kubernetes.io/hostname: ubuntu-neto
             securityContext:
@@ -149,13 +162,21 @@ spec:
         taskRunTemplate:
           serviceAccountName: tekton-amfit
           podTemplate:
-            # ubuntu-neto ja era exigido aqui por memoria (8Gi pro pnpm
-            # install — k3s-worker-cicd so tem 6Gi). Antes deste fix o
-            # nodeSelector abaixo ainda dizia workload:cicd (k3s-worker-cicd),
-            # inconsistente com o manual (pipelinerun-web-manual.yaml, que ja
-            # usava ubuntu-neto) — corrigido pra bater com o manual e evitar
-            # tanto o ExceededNodeResources quanto o crash-loop do Postgres
-            # do Harbor (achado em 2026-09-04, mesma nota do build da API).
+            # ubuntu-neto e o UNICO node do cluster com >=8Gi de RAM (os
+            # outros: k3s-worker-cicd ~6Gi, k3s-server/ci-runner ~4Gi,
+            # raspneto <1Gi) — exigido pelo pnpm install/kaniko snapshot do
+            # Next.js. Tambem hospeda o Pi-hole (DNS de toda a rede) +
+            # monitoring sob disputa real de recursos, o que explica os
+            # timeouts intermitentes de rede que quebraram todo build desde
+            # 2026-09-04 — mitigado com retries no pipeline (ver
+            # pipeline-web.yaml) em vez de trocar de node (achado em
+            # 2026-09-08: nao ha outro node com RAM suficiente).
+            # storageClassName fica em local-path — testei nfs-storage
+            # pensando que reduziria a disputa de disco do kaniko, mas o
+            # snapshotting de camadas usa a camada gravavel do container
+            # (containerd/overlay2), sempre local ao node, independente da
+            # storageClass do workspace — nfs so trazia complexidade
+            # (quirks de POSIX lock) sem beneficio real.
             nodeSelector:
               kubernetes.io/hostname: ubuntu-neto
             securityContext:

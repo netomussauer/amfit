@@ -56,6 +56,16 @@ spec:
         echo ">>> git version"
         git --version
 
+        # Volumes NFS (storageClassName nfs-storage) preservam a ownership
+        # do servidor NFS, que nao bate com o UID do container — o "dubious
+        # ownership" do git (protecao da CVE-2022-24765) bloqueia qualquer
+        # operacao no workspace nesse caso. local-path nao tem esse
+        # problema (ownership local via fsGroup), entao isso e um no-op
+        # inofensivo la — seguro incluir sempre (achado em 2026-09-08, ao
+        # mover o build da API pra nfs-storage). Pod e efemero e isolado por
+        # build, sem risco real de "confiar" no diretorio.
+        git config --global --add safe.directory "$(workspaces.source.path)"
+
         echo ">>> Inicializando repo em $(workspaces.source.path)"
         git init -q
         git remote add origin "$(params.url)"

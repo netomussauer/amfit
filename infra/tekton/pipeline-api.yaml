@@ -73,6 +73,9 @@ spec:
     # encontra todos os hashes.
     - name: golang-test
       runAfter: [git-clone]
+      # Retry: absorve timeout transiente de rede em `go mod download`
+      # (TLS handshake timeout pro proxy.golang.org — achado em 2026-09-08).
+      retries: 2
       taskRef: { name: golang-test, kind: Task }
       params:
         - { name: package-path, value: apps/api }
@@ -83,6 +86,17 @@ spec:
     - name: kaniko-build-push
       runAfter:
         - golang-test
+      # Retry + timeout curto: absorve timeouts transientes de rede
+      # alcancando o token service do Harbor (achado em 2026-09-08). O
+      # timeout default da task e 30m — kaniko (assim como o cliente HTTP
+      # do Go em golang-test) faz seu proprio retry/backoff interno bem
+      # mais longo que isso, entao uma unica tentativa pode consumir os 30m
+      # inteiros sem nunca dar chance do `retries` do PipelineTask agir.
+      # 8m por tentativa e generoso pro build da API (normalmente < 1min
+      # com rede saudavel) mas curto o bastante pra falhar rapido e deixar
+      # a proxima tentativa rodar.
+      retries: 2
+      timeout: "8m"
       taskRef:
         name: kaniko-build-push
         kind: Task
@@ -101,3 +115,27 @@ spec:
           workspace: source
         - name: docker-credentials
           workspace: docker-credentials
+
+    # Deployment usa tag :latest (sem mudanca no manifesto a cada build),
+    # entao nem kubectl nem o ArgoCD reiniciam os pods sozinhos apos um
+    # push — sem este step, uma imagem nova fica publicada no Harbor mas
+    # nunca chega a rodar (achado em 2026-09-08). Mesmo padrao do
+    # REALTPMSYS (task inline "rollout-restart" no pipeline dele). Exige a
+    # Role/RoleBinding em infra/k8s/rbac-tekton-rollout.yaml.
+    - name: rollout-restart
+      runAfter:
+        - kaniko-build-push
+      taskSpec:
+        description: |
+          Reinicia o Deployment amfit-api no ns amfit e aguarda ate 3min o
+          rollout completar.
+        steps:
+          - name: restart
+            image: docker.io/bitnami/kubectl:latest
+            script: |
+              #!/bin/sh
+              set -eu
+              echo "→ kubectl rollout restart deployment/amfit-api -n amfit"
+              kubectl rollout restart deployment/amfit-api -n amfit
+              echo "→ kubectl rollout status (timeout 3m)"
+              kubectl rollout status deployment/amfit-api -n amfit --timeout=3m

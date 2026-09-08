@@ -33,13 +33,29 @@ spec:
     - name: gocache-dir
       description: Diretório usado como GOCACHE (acelera builds repetidos).
       type: string
-      default: /workspace/source/.gocache
+      default: /gocache/.gocache
+  # GOCACHE/GOMODCACHE ficam num emptyDir local (NAO no workspace `source`)
+  # de proposito — desde 2026-09-08 o workspace `source` pode estar em
+  # storageClassName nfs-storage, e o toolchain do Go precisa de POSIX file
+  # locking real pra coordenar go.sum/mod cache ("RLock go.mod: no locks
+  # available" — NFS neste cluster nao suporta lock advisory). Isso nao
+  # basta sozinho: o Go tambem tenta um RLock no proprio go.mod do
+  # diretorio de trabalho (nao so no GOMODCACHE), entao o pacote inteiro
+  # (package-path) e copiado do workspace pro emptyDir ANTES de rodar
+  # qualquer comando go — dai pra frente tudo roda 100% em disco local.
+  # git-clone continua no workspace normalmente (nao precisa de lock).
+  volumes:
+    - name: gocache
+      emptyDir: {}
   steps:
     - name: vet-and-test
       # Bookworm (Debian) ja vem com gcc + git pre-instalados, evitando apk add
       # que falha quando o no nao tem egress para dl-cdn.alpinelinux.org.
       image: golang:$(params.go-version)-bookworm
-      workingDir: $(workspaces.source.path)/$(params.package-path)
+      # NAO /gocache/src aqui — o emptyDir comeca vazio e o container falha
+      # ao iniciar se workingDir nao existir ainda. O script faz `cd`
+      # depois de copiar os arquivos (ver abaixo).
+      workingDir: /gocache
       env:
         - name: CGO_ENABLED
           value: "1"
@@ -48,16 +64,44 @@ spec:
         - name: GOCACHE
           value: $(params.gocache-dir)
         - name: GOMODCACHE
-          value: /workspace/source/.gomodcache
+          value: /gocache/.gomodcache
+      volumeMounts:
+        - name: gocache
+          mountPath: /gocache
       script: |
         #!/usr/bin/env bash
         set -eu
 
+        echo ">>> copiando $(params.package-path) do workspace pro disco local"
+        mkdir -p /gocache/src
+        cp -a "$(workspaces.source.path)/$(params.package-path)/." /gocache/src/
+        cd /gocache/src
+
         echo ">>> go version"
         go version
 
-        echo ">>> go mod download"
-        go mod download
+        echo ">>> go mod download (ate 3 tentativas, 90s cada)"
+        # `go mod download` sozinho pode ficar preso por dezenas de minutos
+        # numa unica tentativa quando o proxy.golang.org da timeout de TLS
+        # intermitente — o cliente HTTP do Go tem seu proprio retry/backoff
+        # interno bem mais longo que o timeout da task inteira (achado em
+        # 2026-09-08: consumiu os 30min do timeout do pipeline numa unica
+        # chamada, sem nunca dar a chance do retry do PipelineTask agir).
+        # `timeout` aqui garante que cada tentativa falha rapido, deixando
+        # o loop abaixo tentar de novo em vez de travar o pipeline inteiro.
+        ok=0
+        for attempt in 1 2 3; do
+          if timeout 90 go mod download; then
+            ok=1
+            break
+          fi
+          echo ">>> tentativa $attempt falhou/travou, tentando de novo..."
+          sleep 5
+        done
+        if [ "$ok" -ne 1 ]; then
+          echo ">>> go mod download falhou apos 3 tentativas"
+          exit 1
+        fi
 
         echo ">>> go vet ./..."
         go vet ./...

@@ -60,6 +60,18 @@ spec:
     - name: kaniko-build-push
       runAfter:
         - git-clone
+      # Retry + timeout curto: absorve timeouts transientes de rede
+      # alcancando o registry npm ou o token service do Harbor (achado em
+      # 2026-09-08). O timeout default da task e 30m — kaniko faz seu
+      # proprio retry/backoff interno bem mais longo que isso, entao uma
+      # unica tentativa pode consumir os 30m inteiros sem nunca dar chance
+      # do `retries` do PipelineTask agir. 15m por tentativa (so 1 retry,
+      # nao 2 como na API) porque o build do Web e mais pesado (pnpm
+      # install + build do Next.js) — precisa de mais tempo por tentativa
+      # mesmo com rede saudavel, entao um orcamento total menor de
+      # tentativas evita estourar o timeout de 45m do pipeline inteiro.
+      retries: 1
+      timeout: "15m"
       taskRef:
         name: kaniko-build-push
         kind: Task
@@ -77,3 +89,27 @@ spec:
           workspace: source
         - name: docker-credentials
           workspace: docker-credentials
+
+    # Deployment usa tag :latest (sem mudanca no manifesto a cada build),
+    # entao nem kubectl nem o ArgoCD reiniciam os pods sozinhos apos um
+    # push — sem este step, uma imagem nova fica publicada no Harbor mas
+    # nunca chega a rodar (achado em 2026-09-08). Mesmo padrao do
+    # REALTPMSYS. Exige a Role/RoleBinding em
+    # infra/k8s/rbac-tekton-rollout.yaml.
+    - name: rollout-restart
+      runAfter:
+        - kaniko-build-push
+      taskSpec:
+        description: |
+          Reinicia o Deployment amfit-web no ns amfit e aguarda ate 3min o
+          rollout completar.
+        steps:
+          - name: restart
+            image: docker.io/bitnami/kubectl:latest
+            script: |
+              #!/bin/sh
+              set -eu
+              echo "→ kubectl rollout restart deployment/amfit-web -n amfit"
+              kubectl rollout restart deployment/amfit-web -n amfit
+              echo "→ kubectl rollout status (timeout 3m)"
+              kubectl rollout status deployment/amfit-web -n amfit --timeout=3m

@@ -33,10 +33,13 @@ spec:
       # k3s-worker-cicd (workload=cicd) hospeda o storage local-path do
       # Harbor inteiro (database/registry/trivy/redis) — build pesado de
       # imagem (kaniko) nesse mesmo node satura o disco o suficiente pra
-      # derrubar o Postgres do Harbor em crash-loop (achado em 2026-09-04:
-      # fsync de 12-20s durante recovery, "untracked child process exited
-      # with exit code 141" repetido). Mesmo node ja usado com sucesso pelo
-      # build do Web por outro motivo (memoria) — reaproveitado aqui.
+      # derrubar o Postgres do Harbor em crash-loop (achado em 2026-09-04,
+      # RECONFIRMADO em 2026-09-08 apos tentar consertar via nfs-storage no
+      # workspace — nao ajudou, pois o snapshotting do kaniko usa a camada
+      # gravavel do container, sempre local ao node, independente de qual
+      # storageClass o workspace Tekton usa. Ver nota completa em
+      # infra/tekton/trigger-amfit.yaml). Mesmo node ja usado com sucesso
+      # pelo build do Web por outro motivo (memoria) — reaproveitado aqui.
       nodeSelector:
         kubernetes.io/hostname: ubuntu-neto
       securityContext:
