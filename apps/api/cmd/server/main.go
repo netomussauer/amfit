@@ -97,6 +97,19 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to MinIO")
 	}
 
+	// minioPublicClient só assina presigned URLs (coach-videos) — aponta pro
+	// endpoint alcançável de fora do cluster, diferente de minioClient acima
+	// (DNS interno, usado pro upload). Ver coach/infrastructure/minio_storage.go.
+	minioPublicClient, err := storage.NewClient(
+		cfg.MinioPublicEndpoint,
+		cfg.MinioAccessKey,
+		cfg.MinioSecretKey,
+		cfg.MinioUseSSL,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create MinIO public client")
+	}
+
 	startupCtx, startupCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer startupCancel()
 
@@ -201,7 +214,7 @@ func main() {
 
 	// Coach
 	coachRepos := coachinfra.NewPostgresRepositories(pool)
-	coachVideoStorage := coachinfra.NewMinioVideoStorage(minioClient)
+	coachVideoStorage := coachinfra.NewMinioVideoStorage(minioClient, minioPublicClient)
 	coachSvc := coachapplication.NewCoachService(
 		coachRepos.Videos,
 		coachRepos.Feedbacks,

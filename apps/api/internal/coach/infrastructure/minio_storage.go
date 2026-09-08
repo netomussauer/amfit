@@ -27,11 +27,17 @@ const presignedURLTTL = 24 * time.Hour
 // MinIO compartilhado.
 type MinioVideoStorage struct {
 	client *storage.Client
+	// publicClient assina as presigned URLs com o endpoint alcançável de
+	// fora do cluster — client (acima) usa o DNS interno e serve só pro
+	// upload, que roda dentro do próprio cluster.
+	publicClient *storage.Client
 }
 
-// NewMinioVideoStorage instancia o storage com o client MinIO compartilhado.
-func NewMinioVideoStorage(client *storage.Client) *MinioVideoStorage {
-	return &MinioVideoStorage{client: client}
+// NewMinioVideoStorage instancia o storage com o client MinIO compartilhado
+// (upload) e um segundo client apontando pro endpoint público (assinatura
+// das presigned URLs devolvidas ao personal/app).
+func NewMinioVideoStorage(client, publicClient *storage.Client) *MinioVideoStorage {
+	return &MinioVideoStorage{client: client, publicClient: publicClient}
 }
 
 // UploadVideo faz PutObject no bucket "coach-videos" com a key
@@ -63,7 +69,7 @@ func (s *MinioVideoStorage) UploadVideo(
 // PresignedURL gera uma URL assinada (TTL 24h) pra assistir o vídeo — o
 // bucket é privado, então essa é a única forma de acesso.
 func (s *MinioVideoStorage) PresignedURL(ctx context.Context, objectKey string) (string, error) {
-	u, err := s.client.Underlying().PresignedGetObject(ctx, bucketCoachVideos, objectKey, presignedURLTTL, url.Values{})
+	u, err := s.publicClient.Underlying().PresignedGetObject(ctx, bucketCoachVideos, objectKey, presignedURLTTL, url.Values{})
 	if err != nil {
 		return "", fmt.Errorf("infrastructure: presigned url %s: %w", objectKey, err)
 	}

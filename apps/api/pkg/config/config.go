@@ -20,6 +20,14 @@ type Config struct {
 	MinioSecretKey string
 	MinioUseSSL    bool
 
+	// MinioPublicEndpoint é o host:porta do MinIO alcançável de fora do
+	// cluster (LoadBalancer/DNS "minio.amfit.local"). Usado só pra assinar
+	// presigned URLs (bucket "coach-videos") — o upload em si continua via
+	// MinioEndpoint (DNS interno, mais direto). Sem essa distinção a URL
+	// assinada embutiria o host *.svc.cluster.local, inacessível fora do
+	// cluster (navegador do personal, app mobile).
+	MinioPublicEndpoint string
+
 	// MidiaPublicURL é o prefixo público (até o nome do bucket exclusive) onde
 	// o MinIO serve as mídias dos exercícios. Em dev local aponta para o
 	// próprio MinIO via 9000; no lab K3s passa pelo Traefik (minio.amfit.local).
@@ -48,6 +56,8 @@ func Load() *Config {
 		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "amfit-minio"),
 		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "amfit-minio-secret"),
 		MinioUseSSL:    getEnvBool("MINIO_USE_SSL", false),
+
+		MinioPublicEndpoint: getEnv("MINIO_PUBLIC_ENDPOINT", "localhost:9000"),
 
 		MidiaPublicURL:      getEnv("MIDIA_PUBLIC_URL", "http://localhost:9000/exercicios"),
 		TenantLogoPublicURL: getEnv("TENANT_LOGO_PUBLIC_URL", "http://localhost:9000/tenant-logos"),

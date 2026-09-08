@@ -18,7 +18,14 @@ type Client struct {
 // NewClient inicializa e valida a conexão com o MinIO.
 func NewClient(endpoint, accessKey, secretKey string, useSSL bool) (*Client, error) {
 	mc, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Creds: credentials.NewStaticV4(accessKey, secretKey, ""),
+		// Region fixa (mesma usada em EnsureBucket) evita que operações como
+		// PresignedGetObject façam uma chamada de rede (GetBucketLocation)
+		// pra descobrir a região antes de assinar — sem isso, um client
+		// apontado só pro endpoint público (ex.: presigned URL de fora do
+		// cluster) pode falhar por esse client não conseguir alcançar a si
+		// mesmo a partir de dentro do cluster (MetalLB hairpin/DNS).
+		Region: "us-east-1",
 		Secure: useSSL,
 	})
 	if err != nil {

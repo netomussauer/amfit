@@ -21,6 +21,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#f97316',
     },
     package: 'com.amfit.app',
+    // Lab não tem TLS (API/MinIO em http:// puro — ver infra/k8s/*/service.yaml).
+    // A partir do Android 9 dev-clients/APKs standalone bloqueiam cleartext
+    // por padrão; sem isso, todo fetch pra API e toda mídia do MinIO falha
+    // fora do Expo Go. Reavaliar quando o lab tiver TLS (Traefik).
+    usesCleartextTraffic: true,
   },
   ios: {
     supportsTablet: true,

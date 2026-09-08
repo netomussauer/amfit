@@ -66,6 +66,11 @@ spec:
               value: "redis://:$(REDIS_PASSWORD)@redis.shared-infra.svc.cluster.local:6379/0"
             - name: MINIO_ENDPOINT
               value: "minio.amfit.svc.cluster.local:9000"
+            # Endpoint alcançável de fora do cluster — só pra assinatura de
+            # presigned URLs (coach-videos). DNS minio.amfit.local precisa
+            # apontar pro LoadBalancer 192.168.1.207 (ver infra/k8s/minio/service.yaml).
+            - name: MINIO_PUBLIC_ENDPOINT
+              value: "minio.amfit.local:9000"
             - name: MINIO_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
