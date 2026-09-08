@@ -67,10 +67,14 @@ spec:
             - name: MINIO_ENDPOINT
               value: "minio.amfit.svc.cluster.local:9000"
             # Endpoint alcançável de fora do cluster — só pra assinatura de
-            # presigned URLs (coach-videos). DNS minio.amfit.local precisa
-            # apontar pro LoadBalancer 192.168.1.207 (ver infra/k8s/minio/service.yaml).
+            # presigned URLs (coach-videos). IP direto (LoadBalancer, ver
+            # infra/k8s/minio/service.yaml) em vez do DNS minio.amfit.local:
+            # o registro já existe no Pi-hole (kubernetes/network-services/
+            # pihole/configmap-records.yaml no infra-lab), mas nada na rede
+            # do lab usa o Pi-hole como resolver hoje (só os nós K3s, via
+            # Ansible) — trocar pro nome assim que isso for resolvido.
             - name: MINIO_PUBLIC_ENDPOINT
-              value: "minio.amfit.local:9000"
+              value: "192.168.1.207:9000"
             - name: MINIO_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
