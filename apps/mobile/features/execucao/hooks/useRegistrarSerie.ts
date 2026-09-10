@@ -1,11 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, onlineManager } from '@tanstack/react-query';
 import type {
   RegistrarSerieRequest,
   RegistroSerieResponse,
   SessaoResponse,
 } from '@amfit/shared';
+import { NetworkError } from '@/shared/lib/api-client';
 import { execucaoService } from '../services/execucao.service';
 import { sessaoKeys } from './query-keys';
+import * as offlineQueue from '../lib/offlineQueue';
+import { runDrain } from '../lib/offlineSyncEngine';
+import { mergeSerieIntoSessao } from '../lib/mergeSerieIntoSessao';
 
 type Context = {
   previous: SessaoResponse | undefined;
@@ -31,7 +35,44 @@ export function useRegistrarSerie(sessaoId: string) {
     RegistrarSerieRequest,
     Context
   >({
-    mutationFn: (body) => execucaoService.registrarSerie(sessaoId, body),
+    // React Query pausa mutations automaticamente quando o onlineManager
+    // reporta offline (networkMode padrão 'online') — sem 'always', o
+    // mutationFn abaixo nunca chegaria a rodar offline, e a decisão de
+    // enfileirar (feita aqui dentro, não pelo RQ) nunca seria tomada.
+    networkMode: 'always',
+    // Offline (ou conexão caindo no meio da chamada — NetworkError):
+    // enfileira e resolve como sucesso otimista em vez de deixar cair no
+    // onError/rollback abaixo, que continua tratando só falhas de verdade
+    // do servidor (ApiError). onMutate/onSuccess não mudam — já fazem o
+    // merge certo por (item_treino_id, numero_serie), seja o `registro`
+    // vindo do backend de verdade ou deste placeholder `queued-`.
+    mutationFn: async (body) => {
+      if (onlineManager.isOnline()) {
+        try {
+          return await execucaoService.registrarSerie(sessaoId, body);
+        } catch (err) {
+          if (!(err instanceof NetworkError)) throw err;
+        }
+      }
+
+      const queued = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: sessaoId,
+        payload: body,
+      });
+      void runDrain(queryClient);
+
+      const placeholder: RegistroSerieResponse = {
+        id: `queued-${queued.id}`,
+        item_treino_id: body.item_treino_id,
+        numero_serie: body.numero_serie,
+        concluida: body.concluida,
+        carga_realizada: body.carga_realizada ?? null,
+        repeticoes_realizadas: body.repeticoes_realizadas ?? null,
+        executado_em: body.concluida ? new Date().toISOString() : null,
+      };
+      return placeholder;
+    },
 
     onMutate: async (body) => {
       await queryClient.cancelQueries({ queryKey });
@@ -81,19 +122,7 @@ export function useRegistrarSerie(sessaoId: string) {
       // Substitui o registro otimista pelo retornado pelo backend (com ID real).
       const current = queryClient.getQueryData<SessaoResponse>(queryKey);
       if (!current) return;
-      const idx = current.series.findIndex(
-        (s) =>
-          s.item_treino_id === registro.item_treino_id &&
-          s.numero_serie === registro.numero_serie,
-      );
-      if (idx >= 0) {
-        const newSeries = [...current.series];
-        newSeries[idx] = registro;
-        queryClient.setQueryData<SessaoResponse>(queryKey, {
-          ...current,
-          series: newSeries,
-        });
-      }
+      queryClient.setQueryData<SessaoResponse>(queryKey, mergeSerieIntoSessao(current, registro));
     },
   });
 }

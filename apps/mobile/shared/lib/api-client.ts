@@ -23,6 +23,17 @@ type RequestOptions = {
   params?: Record<string, string | number | boolean | undefined>;
   isMultipart?: boolean;
   _retry?: boolean;
+  /**
+   * Marca uma chamada feita pelo motor de sincronização offline (fora de
+   * uma ação interativa do usuário) — ver features/execucao/lib/
+   * offlineSyncEngine.ts (Fase 5 do modo offline). Um 401 nessa condição
+   * não deve disparar o logout global (clearAll + onAuthFailed): a fila
+   * de ações pendentes fica intacta e só marca "precisa logar de novo"
+   * (ver SyncAuthExpiredError abaixo), já que apagar sessão/cache por
+   * causa de uma tentativa em segundo plano perderia um treino não
+   * sincronizado sem o usuário nem saber.
+   */
+  isBackgroundSync?: boolean;
 };
 
 type RefreshResponse = {
@@ -39,6 +50,35 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+}
+
+/**
+ * Falha do `fetch()` em si (sem conectividade, DNS, timeout) — distinta
+ * de `ApiError`, que representa uma resposta HTTP de verdade (mesmo que
+ * de erro) vinda do servidor. Ver modo offline (Fase 4 do roadmap):
+ * hooks de mutation usam esse tipo pra decidir se devem enfileirar uma
+ * ação pra sincronizar depois em vez de tratar como falha definitiva.
+ */
+export class NetworkError extends Error {
+  constructor() {
+    super('Sem conexão com o servidor');
+    this.name = 'NetworkError';
+  }
+}
+
+/**
+ * Sessão expirou (refresh token também inválido) durante uma tentativa
+ * de sincronização em segundo plano (`isBackgroundSync: true`) — ver
+ * offlineSyncEngine.ts (Fase 5). Diferente do 401 interativo normal
+ * (que limpa tokens/cache e redireciona pro login), esse erro não
+ * dispara nenhum efeito colateral — quem chamou decide o que fazer
+ * (hoje: marcar a fila como "precisa logar de novo" e parar de tentar).
+ */
+export class SyncAuthExpiredError extends Error {
+  constructor() {
+    super('Sessão expirada durante sincronização em segundo plano');
+    this.name = 'SyncAuthExpiredError';
   }
 }
 
@@ -86,7 +126,14 @@ export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, params, isMultipart = false, _retry = false } = options;
+  const {
+    method = 'GET',
+    body,
+    params,
+    isMultipart = false,
+    _retry = false,
+    isBackgroundSync = false,
+  } = options;
 
   const token = await getAccessToken();
 
@@ -112,11 +159,19 @@ export async function apiRequest<T>(
     requestBody = isMultipart ? (body as BodyInit) : JSON.stringify(body);
   }
 
-  const response = await fetch(url.toString(), {
-    method,
-    headers,
-    body: requestBody,
-  });
+  // Só a chamada de fetch() em si entra no try/catch — uma resposta HTTP
+  // de erro (4xx/5xx) resolve fetch() normalmente e precisa continuar
+  // virando ApiError mais abaixo, não NetworkError.
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      method,
+      headers,
+      body: requestBody,
+    });
+  } catch {
+    throw new NetworkError();
+  }
 
   if (response.status === 401) {
     const isAuthEndpoint = path.startsWith('/auth/');
@@ -138,6 +193,10 @@ export async function apiRequest<T>(
       if (refreshed) {
         return apiRequest<T>(path, { ...options, _retry: true });
       }
+    }
+
+    if (isBackgroundSync) {
+      throw new SyncAuthExpiredError();
     }
 
     await clearAll();

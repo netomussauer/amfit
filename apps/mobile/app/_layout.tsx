@@ -2,28 +2,23 @@ import '../global.css';
 
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ROLES } from '@amfit/shared';
 import { setAuthFailedHandler } from '@/shared/lib/api-client';
 import { clearAll, getAccessToken, parseJwt } from '@/shared/lib/auth';
+import { queryClient } from '@/shared/lib/query-client';
+import { configureOfflineSync } from '@/shared/lib/offline-sync';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
 import { configurarNotificationHandler } from '@/features/notificacoes';
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60 * 1000,
-      retry: 1,
-    },
-    mutations: {
-      retry: 0,
-    },
-  },
-});
+// Em module scope (não num useEffect): precisa estar armado antes do
+// primeiro render, senão uma mutation disparada logo na abertura do app
+// corre antes do onlineManager saber se está offline.
+configureOfflineSync();
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();

@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import type { RegistroSerieResponse, SessaoResponse } from '@amfit/shared';
 import { useRegistrarSerie } from './useRegistrarSerie';
 import { execucaoService } from '../services/execucao.service';
 import { sessaoKeys } from './query-keys';
+import { NetworkError } from '@/shared/lib/api-client';
+import * as offlineQueue from '../lib/offlineQueue';
+import { runDrain } from '../lib/offlineSyncEngine';
 import {
   makeRegistroSerieResponse,
   makeSessaoResponse,
@@ -16,9 +19,19 @@ jest.mock('../services/execucao.service', () => ({
   },
 }));
 
+jest.mock('../lib/offlineQueue', () => ({
+  enqueue: jest.fn(),
+}));
+
+jest.mock('../lib/offlineSyncEngine', () => ({
+  runDrain: jest.fn(),
+}));
+
 const mockedRegistrarSerie = execucaoService.registrarSerie as jest.MockedFunction<
   typeof execucaoService.registrarSerie
 >;
+const mockedEnqueue = offlineQueue.enqueue as jest.MockedFunction<typeof offlineQueue.enqueue>;
+const mockedRunDrain = runDrain as jest.MockedFunction<typeof runDrain>;
 
 function createWrapper(sessaoInicial?: SessaoResponse) {
   const queryClient = new QueryClient({
@@ -58,6 +71,9 @@ function deferred<T>() {
 describe('useRegistrarSerie', () => {
   beforeEach(() => {
     mockedRegistrarSerie.mockReset();
+    mockedEnqueue.mockReset();
+    mockedRunDrain.mockReset();
+    onlineManager.setOnline(true);
   });
 
   it('chama o service com o sessaoId e o corpo informados', async () => {
@@ -197,5 +213,99 @@ describe('useRegistrarSerie', () => {
       sessaoKeys.detail(sessao.id),
     );
     expect(cacheRevertido).toEqual(sessao);
+  });
+
+  it('enfileira e resolve como sucesso quando o service falha com NetworkError', async () => {
+    // Arrange — conexão caiu no meio da chamada (fetch rejeita), não um
+    // erro de negócio: não deve disparar onError/rollback.
+    const sessao = makeSessaoResponse({ series: [] });
+    mockedRegistrarSerie.mockRejectedValue(new NetworkError());
+    mockedEnqueue.mockResolvedValue({
+      id: 'queue-1',
+      type: 'registrar_serie',
+      sessaoRef: sessao.id,
+      payload: {
+        item_treino_id: '30000000-0000-0000-0000-000000000001',
+        numero_serie: 1,
+        concluida: true,
+        carga_realizada: 60,
+        repeticoes_realizadas: 12,
+      },
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    const { queryClient, Wrapper } = createWrapper(sessao);
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
+      wrapper: Wrapper,
+    });
+
+    // Act
+    await act(async () => {
+      result.current.mutate({
+        item_treino_id: '30000000-0000-0000-0000-000000000001',
+        numero_serie: 1,
+        concluida: true,
+        carga_realizada: 60,
+        repeticoes_realizadas: 12,
+      });
+    });
+
+    // Assert — sucesso otimista, sem rollback, e o item foi enfileirado
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedEnqueue).toHaveBeenCalledWith({
+      type: 'registrar_serie',
+      sessaoRef: sessao.id,
+      payload: {
+        item_treino_id: '30000000-0000-0000-0000-000000000001',
+        numero_serie: 1,
+        concluida: true,
+        carga_realizada: 60,
+        repeticoes_realizadas: 12,
+      },
+    });
+    expect(mockedRunDrain).toHaveBeenCalled();
+    const cacheFinal = queryClient.getQueryData<SessaoResponse>(
+      sessaoKeys.detail(sessao.id),
+    );
+    expect(cacheFinal?.series).toHaveLength(1);
+    expect(cacheFinal?.series[0].id).toBe('queued-queue-1');
+  });
+
+  it('enfileira direto (sem tentar o service) quando já está offline', async () => {
+    // Arrange
+    onlineManager.setOnline(false);
+    const sessao = makeSessaoResponse({ series: [] });
+    mockedEnqueue.mockResolvedValue({
+      id: 'queue-2',
+      type: 'registrar_serie',
+      sessaoRef: sessao.id,
+      payload: {
+        item_treino_id: '30000000-0000-0000-0000-000000000001',
+        numero_serie: 1,
+        concluida: true,
+        carga_realizada: null,
+        repeticoes_realizadas: null,
+      },
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    const { Wrapper } = createWrapper(sessao);
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
+      wrapper: Wrapper,
+    });
+
+    // Act
+    await act(async () => {
+      result.current.mutate({
+        item_treino_id: '30000000-0000-0000-0000-000000000001',
+        numero_serie: 1,
+        concluida: true,
+      });
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedRegistrarSerie).not.toHaveBeenCalled();
+    expect(mockedEnqueue).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { AlertTriangle, ChevronRight } from 'lucide-react-native';
 import { ApiError } from '@/shared/lib/api-client';
+import { OfflineBanner } from '@/shared/components/OfflineBanner';
 import { getCurrentUser, getDisplayName, type JwtPayload } from '@/shared/lib/auth';
 import { useTreinoHoje } from '@/features/treino/hooks/useTreinoHoje';
 import { TreinoHojeCard } from '@/features/treino/components/TreinoHojeCard';
@@ -40,7 +41,11 @@ export default function TreinoHojeScreen() {
 
   // 404 (sem ficha ativa) é tratado como estado vazio, não erro real.
   const isSemFicha = error instanceof ApiError && error.status === 404;
-  const showError = isError && !isSemFicha;
+  // Um erro de refetch (ex.: offline) não limpa o `data` já em cache no
+  // React Query — só mostra o bloco de erro fatal quando não há NENHUM
+  // dado (nem cacheado de uma carga anterior) pra mostrar. Com `data` em
+  // cache, cai no branch normal (+ OfflineBanner sinalizando).
+  const showError = isError && !isSemFicha && !data;
 
   async function handleIniciar() {
     if (!treino) return;
@@ -84,6 +89,8 @@ export default function TreinoHojeScreen() {
         />
       }
     >
+      <OfflineBanner />
+
       <Text
         className="text-2xl font-bold text-gray-900"
         accessibilityRole="header"

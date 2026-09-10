@@ -4,6 +4,7 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { useLogout } from './useLogout';
 import { apiRequest } from '@/shared/lib/api-client';
 import { clearAll, getRefreshToken } from '@/shared/lib/auth';
+import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 
 jest.mock('@/shared/lib/api-client', () => ({
   apiRequest: jest.fn(),
@@ -12,6 +13,10 @@ jest.mock('@/shared/lib/api-client', () => ({
 jest.mock('@/shared/lib/auth', () => ({
   clearAll: jest.fn(),
   getRefreshToken: jest.fn(),
+}));
+
+jest.mock('@/features/execucao/lib/offlineQueue', () => ({
+  clear: jest.fn(),
 }));
 
 const mockedReplace = jest.fn();
@@ -24,6 +29,7 @@ const mockedClearAll = clearAll as jest.MockedFunction<typeof clearAll>;
 const mockedGetRefreshToken = getRefreshToken as jest.MockedFunction<
   typeof getRefreshToken
 >;
+const mockedClearQueue = offlineQueue.clear as jest.MockedFunction<typeof offlineQueue.clear>;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -43,6 +49,7 @@ describe('useLogout', () => {
     mockedClearAll.mockReset();
     mockedGetRefreshToken.mockReset();
     mockedReplace.mockReset();
+    mockedClearQueue.mockReset();
   });
 
   it('chama POST /auth/logout com o refresh_token quando existente', async () => {
@@ -98,5 +105,23 @@ describe('useLogout', () => {
     await waitFor(() => expect(mockedClearAll).toHaveBeenCalled());
     expect(clearSpy).toHaveBeenCalled();
     expect(mockedReplace).toHaveBeenCalledWith('/(auth)/login');
+  });
+
+  it('limpa a fila de sincronização offline ao encerrar a sessão', async () => {
+    // Arrange — sem isso, uma ação enfileirada por este usuário poderia
+    // ser sincronizada depois na sessão de outro usuário no mesmo aparelho.
+    mockedGetRefreshToken.mockResolvedValue('refresh-token-atual');
+    mockedApiRequest.mockResolvedValue(undefined);
+    const { Wrapper } = createWrapper();
+    const { result } = await renderHook(() => useLogout(), { wrapper: Wrapper });
+
+    // Act
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedClearQueue).toHaveBeenCalled();
   });
 });

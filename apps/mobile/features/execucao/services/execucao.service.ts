@@ -40,11 +40,12 @@ export const execucaoService = {
   async registrarSerie(
     sessaoId: string,
     body: RegistrarSerieRequest,
+    opts?: { isBackgroundSync?: boolean },
   ): Promise<RegistroSerieResponse> {
     const validated = RegistrarSerieRequestSchema.parse(body);
     const data = await apiRequest<RegistroSerieResponse>(
       `/sessoes/${sessaoId}/series`,
-      { method: 'PATCH', body: validated },
+      { method: 'PATCH', body: validated, isBackgroundSync: opts?.isBackgroundSync },
     );
     return RegistroSerieResponseSchema.parse(data);
   },

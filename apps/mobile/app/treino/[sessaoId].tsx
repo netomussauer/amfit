@@ -23,6 +23,7 @@ import { useMinhaFicha } from '@/features/treino/hooks/useMinhaFicha';
 import { ExercicioBlock } from '@/features/execucao/components/ExercicioBlock';
 import { RestTimer } from '@/features/execucao/components/RestTimer';
 import { ApiError } from '@/shared/lib/api-client';
+import { OfflineBanner } from '@/shared/components/OfflineBanner';
 
 const PERCENTUAL_MINIMO_CONCLUSAO = 0.5;
 
@@ -146,7 +147,11 @@ export default function PlayerScreen() {
     return <ScreenLoading />;
   }
 
-  if (sessaoQuery.isError || fichaQuery.isError || !sessao) {
+  // Um erro de refetch (ex.: offline) não limpa o `data` já em cache no
+  // React Query — só falha de verdade quando não há NENHUM dado (nem
+  // cacheado de uma carga anterior) pra mostrar. Com dado em cache,
+  // renderiza normal mesmo com isError (+ OfflineBanner sinalizando).
+  if (!sessao || !ficha) {
     return (
       <ScreenError
         message="Não foi possível carregar o treino."
@@ -172,6 +177,7 @@ export default function PlayerScreen() {
 
   return (
     <View className="flex-1 bg-gray-50">
+      <OfflineBanner />
       {/* Header sticky */}
       <View className="border-b border-gray-200 bg-white px-4 pb-3 pt-12">
         <View className="flex-row items-center gap-3">
