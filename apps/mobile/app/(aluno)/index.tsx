@@ -16,6 +16,7 @@ import { TreinoHojeCard } from '@/features/treino/components/TreinoHojeCard';
 import { EmptyTreinoState } from '@/features/treino/components/EmptyTreinoState';
 import { TreinoSkeleton } from '@/features/treino/components/TreinoSkeleton';
 import { useIniciarSessao } from '@/features/execucao/hooks/useIniciarSessao';
+import { usePendingIniciarLocalId } from '@/features/execucao/hooks/usePendingIniciarLocalId';
 
 function firstName(fullName: string | undefined): string {
   if (!fullName) return '';
@@ -38,6 +39,7 @@ export default function TreinoHojeScreen() {
   const greetingName = firstName(getDisplayName(user));
   const treino = data?.treino ?? null;
   const sessaoHojeId = data?.sessao_hoje_id ?? null;
+  const pendingLocalId = usePendingIniciarLocalId(treino?.id);
 
   // 404 (sem ficha ativa) é tratado como estado vazio, não erro real.
   const isSemFicha = error instanceof ApiError && error.status === 404;
@@ -63,12 +65,13 @@ export default function TreinoHojeScreen() {
   }
 
   function handleContinuar() {
-    if (!sessaoHojeId) return;
-    router.push(`/treino/${sessaoHojeId}`);
+    const targetId = sessaoHojeId ?? pendingLocalId;
+    if (!targetId) return;
+    router.push(`/treino/${targetId}`);
   }
 
   const podeIniciar = treino !== null && !iniciarMutation.isPending;
-  const continuarMode = sessaoHojeId !== null;
+  const continuarMode = sessaoHojeId !== null || pendingLocalId !== null;
 
   return (
     <ScrollView

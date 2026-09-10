@@ -19,6 +19,9 @@ import type { TreinoResponse, RegistrarSerieRequest } from '@amfit/shared';
 import { useSessao } from '@/features/execucao/hooks/useSessao';
 import { useRegistrarSerie } from '@/features/execucao/hooks/useRegistrarSerie';
 import { useConcluirSessao } from '@/features/execucao/hooks/useConcluirSessao';
+import { useSessaoIdResolution } from '@/features/execucao/hooks/useSessaoIdResolution';
+import { SESSAO_ID_RESOLUTION_FALHOU } from '@/features/execucao/hooks/query-keys';
+import { isLocalSessaoId } from '@/features/execucao/lib/localSessaoId';
 import { useMinhaFicha } from '@/features/treino/hooks/useMinhaFicha';
 import { ExercicioBlock } from '@/features/execucao/components/ExercicioBlock';
 import { RestTimer } from '@/features/execucao/components/RestTimer';
@@ -36,9 +39,29 @@ export default function PlayerScreen() {
   const fichaQuery = useMinhaFicha();
   const registrarSerie = useRegistrarSerie(sessaoId);
   const concluirSessao = useConcluirSessao(sessaoId);
+  const sessaoEhLocal = isLocalSessaoId(sessaoId);
+  const resolucao = useSessaoIdResolution(sessaoEhLocal ? sessaoId : null);
 
   const [restTimerSegundos, setRestTimerSegundos] = useState<number | null>(null);
   const [concluirError, setConcluirError] = useState<string | null>(null);
+
+  // Sessão iniciada offline sincronizou enquanto esta tela ainda estava
+  // montada em `/treino/<id-local>` — troca sozinha pro ID real, sem o
+  // aluno precisar sair e voltar. Se a sincronização falhou em definitivo
+  // (treino removido/inativado antes de reconectar, por exemplo), avisa
+  // e volta pra tela inicial — sem isso a tela ficaria presa pra sempre
+  // em "Aguardando sincronizar...".
+  useEffect(() => {
+    if (resolucao.data === SESSAO_ID_RESOLUTION_FALHOU) {
+      Alert.alert(
+        'Não foi possível iniciar',
+        'Essa sessão não pôde ser sincronizada. Volte e tente iniciar o treino novamente.',
+        [{ text: 'OK', onPress: () => router.replace('/(aluno)') }],
+      );
+    } else if (resolucao.data) {
+      router.replace(`/treino/${resolucao.data}`);
+    }
+  }, [resolucao.data, router]);
 
   const sessao = sessaoQuery.data;
   const ficha = fichaQuery.data;
@@ -173,7 +196,11 @@ export default function PlayerScreen() {
     );
   }
 
-  const podeConcluir = progresso >= PERCENTUAL_MINIMO_CONCLUSAO;
+  // Concluir uma sessão ainda não sincronizada (ID local) não é suportado
+  // nesta fase do modo offline — ficaria tentando PATCH /sessoes/local-xxx
+  // e recebendo um 404 genérico. A sessão sincroniza sozinha assim que a
+  // conexão volta (ver `useSessaoIdResolution` acima).
+  const podeConcluir = progresso >= PERCENTUAL_MINIMO_CONCLUSAO && !sessaoEhLocal;
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -262,7 +289,9 @@ export default function PlayerScreen() {
           accessibilityHint={
             podeConcluir
               ? undefined
-              : `Marque pelo menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries para concluir`
+              : sessaoEhLocal
+                ? 'Aguardando sincronizar com o servidor'
+                : `Marque pelo menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries para concluir`
           }
         >
           <Text className="text-base font-semibold text-white">
@@ -270,7 +299,9 @@ export default function PlayerScreen() {
           </Text>
           {!podeConcluir && (
             <Text className="mt-0.5 text-[11px] text-white/80">
-              Marque ao menos {Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries
+              {sessaoEhLocal
+                ? 'Aguardando sincronizar...'
+                : `Marque ao menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries`}
             </Text>
           )}
         </TouchableOpacity>

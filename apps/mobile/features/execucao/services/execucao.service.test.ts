@@ -48,6 +48,22 @@ describe('execucaoService.iniciar', () => {
       execucaoService.iniciar('60000000-0000-0000-0000-000000000001'),
     ).rejects.toThrow();
   });
+
+  it('repassa isBackgroundSync ao apiRequest quando informado', async () => {
+    // Arrange
+    const sessao = makeSessaoResponse();
+    mockedApiRequest.mockResolvedValue(sessao);
+
+    // Act
+    await execucaoService.iniciar(sessao.treino_id, { isBackgroundSync: true });
+
+    // Assert
+    expect(mockedApiRequest).toHaveBeenCalledWith('/sessoes', {
+      method: 'POST',
+      body: { treino_id: sessao.treino_id },
+      isBackgroundSync: true,
+    });
+  });
 });
 
 describe('execucaoService.buscar', () => {

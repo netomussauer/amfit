@@ -17,13 +17,17 @@ export const execucaoService = {
    * Inicia (ou recupera) a sessão de hoje para um treino.
    * Backend é idempotente: se já existe sessão EM_ANDAMENTO no dia, retorna a existente.
    */
-  async iniciar(treinoId: string): Promise<SessaoResponse> {
+  async iniciar(
+    treinoId: string,
+    opts?: { isBackgroundSync?: boolean },
+  ): Promise<SessaoResponse> {
     const body: IniciarSessaoRequest = IniciarSessaoRequestSchema.parse({
       treino_id: treinoId,
     });
     const data = await apiRequest<SessaoResponse>('/sessoes', {
       method: 'POST',
       body,
+      isBackgroundSync: opts?.isBackgroundSync,
     });
     return SessaoResponseSchema.parse(data);
   },

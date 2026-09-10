@@ -89,6 +89,24 @@ async function writeEnvelope(envelope: QueueEnvelope): Promise<void> {
   notifyListeners();
 }
 
+// Serializa os ciclos leitura-modificação-escrita do envelope. Sem isso,
+// duas chamadas concorrentes (ex.: o usuário registrando uma série
+// enquanto o drain em segundo plano está no meio de um
+// `rewriteSessaoRef`) podem interlear entre o `readEnvelope()` de uma e
+// o `writeEnvelope()` da outra — mesmo rodando tudo numa única thread JS,
+// operações assíncronas ainda interlear nos pontos de `await` — e quem
+// escrever por último apaga silenciosamente a mudança da primeira.
+let queueLock: Promise<unknown> = Promise.resolve();
+
+function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
+  const result = queueLock.then(fn, fn);
+  queueLock = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 /** Pub/sub simples pra usePendingSyncCount via useSyncExternalStore — não
  * depende do MutationCache do React Query de propósito (ver decisão de
  * arquitetura no plano do modo offline). */
@@ -99,39 +117,63 @@ export function subscribe(listener: Listener): () => void {
   };
 }
 
-export async function enqueue(
+export function enqueue(
   item:
     | Omit<IniciarItem, 'id' | 'createdAt' | 'attempts'>
     | Omit<RegistrarItem, 'id' | 'createdAt' | 'attempts'>
     | Omit<ConcluirItem, 'id' | 'createdAt' | 'attempts'>,
 ): Promise<OfflineQueueItem> {
-  const envelope = await readEnvelope();
-  const fullItem = {
-    ...item,
-    id: generateItemId(),
-    createdAt: new Date().toISOString(),
-    attempts: 0,
-  } as OfflineQueueItem;
-  envelope.items.push(fullItem);
-  await writeEnvelope(envelope);
-  return fullItem;
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    const fullItem = {
+      ...item,
+      id: generateItemId(),
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    } as OfflineQueueItem;
+    envelope.items.push(fullItem);
+    await writeEnvelope(envelope);
+    return fullItem;
+  });
 }
 
-export async function dequeue(id: string): Promise<void> {
-  const envelope = await readEnvelope();
-  envelope.items = envelope.items.filter((item) => item.id !== id);
-  await writeEnvelope(envelope);
+export function dequeue(id: string): Promise<void> {
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    envelope.items = envelope.items.filter((item) => item.id !== id);
+    await writeEnvelope(envelope);
+  });
 }
 
-export async function updateItem(
+export function updateItem(
   id: string,
   patch: Partial<Omit<QueueItemBase, 'id'>>,
 ): Promise<void> {
-  const envelope = await readEnvelope();
-  envelope.items = envelope.items.map((item) =>
-    item.id === id ? { ...item, ...patch } : item,
-  );
-  await writeEnvelope(envelope);
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    envelope.items = envelope.items.map((item) =>
+      item.id === id ? { ...item, ...patch } : item,
+    );
+    await writeEnvelope(envelope);
+  });
+}
+
+/** Troca `sessaoRef` de `oldRef` para `newRef` em todo item da fila que o
+ * possuir (`registrar_serie`/`concluir_sessao`) — usado quando um
+ * `iniciar_sessao` sincroniza e o ID local vira um ID real de servidor,
+ * pra itens já enfileirados sob o ID local passarem a apontar pro ID
+ * certo. `iniciar_sessao` não tem `sessaoRef` (usa `localSessaoId`) e
+ * fica de fora. */
+export function rewriteSessaoRef(oldRef: string, newRef: string): Promise<void> {
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    envelope.items = envelope.items.map((item) =>
+      item.type !== 'iniciar_sessao' && item.sessaoRef === oldRef
+        ? { ...item, sessaoRef: newRef }
+        : item,
+    );
+    await writeEnvelope(envelope);
+  });
 }
 
 export async function getAll(): Promise<OfflineQueueItem[]> {
@@ -144,10 +186,12 @@ export async function getPendingCount(): Promise<number> {
   return envelope.items.length;
 }
 
-export async function setNeedsReauth(value: boolean): Promise<void> {
-  const envelope = await readEnvelope();
-  envelope.needsReauth = value;
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+export function setNeedsReauth(value: boolean): Promise<void> {
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    envelope.needsReauth = value;
+    await writeEnvelope(envelope);
+  });
 }
 
 export async function getNeedsReauth(): Promise<boolean> {
@@ -156,6 +200,6 @@ export async function getNeedsReauth(): Promise<boolean> {
 }
 
 /** Só pra testes/depuração explícita — nunca chamada implicitamente. */
-export async function clear(): Promise<void> {
-  await writeEnvelope(EMPTY_ENVELOPE);
+export function clear(): Promise<void> {
+  return withQueueLock(() => writeEnvelope(EMPTY_ENVELOPE));
 }
