@@ -42,10 +42,10 @@ describe('useCriarExercicio', () => {
     const data = { nome: 'Supino reto', grupo_muscular_id: 'grupo-1' };
     const midia = { uri: 'file:///midia.jpg', mimeType: 'image/jpeg', fileName: 'midia.jpg' };
 
-    const { result } = renderHook(() => useCriarExercicio(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useCriarExercicio(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({ data, midia });
     });
 
@@ -63,10 +63,10 @@ describe('useCriarExercicio', () => {
     const error = new Error('Falha ao criar exercício');
     mockedCreate.mockRejectedValue(error);
 
-    const { result } = renderHook(() => useCriarExercicio(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useCriarExercicio(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({
         data: { nome: 'Supino reto', grupo_muscular_id: 'grupo-1' },
         midia: null,

@@ -35,7 +35,7 @@ describe('useAlunoMe', () => {
     const { Wrapper } = createWrapper();
 
     // Act
-    const { result } = renderHook(() => useAlunoMe(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useAlunoMe(), { wrapper: Wrapper });
 
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -50,7 +50,7 @@ describe('useAlunoMe', () => {
     const { queryClient, Wrapper } = createWrapper();
 
     // Act
-    const { result } = renderHook(() => useAlunoMe(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useAlunoMe(), { wrapper: Wrapper });
 
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -64,7 +64,7 @@ describe('useAlunoMe', () => {
     const { Wrapper } = createWrapper();
 
     // Act
-    const { result } = renderHook(() => useAlunoMe(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useAlunoMe(), { wrapper: Wrapper });
 
     // Assert
     await waitFor(() => expect(result.current.isError).toBe(true));

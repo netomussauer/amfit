@@ -16,7 +16,7 @@ import * as Sharing from 'expo-sharing';
  * captura), só logada.
  */
 export async function capturarCardTreino(
-  cardRef: RefObject<View>,
+  cardRef: RefObject<View | null>,
 ): Promise<string | null> {
   try {
     if (!cardRef.current) return null;

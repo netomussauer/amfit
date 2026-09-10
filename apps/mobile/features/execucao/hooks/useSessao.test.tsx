@@ -32,9 +32,9 @@ describe('useSessao', () => {
     mockedBuscar.mockReset();
   });
 
-  it('não dispara a query quando sessaoId é undefined', () => {
+  it('não dispara a query quando sessaoId é undefined', async () => {
     // Arrange / Act
-    const { result } = renderHook(() => useSessao(undefined), {
+    const { result } = await renderHook(() => useSessao(undefined), {
       wrapper: createWrapper(),
     });
 
@@ -50,7 +50,7 @@ describe('useSessao', () => {
     mockedBuscar.mockResolvedValue(sessao);
 
     // Act
-    const { result } = renderHook(() => useSessao(sessao.id), {
+    const { result } = await renderHook(() => useSessao(sessao.id), {
       wrapper: createWrapper(),
     });
 
@@ -66,7 +66,7 @@ describe('useSessao', () => {
     mockedBuscar.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(
+    const { result } = await renderHook(
       () => useSessao('50000000-0000-0000-0000-000000000001'),
       { wrapper: createWrapper() },
     );

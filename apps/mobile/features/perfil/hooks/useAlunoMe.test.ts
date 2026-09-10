@@ -10,9 +10,7 @@ jest.mock('@/shared/lib/api-client', () => ({
 }));
 
 describe('useAlunoMe (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useAlunoMe());
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useAlunoMe())).rejects.toThrow(/no queryclient set/i);
   });
 });

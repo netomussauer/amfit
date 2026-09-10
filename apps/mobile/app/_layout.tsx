@@ -1,11 +1,15 @@
+import '../global.css';
+
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ROLES } from '@amfit/shared';
 import { setAuthFailedHandler } from '@/shared/lib/api-client';
 import { clearAll, getAccessToken, parseJwt } from '@/shared/lib/auth';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
+import { configurarNotificationHandler } from '@/features/notificacoes';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,9 +63,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         const inAlunoSharedRoute = segments[0] === 'treino';
 
         if (role === ROLES.ALUNO && !inAlunoGroup && !inAlunoSharedRoute) {
-          router.replace('/(aluno)/');
+          router.replace('/(aluno)');
         } else if (role === ROLES.PERSONAL && !inPersonalGroup) {
-          router.replace('/(personal)/');
+          router.replace('/(personal)');
         } else if (!role && !inAuthGroup) {
           router.replace('/(auth)/login');
         }
@@ -86,13 +90,23 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Roda uma vez por início de processo JS, independente de login — uma
+    // sessão já autenticada que reabre o app cai direto no AuthGuard, sem
+    // passar por useLogin/registrarPushTokenExpo, mas ainda precisa do
+    // handler de foreground configurado pra notificações que chegarem.
+    configurarNotificationHandler();
+  }, []);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthGuard>
-          <Stack screenOptions={{ headerShown: false }} />
-        </AuthGuard>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthGuard>
+            <Stack screenOptions={{ headerShown: false }} />
+          </AuthGuard>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

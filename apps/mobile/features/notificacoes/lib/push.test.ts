@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { apiRequest } from '@/shared/lib/api-client';
-import { registrarPushTokenExpo } from './push';
+import { registrarPushTokenExpo, configurarNotificationHandler } from './push';
 
 jest.mock('expo-notifications', () => ({
   __esModule: true,
@@ -39,6 +39,28 @@ const mockedGetToken = Notifications.getExpoPushTokenAsync as jest.MockedFunctio
 >;
 const mockedApiRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const mockedDevice = Device as { isDevice: boolean };
+
+describe('configurarNotificationHandler', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('configura o handler de notificação em foreground', () => {
+    configurarNotificationHandler();
+
+    expect(Notifications.setNotificationHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('nunca lança — falha ao configurar o handler é engolida', () => {
+    (Notifications.setNotificationHandler as jest.MockedFunction<
+      typeof Notifications.setNotificationHandler
+    >).mockImplementation(() => {
+      throw new Error('módulo indisponível nesta versão do Expo Go');
+    });
+
+    expect(() => configurarNotificationHandler()).not.toThrow();
+  });
+});
 
 describe('registrarPushTokenExpo', () => {
   beforeEach(() => {

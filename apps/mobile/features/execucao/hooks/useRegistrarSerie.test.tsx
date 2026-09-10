@@ -66,12 +66,12 @@ describe('useRegistrarSerie', () => {
     const registro = makeRegistroSerieResponse({ concluida: true });
     mockedRegistrarSerie.mockResolvedValue(registro);
     const { Wrapper } = createWrapper(sessao);
-    const { result } = renderHook(() => useRegistrarSerie(sessao.id), {
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({
         item_treino_id: registro.item_treino_id,
         numero_serie: registro.numero_serie,
@@ -98,12 +98,12 @@ describe('useRegistrarSerie', () => {
     const { promise, resolve } = deferred<RegistroSerieResponse>();
     mockedRegistrarSerie.mockReturnValue(promise);
     const { queryClient, Wrapper } = createWrapper(sessao);
-    const { result } = renderHook(() => useRegistrarSerie(sessao.id), {
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({
         item_treino_id: '30000000-0000-0000-0000-000000000001',
         numero_serie: 1,
@@ -145,12 +145,12 @@ describe('useRegistrarSerie', () => {
     });
     mockedRegistrarSerie.mockResolvedValue(registro);
     const { queryClient, Wrapper } = createWrapper(sessao);
-    const { result } = renderHook(() => useRegistrarSerie(sessao.id), {
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({
         item_treino_id: registro.item_treino_id,
         numero_serie: registro.numero_serie,
@@ -175,12 +175,12 @@ describe('useRegistrarSerie', () => {
     const error = new Error('Falha ao registrar série');
     mockedRegistrarSerie.mockRejectedValue(error);
     const { queryClient, Wrapper } = createWrapper(sessao);
-    const { result } = renderHook(() => useRegistrarSerie(sessao.id), {
+    const { result } = await renderHook(() => useRegistrarSerie(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({
         item_treino_id: registroExistente.item_treino_id,
         numero_serie: registroExistente.numero_serie,

@@ -42,7 +42,7 @@ describe('ExercicioBlock', () => {
     mockedUseSugestaoProgressao.mockReturnValue(semSugestao());
   });
 
-  it('exibe nome, grupo muscular, série×repetições e carga sugerida do exercício', () => {
+  it('exibe nome, grupo muscular, série×repetições e carga sugerida do exercício', async () => {
     // Arrange
     const item = makeItemTreinoResponse({
       series: 3,
@@ -51,7 +51,7 @@ describe('ExercicioBlock', () => {
     });
 
     // Act
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Assert
     expect(screen.getByText(item.exercicio.nome)).toBeTruthy();
@@ -60,18 +60,18 @@ describe('ExercicioBlock', () => {
     expect(screen.getByText('Sugerida: 40 kg')).toBeTruthy();
   });
 
-  it('não exibe carga sugerida quando o item não possui carga_sugerida', () => {
+  it('não exibe carga sugerida quando o item não possui carga_sugerida', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: null });
 
     // Act
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Assert
     expect(screen.queryByText(/Sugerida:/)).toBeNull();
   });
 
-  it('conta corretamente as séries concluídas em relação ao total', () => {
+  it('conta corretamente as séries concluídas em relação ao total', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ series: 3 });
     const registros = [
@@ -80,18 +80,18 @@ describe('ExercicioBlock', () => {
     ];
 
     // Act
-    render(<ExercicioBlock item={item} registros={registros} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={registros} onRegistrarSerie={jest.fn()} />);
 
     // Assert
     expect(screen.getByText('1/3')).toBeTruthy();
   });
 
-  it('renderiza uma SerieRow para cada série do item', () => {
+  it('renderiza uma SerieRow para cada série do item', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ series: 3 });
 
     // Act
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Assert
     expect(screen.getByLabelText('Carga da série 1')).toBeTruthy();
@@ -99,14 +99,14 @@ describe('ExercicioBlock', () => {
     expect(screen.getByLabelText('Carga da série 3')).toBeTruthy();
   });
 
-  it('repassa o registro de série correto para cada SerieRow via onRegistrarSerie', () => {
+  it('repassa o registro de série correto para cada SerieRow via onRegistrarSerie', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ series: 1 });
     const onRegistrarSerie = jest.fn();
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={onRegistrarSerie} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={onRegistrarSerie} />);
 
     // Act
-    fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
+    await fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
 
     // Assert
     expect(onRegistrarSerie).toHaveBeenCalledWith(
@@ -114,14 +114,14 @@ describe('ExercicioBlock', () => {
     );
   });
 
-  it('expande ao tocar no cabeçalho e exibe a observação do item', () => {
+  it('expande ao tocar no cabeçalho e exibe a observação do item', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ observacao: 'Manter cotovelos alinhados' });
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
     expect(screen.queryByText('Manter cotovelos alinhados')).toBeNull();
 
     // Act
-    fireEvent.press(
+    await fireEvent.press(
       screen.getByLabelText(new RegExp(`${item.exercicio.nome}.*expandir mídia`)),
     );
 
@@ -129,7 +129,7 @@ describe('ExercicioBlock', () => {
     expect(screen.getByText('Manter cotovelos alinhados')).toBeTruthy();
   });
 
-  it('usa a carga sugerida pelo cálculo de progressão no lugar da carga_sugerida estática, quando disponível', () => {
+  it('usa a carga sugerida pelo cálculo de progressão no lugar da carga_sugerida estática, quando disponível', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
     mockedUseSugestaoProgressao.mockReturnValue({
@@ -145,14 +145,14 @@ describe('ExercicioBlock', () => {
     } as ReturnType<typeof useSugestaoProgressao>);
 
     // Act
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Assert — a carga computada (22,5) prevalece sobre a estática (40)
     expect(screen.getByText('Sugerida: 22,5 kg')).toBeTruthy();
     expect(screen.queryByText('Sugerida: 40 kg')).toBeNull();
   });
 
-  it('cai de volta pra carga_sugerida estática quando tem_sugestao=false', () => {
+  it('cai de volta pra carga_sugerida estática quando tem_sugestao=false', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
     mockedUseSugestaoProgressao.mockReturnValue({
@@ -161,13 +161,13 @@ describe('ExercicioBlock', () => {
     } as ReturnType<typeof useSugestaoProgressao>);
 
     // Act
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Assert
     expect(screen.getByText('Sugerida: 40 kg')).toBeTruthy();
   });
 
-  it('exibe o vídeo do exercício quando expandido e tipo_midia é VIDEO', () => {
+  it('exibe o vídeo do exercício quando expandido e tipo_midia é VIDEO', async () => {
     // Arrange
     const item = makeItemTreinoResponse({
       exercicio: {
@@ -176,10 +176,10 @@ describe('ExercicioBlock', () => {
         midia_url: 'https://example.com/video.mp4',
       },
     });
-    render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
+    await render(<ExercicioBlock item={item} registros={[]} onRegistrarSerie={jest.fn()} />);
 
     // Act
-    fireEvent.press(
+    await fireEvent.press(
       screen.getByLabelText(new RegExp(`${item.exercicio.nome}.*expandir mídia`)),
     );
 

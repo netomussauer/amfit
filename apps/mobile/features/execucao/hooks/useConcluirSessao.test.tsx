@@ -49,12 +49,12 @@ describe('useConcluirSessao', () => {
     const sessao = makeSessaoResponse({ status: 'CONCLUIDO' });
     mockedConcluir.mockResolvedValue(sessao);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useConcluirSessao(sessao.id), {
+    const { result } = await renderHook(() => useConcluirSessao(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 
@@ -69,12 +69,12 @@ describe('useConcluirSessao', () => {
     mockedConcluir.mockResolvedValue(sessao);
     const { queryClient, Wrapper } = createWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useConcluirSessao(sessao.id), {
+    const { result } = await renderHook(() => useConcluirSessao(sessao.id), {
       wrapper: Wrapper,
     });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 
@@ -90,13 +90,13 @@ describe('useConcluirSessao', () => {
     const error = new Error('Falha ao concluir sessão');
     mockedConcluir.mockRejectedValue(error);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(
+    const { result } = await renderHook(
       () => useConcluirSessao('50000000-0000-0000-0000-000000000001'),
       { wrapper: Wrapper },
     );
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 

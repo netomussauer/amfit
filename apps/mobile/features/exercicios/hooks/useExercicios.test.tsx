@@ -42,7 +42,7 @@ describe('useExercicios', () => {
     mockedList.mockResolvedValue(response);
 
     // Act
-    const { result } = renderHook(() => useExercicios(), {
+    const { result } = await renderHook(() => useExercicios(), {
       wrapper: createWrapper(),
     });
 
@@ -58,7 +58,7 @@ describe('useExercicios', () => {
     mockedList.mockResolvedValue({ data: [] });
 
     // Act
-    const { result } = renderHook(() => useExercicios(params), {
+    const { result } = await renderHook(() => useExercicios(params), {
       wrapper: createWrapper(),
     });
 
@@ -73,7 +73,7 @@ describe('useExercicios', () => {
     mockedList.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useExercicios(), {
+    const { result } = await renderHook(() => useExercicios(), {
       wrapper: createWrapper(),
     });
 
@@ -88,9 +88,9 @@ describe('useExercicio', () => {
     mockedGetById.mockReset();
   });
 
-  it('não dispara a query quando id é undefined', () => {
+  it('não dispara a query quando id é undefined', async () => {
     // Arrange / Act
-    const { result } = renderHook(() => useExercicio(undefined), {
+    const { result } = await renderHook(() => useExercicio(undefined), {
       wrapper: createWrapper(),
     });
 
@@ -105,7 +105,7 @@ describe('useExercicio', () => {
     mockedGetById.mockResolvedValue(exercicio);
 
     // Act
-    const { result } = renderHook(() => useExercicio('exercicio-1'), {
+    const { result } = await renderHook(() => useExercicio('exercicio-1'), {
       wrapper: createWrapper(),
     });
 

@@ -35,8 +35,8 @@ describe('useSugestaoProgressao', () => {
     mockedGetMinhaSugestao.mockReset();
   });
 
-  it('não dispara a query quando exercicioId é undefined', () => {
-    const { result } = renderHook(() => useSugestaoProgressao(undefined), {
+  it('não dispara a query quando exercicioId é undefined', async () => {
+    const { result } = await renderHook(() => useSugestaoProgressao(undefined), {
       wrapper: createWrapper(),
     });
 
@@ -50,7 +50,7 @@ describe('useSugestaoProgressao', () => {
     const response = makeSugestaoProgressaoResponse({ exercicio_id: exercicioId });
     mockedGetMinhaSugestao.mockResolvedValue(response);
 
-    const { result } = renderHook(() => useSugestaoProgressao(exercicioId), {
+    const { result } = await renderHook(() => useSugestaoProgressao(exercicioId), {
       wrapper: createWrapper(),
     });
 
@@ -64,7 +64,7 @@ describe('useSugestaoProgressao', () => {
     const error = new Error('Falha de rede');
     mockedGetMinhaSugestao.mockRejectedValue(error);
 
-    const { result } = renderHook(() => useSugestaoProgressao(exercicioId), {
+    const { result } = await renderHook(() => useSugestaoProgressao(exercicioId), {
       wrapper: createWrapper(),
     });
 

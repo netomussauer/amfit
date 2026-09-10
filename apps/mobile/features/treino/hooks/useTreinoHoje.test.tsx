@@ -38,7 +38,7 @@ describe('useTreinoHoje', () => {
     mockedGetTreinoHoje.mockResolvedValue(response);
 
     // Act
-    const { result } = renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
 
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -51,7 +51,7 @@ describe('useTreinoHoje', () => {
     mockedGetTreinoHoje.mockResolvedValue(null);
 
     // Act
-    const { result } = renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
 
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -64,7 +64,7 @@ describe('useTreinoHoje', () => {
     mockedGetTreinoHoje.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useTreinoHoje(), { wrapper: createWrapper() });
 
     // Assert
     await waitFor(() => expect(result.current.isError).toBe(true));

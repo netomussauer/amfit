@@ -20,9 +20,7 @@ jest.mock('expo-router', () => ({
 }));
 
 describe('useLogout (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useLogout());
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useLogout())).rejects.toThrow(/no queryclient set/i);
   });
 });

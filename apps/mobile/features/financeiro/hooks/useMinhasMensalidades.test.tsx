@@ -36,7 +36,7 @@ describe('useMinhasMensalidades', () => {
     mockedGetMinhasMensalidades.mockResolvedValue(responseFixture);
 
     const params = { per_page: 12 };
-    const { result } = renderHook(() => useMinhasMensalidades(params), {
+    const { result } = await renderHook(() => useMinhasMensalidades(params), {
       wrapper: createWrapper(),
     });
 
@@ -48,7 +48,7 @@ describe('useMinhasMensalidades', () => {
   it('busca sem params quando nenhum é informado', async () => {
     mockedGetMinhasMensalidades.mockResolvedValue(responseFixture);
 
-    const { result } = renderHook(() => useMinhasMensalidades(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMinhasMensalidades(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedGetMinhasMensalidades).toHaveBeenCalledWith(undefined);

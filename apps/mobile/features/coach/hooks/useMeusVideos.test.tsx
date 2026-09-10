@@ -32,7 +32,7 @@ describe('useMeusVideos', () => {
     mockedGetMinhasVideos.mockResolvedValue(responseFixture);
 
     const params = { per_page: 10 };
-    const { result } = renderHook(() => useMeusVideos(params), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMeusVideos(params), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedGetMinhasVideos).toHaveBeenCalledWith(params);

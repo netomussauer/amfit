@@ -49,10 +49,10 @@ describe('useIniciarSessao', () => {
     const sessao = makeSessaoResponse();
     mockedIniciar.mockResolvedValue(sessao);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({ treino_id: sessao.treino_id });
     });
 
@@ -67,10 +67,10 @@ describe('useIniciarSessao', () => {
     mockedIniciar.mockResolvedValue(sessao);
     const { queryClient, Wrapper } = createWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result } = renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({ treino_id: sessao.treino_id });
     });
 
@@ -85,10 +85,10 @@ describe('useIniciarSessao', () => {
     const error = new Error('Falha ao iniciar sessão');
     mockedIniciar.mockRejectedValue(error);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useIniciarSessao(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate({ treino_id: '60000000-0000-0000-0000-000000000001' });
     });
 

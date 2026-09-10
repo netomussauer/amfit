@@ -18,12 +18,12 @@ describe('SerieRow', () => {
     jest.clearAllMocks();
   });
 
-  it('preenche a carga com a carga sugerida do item quando não há registro', () => {
+  it('preenche a carga com a carga sugerida do item quando não há registro', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
 
     // Act
-    render(
+    await render(
       <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={jest.fn()} />,
     );
 
@@ -32,7 +32,7 @@ describe('SerieRow', () => {
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('');
   });
 
-  it('preenche os campos com os dados do registro quando existente', () => {
+  it('preenche os campos com os dados do registro quando existente', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
     const registro = makeRegistroSerieResponse({
@@ -42,7 +42,7 @@ describe('SerieRow', () => {
     });
 
     // Act
-    render(
+    await render(
       <SerieRow item={item} numeroSerie={1} registro={registro} onConcluir={jest.fn()} />,
     );
 
@@ -51,32 +51,32 @@ describe('SerieRow', () => {
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('8');
   });
 
-  it('atualiza os inputs de carga e repetições ao digitar', () => {
+  it('atualiza os inputs de carga e repetições ao digitar', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
 
     // Act
-    render(
+    await render(
       <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={jest.fn()} />,
     );
-    fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '55,5');
-    fireEvent.changeText(screen.getByLabelText('Repetições da série 1'), '12');
+    await fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '55,5');
+    await fireEvent.changeText(screen.getByLabelText('Repetições da série 1'), '12');
 
     // Assert
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('55,5');
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('12');
   });
 
-  it('chama onConcluir com os dados corretos e dispara haptics ao marcar como concluída', () => {
+  it('chama onConcluir com os dados corretos e dispara haptics ao marcar como concluída', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
     const onConcluir = jest.fn();
-    render(<SerieRow item={item} numeroSerie={2} registro={undefined} onConcluir={onConcluir} />);
-    fireEvent.changeText(screen.getByLabelText('Carga da série 2'), '60');
-    fireEvent.changeText(screen.getByLabelText('Repetições da série 2'), '10');
+    await render(<SerieRow item={item} numeroSerie={2} registro={undefined} onConcluir={onConcluir} />);
+    await fireEvent.changeText(screen.getByLabelText('Carga da série 2'), '60');
+    await fireEvent.changeText(screen.getByLabelText('Repetições da série 2'), '10');
 
     // Act
-    fireEvent.press(screen.getByLabelText('Marcar série 2 como concluída'));
+    await fireEvent.press(screen.getByLabelText('Marcar série 2 como concluída'));
 
     // Assert
     expect(onConcluir).toHaveBeenCalledWith({
@@ -89,17 +89,17 @@ describe('SerieRow', () => {
     expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
   });
 
-  it('não dispara haptics ao desmarcar uma série já concluída', () => {
+  it('não dispara haptics ao desmarcar uma série já concluída', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
     const registro = makeRegistroSerieResponse({ concluida: true });
     const onConcluir = jest.fn();
-    render(
+    await render(
       <SerieRow item={item} numeroSerie={1} registro={registro} onConcluir={onConcluir} />,
     );
 
     // Act
-    fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
+    await fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
 
     // Assert
     expect(onConcluir).toHaveBeenCalledWith(
@@ -108,12 +108,12 @@ describe('SerieRow', () => {
     expect(Haptics.impactAsync).not.toHaveBeenCalled();
   });
 
-  it('prioriza a carga sugerida por progressão sobre a carga_sugerida estática do item', () => {
+  it('prioriza a carga sugerida por progressão sobre a carga_sugerida estática do item', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
 
     // Act
-    render(
+    await render(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -127,13 +127,13 @@ describe('SerieRow', () => {
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('22,5');
   });
 
-  it('prioriza a carga do registro já salvo sobre a sugestão de progressão', () => {
+  it('prioriza a carga do registro já salvo sobre a sugestão de progressão', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
     const registro = makeRegistroSerieResponse({ carga_realizada: 60 });
 
     // Act
-    render(
+    await render(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -151,7 +151,7 @@ describe('SerieRow', () => {
     // Arrange — cargaSugeridaProgressao chega undefined no primeiro render
     // (query ainda não resolveu) e só depois é passada com valor.
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
-    const { rerender } = render(
+    const { rerender } = await render(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -163,7 +163,7 @@ describe('SerieRow', () => {
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('40');
 
     // Act
-    rerender(
+    await rerender(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -182,7 +182,7 @@ describe('SerieRow', () => {
   it('não sobrescreve a carga que o aluno já editou quando a sugestão chega depois', async () => {
     // Arrange
     const item = makeItemTreinoResponse({ carga_sugerida: 40 });
-    const { rerender } = render(
+    const { rerender } = await render(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -191,10 +191,10 @@ describe('SerieRow', () => {
         onConcluir={jest.fn()}
       />,
     );
-    fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '35');
+    await fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '35');
 
     // Act — a sugestão chega DEPOIS do aluno já ter digitado um valor
-    rerender(
+    await rerender(
       <SerieRow
         item={item}
         numeroSerie={1}
@@ -208,13 +208,13 @@ describe('SerieRow', () => {
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('35');
   });
 
-  it('desabilita os campos de edição quando a série já está concluída', () => {
+  it('desabilita os campos de edição quando a série já está concluída', async () => {
     // Arrange
     const item = makeItemTreinoResponse();
     const registro = makeRegistroSerieResponse({ concluida: true });
 
     // Act
-    render(
+    await render(
       <SerieRow item={item} numeroSerie={1} registro={registro} onConcluir={jest.fn()} />,
     );
 

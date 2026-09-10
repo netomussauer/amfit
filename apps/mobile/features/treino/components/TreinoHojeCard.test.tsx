@@ -3,38 +3,38 @@ import { TreinoHojeCard } from './TreinoHojeCard';
 import { makeItemTreino, makeTreino } from '../__fixtures__/treino.fixtures';
 
 describe('TreinoHojeCard', () => {
-  it('exibe a letra e o nome do treino', () => {
+  it('exibe a letra e o nome do treino', async () => {
     // Arrange
     const treino = makeTreino({ letra: 'A', nome: 'Peito e tríceps' });
 
     // Act
-    render(<TreinoHojeCard treino={treino} />);
+    await render(<TreinoHojeCard treino={treino} />);
 
     // Assert
     expect(screen.getByText('Treino A')).toBeTruthy();
     expect(screen.getByText('Peito e tríceps')).toBeTruthy();
   });
 
-  it('não quebra quando o treino não tem nome', () => {
+  it('não quebra quando o treino não tem nome', async () => {
     // Arrange
     const treino = makeTreino({ nome: null });
 
     // Act / Assert
-    expect(() => render(<TreinoHojeCard treino={treino} />)).not.toThrow();
+    await expect(render(<TreinoHojeCard treino={treino} />)).resolves.toBeDefined();
   });
 
-  it('exibe a contagem de exercícios no singular quando há apenas 1 item', () => {
+  it('exibe a contagem de exercícios no singular quando há apenas 1 item', async () => {
     // Arrange
     const treino = makeTreino({ itens: [makeItemTreino()] });
 
     // Act
-    render(<TreinoHojeCard treino={treino} />);
+    await render(<TreinoHojeCard treino={treino} />);
 
     // Assert
     expect(screen.getByText('1 exercício')).toBeTruthy();
   });
 
-  it('exibe a contagem de exercícios no plural quando há mais de 1 item', () => {
+  it('exibe a contagem de exercícios no plural quando há mais de 1 item', async () => {
     // Arrange
     const treino = makeTreino({
       itens: [
@@ -44,13 +44,13 @@ describe('TreinoHojeCard', () => {
     });
 
     // Act
-    render(<TreinoHojeCard treino={treino} />);
+    await render(<TreinoHojeCard treino={treino} />);
 
     // Assert
     expect(screen.getByText('2 exercícios')).toBeTruthy();
   });
 
-  it('renderiza um ExercicioItem para cada item do treino', () => {
+  it('renderiza um ExercicioItem para cada item do treino', async () => {
     // Arrange
     const treino = makeTreino({
       itens: [
@@ -82,7 +82,7 @@ describe('TreinoHojeCard', () => {
     });
 
     // Act
-    render(<TreinoHojeCard treino={treino} />);
+    await render(<TreinoHojeCard treino={treino} />);
 
     // Assert
     expect(screen.getByText('Supino reto')).toBeTruthy();

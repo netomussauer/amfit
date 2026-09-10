@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react-native';
 import { EmptyTreinoState } from './EmptyTreinoState';
 
 describe('EmptyTreinoState', () => {
-  it('renderiza o título e a descrição padrão quando nenhuma prop é informada', () => {
+  it('renderiza o título e a descrição padrão quando nenhuma prop é informada', async () => {
     // Act
-    render(<EmptyTreinoState />);
+    await render(<EmptyTreinoState />);
 
     // Assert
     expect(screen.getByText('Nenhum treino agendado')).toBeTruthy();
@@ -13,9 +13,9 @@ describe('EmptyTreinoState', () => {
     ).toBeTruthy();
   });
 
-  it('renderiza título e descrição customizados quando informados', () => {
+  it('renderiza título e descrição customizados quando informados', async () => {
     // Act
-    render(
+    await render(
       <EmptyTreinoState title="Sem ficha ativa" description="Fale com seu personal." />,
     );
 

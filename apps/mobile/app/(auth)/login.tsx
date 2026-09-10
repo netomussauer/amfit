@@ -13,6 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { LoginRequestSchema, type LoginRequest, ROLES, type Role } from '@amfit/shared';
 import { useLogin } from '@/features/auth/hooks/useLogin';
+import { ApiError } from '@/shared/lib/api-client';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -45,13 +46,22 @@ export default function LoginScreen() {
     doLogin(values, {
       onSuccess: (data) => {
         if (data.usuario.role === ROLES.PERSONAL) {
-          router.replace('/(personal)/');
+          router.replace('/(personal)');
         } else {
-          router.replace('/(aluno)/');
+          router.replace('/(aluno)');
         }
       },
-      onError: () => {
-        setServerError('E-mail ou senha inválidos.');
+      onError: (err) => {
+        // Antes disso mostrava "E-mail ou senha inválidos" pra qualquer
+        // falha (erro de rede, timeout, 500 etc.), não só 401 de verdade —
+        // mascarava o motivo real e atrapalhou o diagnóstico de um problema
+        // de conectividade durante o teste em lab. Mesmo padrão do web
+        // (apps/web/.../LoginForm.tsx).
+        if (err instanceof ApiError && err.status === 401) {
+          setServerError('E-mail ou senha inválidos.');
+        } else {
+          setServerError('Não foi possível entrar agora. Tente novamente em instantes.');
+        }
       },
     });
   }
@@ -153,6 +163,7 @@ export default function LoginScreen() {
                     className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900"
                     placeholder="••••••••"
                     secureTextEntry
+                    autoCapitalize="none"
                     autoComplete="password"
                     onBlur={onBlur}
                     onChangeText={onChange}

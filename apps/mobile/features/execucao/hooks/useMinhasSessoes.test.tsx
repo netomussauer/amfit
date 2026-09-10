@@ -38,7 +38,7 @@ describe('useMinhasSessoes', () => {
     mockedListar.mockResolvedValue(response);
 
     // Act
-    const { result } = renderHook(() => useMinhasSessoes(), {
+    const { result } = await renderHook(() => useMinhasSessoes(), {
       wrapper: createWrapper(),
     });
 
@@ -56,7 +56,7 @@ describe('useMinhasSessoes', () => {
     mockedListar.mockResolvedValue(response);
 
     // Act
-    const { result } = renderHook(() => useMinhasSessoes(2, 10), {
+    const { result } = await renderHook(() => useMinhasSessoes(2, 10), {
       wrapper: createWrapper(),
     });
 
@@ -71,7 +71,7 @@ describe('useMinhasSessoes', () => {
     mockedListar.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useMinhasSessoes(), {
+    const { result } = await renderHook(() => useMinhasSessoes(), {
       wrapper: createWrapper(),
     });
 

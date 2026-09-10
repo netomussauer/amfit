@@ -24,6 +24,7 @@ export function EvolucaoCargaChart({ pontos }: Props) {
 
   return (
     <View
+      testID="evolucao-carga-chart-container"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       className="rounded-xl border border-gray-200 bg-white p-4"

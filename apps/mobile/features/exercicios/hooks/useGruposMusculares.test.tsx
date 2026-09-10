@@ -38,7 +38,7 @@ describe('useGruposMusculares', () => {
     mockedListGrupos.mockResolvedValue(grupos);
 
     // Act
-    const { result } = renderHook(() => useGruposMusculares(), {
+    const { result } = await renderHook(() => useGruposMusculares(), {
       wrapper: createWrapper(),
     });
 
@@ -54,7 +54,7 @@ describe('useGruposMusculares', () => {
     mockedListGrupos.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useGruposMusculares(), {
+    const { result } = await renderHook(() => useGruposMusculares(), {
       wrapper: createWrapper(),
     });
 

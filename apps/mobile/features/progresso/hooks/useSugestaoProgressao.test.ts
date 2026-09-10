@@ -12,9 +12,7 @@ jest.mock('../services/progresso.service', () => ({
 }));
 
 describe('useSugestaoProgressao (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useSugestaoProgressao('exercicio-1'));
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useSugestaoProgressao('exercicio-1'))).rejects.toThrow(/no queryclient set/i);
   });
 });

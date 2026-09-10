@@ -93,7 +93,13 @@ export default function CoachVideoScreen() {
     <View className="flex-1 bg-white">
       <View className="flex-row items-center gap-2 border-b border-gray-100 px-6 pb-3 pt-12">
         <TouchableOpacity
-          onPress={() => router.back()}
+          // router.back() aqui volta pra tab default do navigator (Treino),
+          // não pra tab de onde essa tela foi aberta (Perfil) — essa
+          // rota só é aberta a partir de Perfil (único push existente),
+          // então navega direto pra lá em vez de depender do histórico da
+          // stack, que se comporta de forma inconsistente empurrado por
+          // cima de um Tabs navigator.
+          onPress={() => router.push('/(aluno)/perfil')}
           className="-ml-2 h-9 w-9 items-center justify-center rounded-full"
           accessibilityRole="button"
           accessibilityLabel="Voltar"

@@ -1,1 +1,1 @@
-export { registrarPushTokenExpo } from './lib/push';
+export { registrarPushTokenExpo, configurarNotificationHandler } from './lib/push';

@@ -15,31 +15,31 @@ function makeData(overrides: Partial<ShareCardData> = {}): ShareCardData {
 }
 
 describe('ShareCard', () => {
-  it('exibe a letra e o nome do treino', () => {
-    render(<ShareCard data={makeData()} />);
+  it('exibe a letra e o nome do treino', async () => {
+    await render(<ShareCard data={makeData()} />);
     expect(screen.getByText('Treino A · Peito e tríceps')).toBeTruthy();
   });
 
-  it('omite o nome do treino quando ausente', () => {
-    render(<ShareCard data={makeData({ treinoNome: undefined })} />);
+  it('omite o nome do treino quando ausente', async () => {
+    await render(<ShareCard data={makeData({ treinoNome: undefined })} />);
     expect(screen.getByText('Treino A')).toBeTruthy();
   });
 
-  it('exibe as estatísticas da sessão', () => {
-    render(<ShareCard data={makeData()} />);
+  it('exibe as estatísticas da sessão', async () => {
+    await render(<ShareCard data={makeData()} />);
     expect(screen.getByText('12')).toBeTruthy();
     expect(screen.getByText('4')).toBeTruthy();
     expect(screen.getByText('1.240 kg')).toBeTruthy();
     expect(screen.getByText('52 min')).toBeTruthy();
   });
 
-  it('exibe a data de execução formatada', () => {
-    render(<ShareCard data={makeData()} />);
+  it('exibe a data de execução formatada', async () => {
+    await render(<ShareCard data={makeData()} />);
     expect(screen.getByText('04 de setembro de 2026')).toBeTruthy();
   });
 
-  it('não exibe nenhum dado sensível (peso corporal, fotos, medidas)', () => {
-    render(<ShareCard data={makeData()} />);
+  it('não exibe nenhum dado sensível (peso corporal, fotos, medidas)', async () => {
+    await render(<ShareCard data={makeData()} />);
     // Guard-rail: o tipo ShareCardData não tem esses campos, mas o teste
     // documenta a garantia mesmo se alguém adicionar um campo solto depois.
     expect(screen.queryByText(/peso|gordura|foto/i)).toBeNull();

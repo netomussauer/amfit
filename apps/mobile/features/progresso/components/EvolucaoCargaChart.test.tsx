@@ -8,7 +8,7 @@ import { makeEvolucaoCargaPoint } from '../__fixtures__/progresso.fixtures';
 // fazer um render completo aqui em vez de só testar a transformação de dados.
 
 describe('EvolucaoCargaChart', () => {
-  it('renderiza a carga máxima e a data de cada ponto', () => {
+  it('renderiza a carga máxima e a data de cada ponto', async () => {
     // Arrange
     const pontos = [
       makeEvolucaoCargaPoint({ sessaoId: 's1', data: '2026-08-01', cargaMaxima: 80 }),
@@ -16,7 +16,7 @@ describe('EvolucaoCargaChart', () => {
     ];
 
     // Act
-    render(<EvolucaoCargaChart pontos={pontos} />);
+    await render(<EvolucaoCargaChart pontos={pontos} />);
 
     // Assert
     // O container é accessibilityElementsHidden por design (ver teste
@@ -29,33 +29,34 @@ describe('EvolucaoCargaChart', () => {
     expect(screen.getByText(formatDataIso('2026-08-08'), opts)).toBeTruthy();
   });
 
-  it('renderiza um traço "—" para sessões sem carga registrada', () => {
+  it('renderiza um traço "—" para sessões sem carga registrada', async () => {
     // Arrange
     const pontos = [makeEvolucaoCargaPoint({ sessaoId: 's1', cargaMaxima: null })];
 
     // Act
-    render(<EvolucaoCargaChart pontos={pontos} />);
+    await render(<EvolucaoCargaChart pontos={pontos} />);
 
     // Assert
     expect(screen.getByText('—', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('não quebra quando a lista de pontos está vazia', () => {
+  it('não quebra quando a lista de pontos está vazia', async () => {
     // Act / Assert
-    expect(() => render(<EvolucaoCargaChart pontos={[]} />)).not.toThrow();
+    await expect(render(<EvolucaoCargaChart pontos={[]} />)).resolves.toBeDefined();
   });
 
-  it('esconde o gráfico visual de leitores de tela (a lista textual em progresso.tsx é a versão acessível)', () => {
+  it('esconde o gráfico visual de leitores de tela (a lista textual em progresso.tsx é a versão acessível)', async () => {
     // Arrange
     const pontos = [makeEvolucaoCargaPoint()];
 
     // Act
-    render(<EvolucaoCargaChart pontos={pontos} />);
+    await render(<EvolucaoCargaChart pontos={pontos} />);
 
     // Assert
-    const hiddenContainer = screen.UNSAFE_getByProps({
-      accessibilityElementsHidden: true,
+    const hiddenContainer = screen.getByTestId('evolucao-carga-chart-container', {
+      includeHiddenElements: true,
     });
+    expect(hiddenContainer.props.accessibilityElementsHidden).toBe(true);
     expect(hiddenContainer.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 });

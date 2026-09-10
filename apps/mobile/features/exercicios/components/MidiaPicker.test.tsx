@@ -51,9 +51,9 @@ describe('MidiaPicker', () => {
     mockedLaunchLibrary.mockReset();
   });
 
-  it('exibe o botão de seleção e a dica de tamanho quando não há mídia', () => {
+  it('exibe o botão de seleção e a dica de tamanho quando não há mídia', async () => {
     // Act
-    render(<MidiaPicker value={null} onChange={jest.fn()} />);
+    await render(<MidiaPicker value={null} onChange={jest.fn()} />);
 
     // Assert
     expect(screen.getByRole('button', { name: 'Selecionar mídia do exercício' })).toBeTruthy();
@@ -66,10 +66,10 @@ describe('MidiaPicker', () => {
       status: 'denied',
     } as ImagePicker.MediaLibraryPermissionResponse);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
 
     // Assert
     expect(await screen.findByText('Permissão de acesso às fotos negada.')).toBeTruthy();
@@ -82,10 +82,10 @@ describe('MidiaPicker', () => {
     grantPermission();
     mockedLaunchLibrary.mockResolvedValue({ canceled: true, assets: null } as never);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
     await Promise.resolve();
 
     // Assert
@@ -108,10 +108,10 @@ describe('MidiaPicker', () => {
       ],
     } as never);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
 
     // Assert
     await screen.findByRole('button', { name: 'Selecionar mídia do exercício' }, { timeout: 3000 });
@@ -130,10 +130,10 @@ describe('MidiaPicker', () => {
       assets: [{ uri: 'file:///imagem.jpg', type: 'image', fileSize: 1024 }],
     } as never);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
     await Promise.resolve();
     await Promise.resolve();
 
@@ -161,10 +161,10 @@ describe('MidiaPicker', () => {
       ],
     } as never);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
 
     // Assert
     expect(
@@ -189,17 +189,17 @@ describe('MidiaPicker', () => {
       ],
     } as never);
     const onChange = jest.fn();
-    render(<MidiaPicker value={null} onChange={onChange} />);
+    await render(<MidiaPicker value={null} onChange={onChange} />);
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Selecionar mídia do exercício' }));
 
     // Assert
     expect(await screen.findByText('O vídeo deve ter no máximo 10MB.')).toBeTruthy();
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('renderiza a pré-visualização da imagem e permite trocar/remover quando há valor', () => {
+  it('renderiza a pré-visualização da imagem e permite trocar/remover quando há valor', async () => {
     // Arrange
     const value: MidiaInput = {
       uri: 'file:///imagem.jpg',
@@ -207,7 +207,7 @@ describe('MidiaPicker', () => {
       fileName: 'imagem.jpg',
     };
     const onChange = jest.fn();
-    render(<MidiaPicker value={value} onChange={onChange} />);
+    await render(<MidiaPicker value={value} onChange={onChange} />);
 
     // Assert
     expect(
@@ -216,13 +216,13 @@ describe('MidiaPicker', () => {
     expect(screen.getByRole('button', { name: 'Trocar mídia' })).toBeTruthy();
 
     // Act
-    fireEvent.press(screen.getByRole('button', { name: 'Remover mídia' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Remover mídia' }));
 
     // Assert
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it('renderiza a pré-visualização de vídeo quando o mimeType é de vídeo', () => {
+  it('renderiza a pré-visualização de vídeo quando o mimeType é de vídeo', async () => {
     // Arrange
     const value: MidiaInput = {
       uri: 'file:///video.mp4',
@@ -231,7 +231,7 @@ describe('MidiaPicker', () => {
     };
 
     // Act
-    render(<MidiaPicker value={value} onChange={jest.fn()} />);
+    await render(<MidiaPicker value={value} onChange={jest.fn()} />);
 
     // Assert
     expect(

@@ -22,6 +22,7 @@ export function ExercicioCard({ exercicio, onPress }: Props) {
       <View className="h-16 w-16 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
         {exercicio.midia_url && isImage ? (
           <Image
+            testID="exercicio-card-imagem"
             source={{ uri: exercicio.midia_url }}
             className="h-16 w-16"
             resizeMode="cover"

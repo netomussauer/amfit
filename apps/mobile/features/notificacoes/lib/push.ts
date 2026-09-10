@@ -1,21 +1,80 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { PLATAFORMA_DISPOSITIVO, RegistrarPushTokenRequestSchema } from '@amfit/shared';
 import { apiRequest } from '@/shared/lib/api-client';
 
-// Comportamento em foreground — sem isso, o app não mostra nada quando uma
-// notificação chega com o app aberto (default do Expo é não exibir).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+/**
+ * A partir do SDK 53 do Expo, push remoto (notificação enviada pelo
+ * servidor) no Android foi removido do Expo Go — o próprio pacote
+ * `expo-notifications` lança um erro só por ser importado nesse cenário
+ * (precisa de dev build). Checar isso ANTES de tentar importar evita pagar
+ * o custo da tentativa (e logar o warning) toda vez: sem essa checagem,
+ * tanto configurarNotificationHandler (chamada 1x por montagem da raiz do
+ * app) quanto registrarPushTokenExpo (chamada 1x por login) reexecutariam
+ * e recapturariam o mesmo erro sempre, já que um `require` que lança não
+ * fica "cacheado" como bem-sucedido pelo Metro.
+ */
+function pushIndisponivelNesteAmbiente(): boolean {
+  return (
+    Platform.OS === 'android' &&
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+  );
+}
+
+/**
+ * `expo-notifications` nunca é importado estaticamente no topo do arquivo
+ * — mesmo com a checagem acima, mantemos o require dentro de um try/catch
+ * como rede de segurança (ex.: emulador sem Google Play Services, ou
+ * qualquer outro cenário não coberto por pushIndisponivelNesteAmbiente).
+ * Um `import` estático travaria qualquer tela que dependa (mesmo que
+ * indiretamente, como a de login via useLogin) desse módulo, antes mesmo
+ * dela renderizar.
+ */
+function getNotificationsModule(): typeof import('expo-notifications') | null {
+  // pushIndisponivelNesteAmbiente() também entra no try: as funções deste
+  // arquivo prometem nunca lançar, e essa checagem depende de
+  // Constants.executionEnvironment (expo-constants) — se algum dia isso
+  // vier undefined por qualquer motivo, o throw resultante não pode
+  // escapar pra fora de configurarNotificationHandler/registrarPushTokenExpo.
+  try {
+    if (pushIndisponivelNesteAmbiente()) return null;
+    return require('expo-notifications') as typeof import('expo-notifications');
+  } catch (err) {
+    console.warn('[push] expo-notifications indisponível neste ambiente', err);
+    return null;
+  }
+}
+
+/**
+ * Configura o handler de notificação em foreground — sem isso, o app não
+ * mostra nada quando uma notificação chega com o app aberto (default do
+ * Expo é não exibir). Chamada uma vez no mount da raiz do app
+ * (app/_layout.tsx), independente de login: precisa rodar pra qualquer
+ * sessão já autenticada que reabre o app direto (sem passar por
+ * useLogin/registrarPushTokenExpo), já que é estado em memória que se
+ * perde a cada reinício do processo JS.
+ *
+ * Nunca lança — mesmo tratamento de erro de registrarPushTokenExpo abaixo.
+ */
+export function configurarNotificationHandler(): void {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return;
+
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch (err) {
+    console.warn('[push] falha ao configurar notification handler', err);
+  }
+}
 
 /**
  * Pede permissão, obtém o token Expo Push do device e registra no backend
@@ -28,6 +87,9 @@ Notifications.setNotificationHandler({
  * uma falha aqui não pode quebrar o login.
  */
 export async function registrarPushTokenExpo(): Promise<void> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return;
+
   try {
     if (!Device.isDevice) {
       // Emuladores/simuladores não recebem push de verdade — Notifications

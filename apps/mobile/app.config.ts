@@ -12,20 +12,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   platforms: ['android', 'ios'],
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  splash: {
-    resizeMode: 'contain',
-    backgroundColor: '#f97316',
-  },
   android: {
     adaptiveIcon: {
       backgroundColor: '#f97316',
     },
     package: 'com.amfit.app',
-    // Lab não tem TLS (API/MinIO em http:// puro — ver infra/k8s/*/service.yaml).
-    // A partir do Android 9 dev-clients/APKs standalone bloqueiam cleartext
-    // por padrão; sem isso, todo fetch pra API e toda mídia do MinIO falha
-    // fora do Expo Go. Reavaliar quando o lab tiver TLS (Traefik).
-    usesCleartextTraffic: true,
   },
   ios: {
     supportsTablet: true,
@@ -47,6 +38,29 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Ícone/cor de notificação usam o default do Expo — trocar quando
     // houver asset dedicado em apps/mobile/assets/.
     'expo-notifications',
+    // `splash` saiu do schema do app.config a partir do SDK 57 — a
+    // configuração de splash screen agora só é aceita via esse plugin.
+    [
+      'expo-splash-screen',
+      {
+        resizeMode: 'contain',
+        backgroundColor: '#f97316',
+      },
+    ],
+    // `android.usesCleartextTraffic` saiu do schema do app.config a partir
+    // do SDK 57 — agora é uma build property (expo-build-properties), não
+    // mais um campo direto do Android config. Lab não tem TLS (API/MinIO em
+    // http:// puro — ver infra/k8s/*/service.yaml); a partir do Android 9
+    // dev-clients/APKs standalone bloqueiam cleartext por padrão. Reavaliar
+    // quando o lab tiver TLS (Traefik).
+    [
+      'expo-build-properties',
+      {
+        android: {
+          usesCleartextTraffic: true,
+        },
+      },
+    ],
   ],
   // `extra.eas.projectId` ainda não existe — nenhum projeto Expo/EAS foi
   // criado pra esse app até agora. Sem ele, Notifications.getExpoPushTokenAsync

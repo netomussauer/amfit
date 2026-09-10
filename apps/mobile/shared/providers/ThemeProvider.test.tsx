@@ -44,6 +44,13 @@ function primaryColorOf(): string {
   return varsStyle?.['--color-primary'];
 }
 
+// Este arquivo mostrou timeouts esporádicos no ambiente de CI/dev (o
+// primeiro render assíncrono é sabidamente mais lento, e sob carga chega a
+// passar de 15s) — não é um teste específico travando, é o ambiente sob
+// carga. Sobe o timeout padrão pro arquivo inteiro em vez de remendar
+// teste por teste.
+jest.setTimeout(20000);
+
 describe('ThemeProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,7 +59,7 @@ describe('ThemeProvider', () => {
   it('mantém o tema default quando o usuário não está autenticado', async () => {
     mockedGetAccessToken.mockResolvedValue(null);
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,
@@ -72,7 +79,7 @@ describe('ThemeProvider', () => {
       stale: false,
     });
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,
@@ -93,7 +100,7 @@ describe('ThemeProvider', () => {
       cor_secundaria: 'aabbcc',
     });
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,
@@ -120,7 +127,7 @@ describe('ThemeProvider', () => {
       cor_secundaria: 'aabbcc',
     });
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,
@@ -134,7 +141,7 @@ describe('ThemeProvider', () => {
     mockedGetConfigCache.mockResolvedValue(null);
     mockedGetMinhaConfig.mockRejectedValue(new Error('network down'));
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,
@@ -152,7 +159,7 @@ describe('ThemeProvider', () => {
       cor_secundaria: 'aabbcc',
     });
 
-    render(
+    await render(
       <ThemeProvider>
         <Text>conteúdo</Text>
       </ThemeProvider>,

@@ -29,6 +29,11 @@ jest.mock('react-native-reanimated', () => {
   };
 });
 
+// react-native-worklets (dependência nova do Reanimated 4) já tem um stub
+// global em jest.setup.js — mockar só react-native-reanimated acima não
+// bastaria sozinho, já que o mock oficial do reanimated ainda importa
+// código-fonte real da lib por baixo.
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),
@@ -53,9 +58,9 @@ describe('RestTimer', () => {
     jest.useRealTimers();
   });
 
-  it('exibe o tempo total formatado (mm:ss) ao abrir', () => {
+  it('exibe o tempo total formatado (mm:ss) ao abrir', async () => {
     // Act
-    render(
+    await render(
       <RestTimer visible duracaoSegundos={65} onComplete={jest.fn()} onSkip={jest.fn()} />,
     );
 
@@ -65,7 +70,7 @@ describe('RestTimer', () => {
 
   it('decrementa o contador a cada segundo', async () => {
     // Arrange
-    render(
+    await render(
       <RestTimer visible duracaoSegundos={5} onComplete={jest.fn()} onSkip={jest.fn()} />,
     );
 
@@ -95,13 +100,19 @@ describe('RestTimer', () => {
   it('dispara haptics e chama onComplete (com um pequeno delay) quando o tempo se esgota', async () => {
     // Arrange
     const onComplete = jest.fn();
-    render(
+    await render(
       <RestTimer visible duracaoSegundos={2} onComplete={onComplete} onSkip={jest.fn()} />,
     );
 
-    // Act — 2 ticks do intervalo (2000ms) + o delay de 250ms antes de chamar onComplete
+    // Act — 2 ticks do intervalo (2000ms), depois o delay de 250ms antes de
+    // chamar onComplete (em dois avanços separados: o setTimeout de 250ms só
+    // é agendado dentro do callback do 2º tick, então avançar tudo de uma vez
+    // não garante que esse timer aninhado seja processado no mesmo passo).
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(2250);
+      await jest.advanceTimersByTimeAsync(2000);
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(250);
     });
 
     // Assert
@@ -115,7 +126,7 @@ describe('RestTimer', () => {
   it('não chama onComplete antes do delay de finalização decorrer', async () => {
     // Arrange
     const onComplete = jest.fn();
-    render(
+    await render(
       <RestTimer visible duracaoSegundos={1} onComplete={onComplete} onSkip={jest.fn()} />,
     );
 
@@ -133,7 +144,7 @@ describe('RestTimer', () => {
     // Arrange
     const onComplete = jest.fn();
     const onSkip = jest.fn();
-    render(
+    await render(
       <RestTimer
         visible
         duracaoSegundos={60}
@@ -143,7 +154,7 @@ describe('RestTimer', () => {
     );
 
     // Act
-    fireEvent.press(screen.getByLabelText('Pular descanso'));
+    await fireEvent.press(screen.getByLabelText('Pular descanso'));
 
     // Assert
     expect(onSkip).toHaveBeenCalledTimes(1);
@@ -160,12 +171,12 @@ describe('RestTimer', () => {
   it('limpa o intervalo ao desmontar, sem chamar onComplete após o unmount', async () => {
     // Arrange
     const onComplete = jest.fn();
-    const { unmount } = render(
+    const { unmount } = await render(
       <RestTimer visible duracaoSegundos={2} onComplete={onComplete} onSkip={jest.fn()} />,
     );
 
     // Act
-    unmount();
+    await unmount();
     await act(async () => {
       await jest.advanceTimersByTimeAsync(5000);
     });
@@ -174,9 +185,9 @@ describe('RestTimer', () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it('expõe o tempo restante via accessibilityLabel em um alerta', () => {
+  it('expõe o tempo restante via accessibilityLabel em um alerta', async () => {
     // Act
-    render(
+    await render(
       <RestTimer visible duracaoSegundos={30} onComplete={jest.fn()} onSkip={jest.fn()} />,
     );
 

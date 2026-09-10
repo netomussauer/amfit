@@ -39,10 +39,10 @@ describe('useDesativarExercicio', () => {
     const removeSpy = jest.spyOn(queryClient, 'removeQueries');
     mockedDesativar.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useDesativarExercicio(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useDesativarExercicio(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate('exercicio-1');
     });
 
@@ -63,10 +63,10 @@ describe('useDesativarExercicio', () => {
     const error = new Error('Falha ao desativar exercício');
     mockedDesativar.mockRejectedValue(error);
 
-    const { result } = renderHook(() => useDesativarExercicio(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useDesativarExercicio(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate('exercicio-1');
     });
 

@@ -12,9 +12,7 @@ jest.mock('../services/execucao.service', () => ({
 }));
 
 describe('useRegistrarSerie (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useRegistrarSerie('sessao-1'));
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useRegistrarSerie('sessao-1'))).rejects.toThrow(/no queryclient set/i);
   });
 });

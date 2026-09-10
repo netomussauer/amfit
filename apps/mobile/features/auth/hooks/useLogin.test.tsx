@@ -62,10 +62,10 @@ describe('useLogin', () => {
     // Arrange
     const credenciais = makeLoginRequest();
     mockedApiRequest.mockResolvedValue(makeAuthResponse());
-    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate(credenciais);
     });
 
@@ -84,10 +84,10 @@ describe('useLogin', () => {
       refresh_token: 'novo-refresh-token',
     });
     mockedApiRequest.mockResolvedValue(authResponse);
-    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate(makeLoginRequest());
     });
 
@@ -100,10 +100,10 @@ describe('useLogin', () => {
   it('registra o push token do device após login bem-sucedido', async () => {
     // Arrange
     mockedApiRequest.mockResolvedValue(makeAuthResponse());
-    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate(makeLoginRequest());
     });
 
@@ -115,10 +115,10 @@ describe('useLogin', () => {
   it('pede pro ThemeProvider buscar a marca do personal após login bem-sucedido', async () => {
     // Arrange
     mockedApiRequest.mockResolvedValue(makeAuthResponse());
-    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate(makeLoginRequest());
     });
 
@@ -131,10 +131,10 @@ describe('useLogin', () => {
     // Arrange
     const error = new Error('Credenciais inválidas');
     mockedApiRequest.mockRejectedValue(error);
-    const { result } = renderHook(() => useLogin(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate(makeLoginRequest());
     });
 

@@ -15,9 +15,7 @@ jest.mock('@/shared/lib/auth', () => ({
 }));
 
 describe('useLogin (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useLogin());
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useLogin())).rejects.toThrow(/no queryclient set/i);
   });
 });

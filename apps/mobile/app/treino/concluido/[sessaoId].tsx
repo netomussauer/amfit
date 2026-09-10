@@ -78,7 +78,7 @@ export default function TreinoConcluidoScreen() {
   const [compartilhando, setCompartilhando] = useState(false);
 
   function handleVoltar() {
-    router.replace('/(aluno)/');
+    router.replace('/(aluno)');
   }
 
   async function handleCompartilhar() {

@@ -32,6 +32,7 @@ export function ExercicioItem({ item, onPressEvolucao }: Props) {
       <View className="h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-lg bg-gray-100">
         {exercicio.midia_url && isImage ? (
           <Image
+            testID="exercicio-item-imagem"
             source={{ uri: exercicio.midia_url }}
             className="h-[60px] w-[60px]"
             resizeMode="cover"

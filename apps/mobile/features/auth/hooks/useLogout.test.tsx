@@ -50,10 +50,10 @@ describe('useLogout', () => {
     mockedGetRefreshToken.mockResolvedValue('refresh-token-atual');
     mockedApiRequest.mockResolvedValue(undefined);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useLogout(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 
@@ -69,10 +69,10 @@ describe('useLogout', () => {
     // Arrange
     mockedGetRefreshToken.mockResolvedValue(null);
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useLogout(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 
@@ -87,10 +87,10 @@ describe('useLogout', () => {
     mockedApiRequest.mockRejectedValue(new Error('Falha de rede'));
     const { queryClient, Wrapper } = createWrapper();
     const clearSpy = jest.spyOn(queryClient, 'clear');
-    const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+    const { result } = await renderHook(() => useLogout(), { wrapper: Wrapper });
 
     // Act
-    act(() => {
+    await act(async () => {
       result.current.mutate();
     });
 

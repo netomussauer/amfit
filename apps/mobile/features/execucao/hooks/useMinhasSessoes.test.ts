@@ -12,9 +12,7 @@ jest.mock('../services/execucao.service', () => ({
 }));
 
 describe('useMinhasSessoes (sem QueryClientProvider)', () => {
-  it('lança erro ao ser usado fora de um QueryClientProvider', () => {
-    expect(() => {
-      renderHook(() => useMinhasSessoes());
-    }).toThrow(/no queryclient set/i);
+  it('lança erro ao ser usado fora de um QueryClientProvider', async () => {
+    await expect(renderHook(() => useMinhasSessoes())).rejects.toThrow(/no queryclient set/i);
   });
 });

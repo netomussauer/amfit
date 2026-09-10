@@ -39,7 +39,7 @@ describe('useMinhaFicha', () => {
     mockedGetMinhaFicha.mockResolvedValue(ficha);
 
     // Act
-    const { result } = renderHook(() => useMinhaFicha(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMinhaFicha(), { wrapper: createWrapper() });
 
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -52,7 +52,7 @@ describe('useMinhaFicha', () => {
     mockedGetMinhaFicha.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useMinhaFicha(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMinhaFicha(), { wrapper: createWrapper() });
 
     // Assert
     await waitFor(() => expect(result.current.isError).toBe(true));

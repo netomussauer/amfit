@@ -35,9 +35,9 @@ describe('useMeuProgresso', () => {
     mockedGetMeuProgresso.mockReset();
   });
 
-  it('não dispara a query quando exercicioId é undefined', () => {
+  it('não dispara a query quando exercicioId é undefined', async () => {
     // Arrange / Act
-    const { result } = renderHook(() => useMeuProgresso(undefined), {
+    const { result } = await renderHook(() => useMeuProgresso(undefined), {
       wrapper: createWrapper(),
     });
 
@@ -54,7 +54,7 @@ describe('useMeuProgresso', () => {
     mockedGetMeuProgresso.mockResolvedValue(response);
 
     // Act
-    const { result } = renderHook(() => useMeuProgresso(exercicioId), {
+    const { result } = await renderHook(() => useMeuProgresso(exercicioId), {
       wrapper: createWrapper(),
     });
 
@@ -71,7 +71,7 @@ describe('useMeuProgresso', () => {
     mockedGetMeuProgresso.mockResolvedValue(makeHistoricoExercicioResponse());
 
     // Act
-    const { result } = renderHook(() => useMeuProgresso(exercicioId, params), {
+    const { result } = await renderHook(() => useMeuProgresso(exercicioId, params), {
       wrapper: createWrapper(),
     });
 
@@ -87,7 +87,7 @@ describe('useMeuProgresso', () => {
     mockedGetMeuProgresso.mockRejectedValue(error);
 
     // Act
-    const { result } = renderHook(() => useMeuProgresso(exercicioId), {
+    const { result } = await renderHook(() => useMeuProgresso(exercicioId), {
       wrapper: createWrapper(),
     });
 

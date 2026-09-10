@@ -37,13 +37,13 @@ describe('useEnviarVideo', () => {
 
   it('envia o video com o input informado', async () => {
     mockedEnviarVideo.mockResolvedValue(videoFixture);
-    const { result } = renderHook(() => useEnviarVideo(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useEnviarVideo(), { wrapper: createWrapper() });
 
     const input = {
       video: { uri: 'file:///a.mp4', mimeType: 'video/mp4', fileName: 'a.mp4' },
       duracaoSegundos: 30,
     };
-    act(() => {
+    await act(async () => {
       result.current.mutate(input);
     });
 

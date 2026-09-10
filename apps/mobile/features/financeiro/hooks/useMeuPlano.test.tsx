@@ -44,7 +44,7 @@ describe('useMeuPlano', () => {
   it('busca o plano e expõe os dados retornados', async () => {
     mockedGetMeuPlano.mockResolvedValue(planoFixture);
 
-    const { result } = renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(planoFixture);
@@ -53,7 +53,7 @@ describe('useMeuPlano', () => {
   it('não retenta quando o erro é 404 (aluno sem plano configurado)', async () => {
     mockedGetMeuPlano.mockRejectedValue(new ApiError(404, 'not found'));
 
-    const { result } = renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockedGetMeuPlano).toHaveBeenCalledTimes(1);
@@ -62,7 +62,7 @@ describe('useMeuPlano', () => {
   it('retenta uma vez quando o erro não é 404', async () => {
     mockedGetMeuPlano.mockRejectedValue(new ApiError(500, 'boom'));
 
-    const { result } = renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
+    const { result } = await renderHook(() => useMeuPlano(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(mockedGetMeuPlano).toHaveBeenCalledTimes(2);
