@@ -3,9 +3,14 @@ import type { RegistroSerieResponse, SessaoResponse } from '@amfit/shared';
 import { runDrain } from './offlineSyncEngine';
 import { execucaoService } from '../services/execucao.service';
 import * as offlineQueue from './offlineQueue';
-import type { RegistrarItem, IniciarItem } from './offlineQueue';
+import type { RegistrarItem, IniciarItem, ConcluirItem } from './offlineQueue';
 import { NetworkError, SyncAuthExpiredError, ApiError } from '@/shared/lib/api-client';
-import { sessaoKeys, sessaoIdResolutionKeys, SESSAO_ID_RESOLUTION_FALHOU } from '../hooks/query-keys';
+import {
+  sessaoKeys,
+  sessaoIdResolutionKeys,
+  SESSAO_ID_RESOLUTION_FALHOU,
+  minhasSessoesKeys,
+} from '../hooks/query-keys';
 import { treinoKeys } from '@/features/treino/hooks/query-keys';
 import { makeSessaoResponse, makeRegistroSerieResponse } from '../__fixtures__/execucao.fixtures';
 
@@ -13,6 +18,7 @@ jest.mock('../services/execucao.service', () => ({
   execucaoService: {
     registrarSerie: jest.fn(),
     iniciar: jest.fn(),
+    concluir: jest.fn(),
   },
 }));
 
@@ -29,6 +35,9 @@ const mockedRegistrarSerie = execucaoService.registrarSerie as jest.MockedFuncti
 >;
 const mockedIniciar = execucaoService.iniciar as jest.MockedFunction<
   typeof execucaoService.iniciar
+>;
+const mockedConcluir = execucaoService.concluir as jest.MockedFunction<
+  typeof execucaoService.concluir
 >;
 const mockedGetAll = offlineQueue.getAll as jest.MockedFunction<typeof offlineQueue.getAll>;
 const mockedDequeue = offlineQueue.dequeue as jest.MockedFunction<typeof offlineQueue.dequeue>;
@@ -76,6 +85,17 @@ function makeIniciarItem(overrides: Partial<IniciarItem> = {}): IniciarItem {
     type: 'iniciar_sessao',
     localSessaoId: 'local-1-abc',
     payload: { treino_id: '60000000-0000-0000-0000-000000000001' },
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+    ...overrides,
+  };
+}
+
+function makeConcluirItem(overrides: Partial<ConcluirItem> = {}): ConcluirItem {
+  return {
+    id: 'queue-concluir-1',
+    type: 'concluir_sessao',
+    sessaoRef: 'sessao-1',
     createdAt: new Date().toISOString(),
     attempts: 0,
     ...overrides,
@@ -220,23 +240,95 @@ describe('offlineSyncEngine.runDrain', () => {
     expect(mockedRewriteSessaoRef).not.toHaveBeenCalled();
   });
 
-  it('para o drain (sem desenfileirar nada) quando o item da vez é concluir_sessao (ainda não implementado)', async () => {
+  it('drena um concluir_sessao: chama o backend, grava a sessão concluída no cache e invalida treino de hoje e minhas sessões', async () => {
+    const sessaoConcluida = makeSessaoResponse({ id: 'sessao-1', status: 'CONCLUIDO' });
     const queryClient = new QueryClient();
-    mockedGetAll.mockResolvedValueOnce([
-      {
-        id: 'queue-concluir-1',
-        type: 'concluir_sessao' as const,
-        sessaoRef: 'sessao-1',
-        createdAt: new Date().toISOString(),
-        attempts: 0,
-      },
-    ]);
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const item = makeConcluirItem({ sessaoRef: 'sessao-1' });
+    mockedGetAll.mockResolvedValueOnce([item]).mockResolvedValueOnce([]);
+    mockedConcluir.mockResolvedValueOnce(sessaoConcluida);
+
+    await runDrain(queryClient);
+
+    expect(mockedConcluir).toHaveBeenCalledWith('sessao-1', { isBackgroundSync: true });
+    expect(queryClient.getQueryData(sessaoKeys.detail('sessao-1'))).toEqual(sessaoConcluida);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: treinoKeys.hoje() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: minhasSessoesKeys.all });
+    expect(mockedDequeue).toHaveBeenCalledWith(item.id);
+  });
+
+  it('para (sem desenfileirar) quando concluir_sessao falha com NetworkError', async () => {
+    const queryClient = new QueryClient();
+    const item = makeConcluirItem();
+    mockedGetAll.mockResolvedValueOnce([item]);
+    mockedConcluir.mockRejectedValue(new NetworkError());
 
     await runDrain(queryClient);
 
     expect(mockedDequeue).not.toHaveBeenCalled();
-    expect(mockedIniciar).not.toHaveBeenCalled();
-    expect(mockedRegistrarSerie).not.toHaveBeenCalled();
+  });
+
+  it('marca needsReauth (sem desenfileirar) quando concluir_sessao expira durante sync em segundo plano', async () => {
+    const queryClient = new QueryClient();
+    const item = makeConcluirItem();
+    mockedGetAll.mockResolvedValueOnce([item]);
+    mockedConcluir.mockRejectedValue(new SyncAuthExpiredError());
+
+    await runDrain(queryClient);
+
+    expect(mockedSetNeedsReauth).toHaveBeenCalledWith(true);
+    expect(mockedDequeue).not.toHaveBeenCalled();
+  });
+
+  it('descarta o concluir_sessao quando o backend recusa em definitivo, sem travar o resto da fila', async () => {
+    const queryClient = new QueryClient();
+    const item = makeConcluirItem();
+    mockedGetAll.mockResolvedValueOnce([item]).mockResolvedValueOnce([]);
+    mockedConcluir.mockRejectedValue(new ApiError(422, 'progresso insuficiente'));
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await runDrain(queryClient);
+
+    expect(mockedDequeue).toHaveBeenCalledWith(item.id);
+    warnSpy.mockRestore();
+  });
+
+  it('processa iniciar_sessao, registrar_serie e concluir_sessao em ordem FIFO na mesma drenagem', async () => {
+    // Cenário completo (Fase 3+4): sessão iniciada offline, uma série
+    // registrada e concluída, tudo antes de reconectar — confirma que os
+    // três tipos de item convivem na mesma fila e são processados na
+    // ordem certa numa única chamada de runDrain.
+    const sessaoReal = makeSessaoResponse({
+      id: '50000000-0000-0000-0000-000000000099',
+      series: [],
+    });
+    const queryClient = new QueryClient();
+
+    const iniciarItem = makeIniciarItem({ id: 'queue-1', localSessaoId: 'local-1-abc' });
+    const registrarItem = makeItem({ id: 'queue-2', sessaoRef: 'local-1-abc' });
+    const concluirItem = makeConcluirItem({ id: 'queue-3', sessaoRef: 'local-1-abc' });
+
+    mockedGetAll
+      .mockResolvedValueOnce([iniciarItem, registrarItem, concluirItem])
+      .mockResolvedValueOnce([registrarItem, concluirItem])
+      .mockResolvedValueOnce([concluirItem])
+      .mockResolvedValueOnce([]);
+    mockedIniciar.mockResolvedValueOnce(sessaoReal);
+    const registro = makeRegistroSerieResponse();
+    mockedRegistrarSerie.mockResolvedValueOnce(registro);
+    const sessaoConcluida = { ...sessaoReal, status: 'CONCLUIDO' as const };
+    mockedConcluir.mockResolvedValueOnce(sessaoConcluida);
+
+    await runDrain(queryClient);
+
+    expect(mockedIniciar).toHaveBeenCalledWith(iniciarItem.payload.treino_id, {
+      isBackgroundSync: true,
+    });
+    expect(mockedRewriteSessaoRef).toHaveBeenCalledWith('local-1-abc', sessaoReal.id);
+    expect(mockedDequeue).toHaveBeenNthCalledWith(1, 'queue-1');
+    expect(mockedDequeue).toHaveBeenNthCalledWith(2, 'queue-2');
+    expect(mockedDequeue).toHaveBeenNthCalledWith(3, 'queue-3');
   });
 
   it('para (sem desenfileirar) quando um item falha com NetworkError', async () => {

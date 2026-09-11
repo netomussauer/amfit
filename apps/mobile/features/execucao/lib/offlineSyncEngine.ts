@@ -3,10 +3,15 @@ import { onlineManager } from '@tanstack/react-query';
 import type { SessaoResponse } from '@amfit/shared';
 import { NetworkError, SyncAuthExpiredError } from '@/shared/lib/api-client';
 import { execucaoService } from '../services/execucao.service';
-import { sessaoKeys, sessaoIdResolutionKeys, SESSAO_ID_RESOLUTION_FALHOU } from '../hooks/query-keys';
+import {
+  sessaoKeys,
+  sessaoIdResolutionKeys,
+  SESSAO_ID_RESOLUTION_FALHOU,
+  minhasSessoesKeys,
+} from '../hooks/query-keys';
 import { treinoKeys } from '@/features/treino/hooks/query-keys';
 import * as offlineQueue from './offlineQueue';
-import type { RegistrarItem, IniciarItem } from './offlineQueue';
+import type { RegistrarItem, IniciarItem, ConcluirItem } from './offlineQueue';
 import { mergeSerieIntoSessao } from './mergeSerieIntoSessao';
 
 let isDraining = false;
@@ -68,9 +73,27 @@ async function processIniciarItem(queryClient: QueryClient, item: IniciarItem): 
 }
 
 /**
- * Drena a fila offline em ordem FIFO. Processa `iniciar_sessao` e
- * `registrar_serie` (Fases 2-3) — `concluir_sessao` entra na Fase 4,
- * quando também passar a ser enfileirado.
+ * Processa um `concluir_sessao` enfileirado offline (Fase 4): chama o
+ * backend (idempotente — confirmado por
+ * `TestConcluirSessao_ChamadaDuasVezes_NaoErra`), grava a sessão real no
+ * cache e replica as mesmas invalidations do `onSuccess` interativo de
+ * `useConcluirSessao`. Se `item.sessaoRef` ainda apontava pra um ID local
+ * quando este item foi enfileirado, já chega aqui reescrito pro ID real
+ * — `iniciar_sessao` sempre é processado antes na mesma fila FIFO.
+ */
+async function processConcluirItem(queryClient: QueryClient, item: ConcluirItem): Promise<void> {
+  const sessaoConcluida = await execucaoService.concluir(item.sessaoRef, {
+    isBackgroundSync: true,
+  });
+  queryClient.setQueryData(sessaoKeys.detail(item.sessaoRef), sessaoConcluida);
+  queryClient.invalidateQueries({ queryKey: treinoKeys.hoje() });
+  queryClient.invalidateQueries({ queryKey: minhasSessoesKeys.all });
+  await offlineQueue.dequeue(item.id);
+}
+
+/**
+ * Drena a fila offline em ordem FIFO. Processa `iniciar_sessao`,
+ * `registrar_serie` e `concluir_sessao` (Fases 2-4).
  *
  * Numa NetworkError (conexão caiu de novo no meio do drain), para e deixa
  * o resto na fila pra próxima tentativa. Numa ApiError de verdade (4xx/5xx
@@ -89,16 +112,11 @@ export async function runDrain(queryClient: QueryClient): Promise<void> {
       const item = items[0];
       if (!item) break;
 
-      if (item.type === 'concluir_sessao') {
-        // Ainda não implementado (Fase 4) — não deveria existir na fila
-        // ainda, mas por segurança não trava o drain nem descarta:
-        // simplesmente para aqui.
-        break;
-      }
-
       try {
         if (item.type === 'iniciar_sessao') {
           await processIniciarItem(queryClient, item);
+        } else if (item.type === 'concluir_sessao') {
+          await processConcluirItem(queryClient, item);
         } else {
           await processRegistrarItem(queryClient, item);
         }

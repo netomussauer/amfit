@@ -196,11 +196,7 @@ export default function PlayerScreen() {
     );
   }
 
-  // Concluir uma sessão ainda não sincronizada (ID local) não é suportado
-  // nesta fase do modo offline — ficaria tentando PATCH /sessoes/local-xxx
-  // e recebendo um 404 genérico. A sessão sincroniza sozinha assim que a
-  // conexão volta (ver `useSessaoIdResolution` acima).
-  const podeConcluir = progresso >= PERCENTUAL_MINIMO_CONCLUSAO && !sessaoEhLocal;
+  const podeConcluir = progresso >= PERCENTUAL_MINIMO_CONCLUSAO;
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -289,9 +285,7 @@ export default function PlayerScreen() {
           accessibilityHint={
             podeConcluir
               ? undefined
-              : sessaoEhLocal
-                ? 'Aguardando sincronizar com o servidor'
-                : `Marque pelo menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries para concluir`
+              : `Marque pelo menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries para concluir`
           }
         >
           <Text className="text-base font-semibold text-white">
@@ -299,9 +293,7 @@ export default function PlayerScreen() {
           </Text>
           {!podeConcluir && (
             <Text className="mt-0.5 text-[11px] text-white/80">
-              {sessaoEhLocal
-                ? 'Aguardando sincronizar...'
-                : `Marque ao menos ${Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries`}
+              Marque ao menos {Math.ceil(totalSeries * PERCENTUAL_MINIMO_CONCLUSAO)} séries
             </Text>
           )}
         </TouchableOpacity>

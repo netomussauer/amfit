@@ -54,10 +54,13 @@ export const execucaoService = {
     return RegistroSerieResponseSchema.parse(data);
   },
 
-  async concluir(sessaoId: string): Promise<SessaoResponse> {
+  async concluir(
+    sessaoId: string,
+    opts?: { isBackgroundSync?: boolean },
+  ): Promise<SessaoResponse> {
     const data = await apiRequest<SessaoResponse>(
       `/sessoes/${sessaoId}/concluir`,
-      { method: 'PATCH' },
+      { method: 'PATCH', isBackgroundSync: opts?.isBackgroundSync },
     );
     return SessaoResponseSchema.parse(data);
   },

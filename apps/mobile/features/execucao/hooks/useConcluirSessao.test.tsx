@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { useConcluirSessao } from './useConcluirSessao';
 import { execucaoService } from '../services/execucao.service';
 import { sessaoKeys, minhasSessoesKeys } from './query-keys';
 import { treinoKeys } from '@/features/treino/hooks/query-keys';
+import { NetworkError } from '@/shared/lib/api-client';
+import * as offlineQueue from '../lib/offlineQueue';
+import { runDrain } from '../lib/offlineSyncEngine';
 import { makeSessaoResponse } from '../__fixtures__/execucao.fixtures';
 
 jest.mock('../services/execucao.service', () => ({
@@ -13,9 +16,19 @@ jest.mock('../services/execucao.service', () => ({
   },
 }));
 
+jest.mock('../lib/offlineQueue', () => ({
+  enqueue: jest.fn(),
+}));
+
+jest.mock('../lib/offlineSyncEngine', () => ({
+  runDrain: jest.fn(),
+}));
+
 const mockedConcluir = execucaoService.concluir as jest.MockedFunction<
   typeof execucaoService.concluir
 >;
+const mockedEnqueue = offlineQueue.enqueue as jest.MockedFunction<typeof offlineQueue.enqueue>;
+const mockedRunDrain = runDrain as jest.MockedFunction<typeof runDrain>;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -42,6 +55,9 @@ function createWrapper() {
 describe('useConcluirSessao', () => {
   beforeEach(() => {
     mockedConcluir.mockReset();
+    mockedEnqueue.mockReset();
+    mockedRunDrain.mockReset();
+    onlineManager.setOnline(true);
   });
 
   it('chama o service com o sessaoId informado', async () => {
@@ -103,5 +119,104 @@ describe('useConcluirSessao', () => {
     // Assert
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBe(error);
+  });
+
+  it('enfileira e resolve com uma sessão otimista CONCLUIDO quando offline', async () => {
+    // Arrange
+    onlineManager.setOnline(false);
+    const sessao = makeSessaoResponse({ series: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(sessaoKeys.detail(sessao.id), sessao);
+    mockedEnqueue.mockResolvedValue({
+      id: 'queue-1',
+      type: 'concluir_sessao',
+      sessaoRef: sessao.id,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    const { result } = await renderHook(() => useConcluirSessao(sessao.id), {
+      wrapper: Wrapper,
+    });
+
+    // Act
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedConcluir).not.toHaveBeenCalled();
+    expect(mockedEnqueue).toHaveBeenCalledWith({
+      type: 'concluir_sessao',
+      sessaoRef: sessao.id,
+    });
+    expect(mockedRunDrain).toHaveBeenCalled();
+    expect(result.current.data).toMatchObject({ status: 'CONCLUIDO' });
+    expect(result.current.data?.concluido_em).toEqual(expect.any(String));
+    const cacheFinal = queryClient.getQueryData<ReturnType<typeof makeSessaoResponse>>(
+      sessaoKeys.detail(sessao.id),
+    );
+    expect(cacheFinal?.status).toBe('CONCLUIDO');
+  });
+
+  it('enfileira direto (sem tentar o service) mesmo online, quando a sessão ainda tem ID local não sincronizado', async () => {
+    // Arrange — um ID local nunca existe no servidor, mesmo estando
+    // online agora: a sessão em si (iniciada offline) ainda não
+    // sincronizou. Tentar a chamada real daria um 404 genérico contra
+    // /sessoes/local-xxx/concluir em vez de enfileirar.
+    onlineManager.setOnline(true);
+    const sessaoLocal = makeSessaoResponse({ id: 'local-1234567890-abc123', series: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(sessaoKeys.detail(sessaoLocal.id), sessaoLocal);
+    mockedEnqueue.mockResolvedValue({
+      id: 'queue-1',
+      type: 'concluir_sessao',
+      sessaoRef: sessaoLocal.id,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    const { result } = await renderHook(() => useConcluirSessao(sessaoLocal.id), {
+      wrapper: Wrapper,
+    });
+
+    // Act
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedConcluir).not.toHaveBeenCalled();
+    expect(mockedEnqueue).toHaveBeenCalledWith({
+      type: 'concluir_sessao',
+      sessaoRef: sessaoLocal.id,
+    });
+  });
+
+  it('enfileira e resolve como sucesso quando o service falha com NetworkError', async () => {
+    // Arrange — conexão caiu no meio da chamada, não um erro de negócio.
+    const sessao = makeSessaoResponse({ series: [] });
+    mockedConcluir.mockRejectedValue(new NetworkError());
+    mockedEnqueue.mockResolvedValue({
+      id: 'queue-1',
+      type: 'concluir_sessao',
+      sessaoRef: sessao.id,
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(sessaoKeys.detail(sessao.id), sessao);
+    const { result } = await renderHook(() => useConcluirSessao(sessao.id), {
+      wrapper: Wrapper,
+    });
+
+    // Act
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    // Assert — sucesso, não cai no isError
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedEnqueue).toHaveBeenCalledTimes(1);
   });
 });

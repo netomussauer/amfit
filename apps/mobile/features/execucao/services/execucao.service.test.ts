@@ -151,6 +151,21 @@ describe('execucaoService.concluir', () => {
     });
     expect(result).toEqual(sessao);
   });
+
+  it('repassa isBackgroundSync ao apiRequest quando informado', async () => {
+    // Arrange
+    const sessao = makeSessaoResponse({ status: 'CONCLUIDO' });
+    mockedApiRequest.mockResolvedValue(sessao);
+
+    // Act
+    await execucaoService.concluir(sessao.id, { isBackgroundSync: true });
+
+    // Assert
+    expect(mockedApiRequest).toHaveBeenCalledWith(`/sessoes/${sessao.id}/concluir`, {
+      method: 'PATCH',
+      isBackgroundSync: true,
+    });
+  });
 });
 
 describe('execucaoService.listarMinhasSessoes', () => {
