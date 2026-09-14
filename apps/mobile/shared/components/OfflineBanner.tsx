@@ -2,12 +2,7 @@ import { Text, View } from 'react-native';
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
 import { usePendingSyncCount } from '@/features/execucao/hooks/usePendingSyncCount';
 import { useNeedsReauth } from '@/features/execucao/hooks/useNeedsReauth';
-
-function acoes(count: number, adjetivo?: { singular: string; plural: string }): string {
-  const substantivo = count === 1 ? 'ação' : 'ações';
-  const sufixo = adjetivo ? ` ${count === 1 ? adjetivo.singular : adjetivo.plural}` : '';
-  return `${count} ${substantivo}${sufixo}`;
-}
+import { pluralizar } from '@/shared/lib/pluralize';
 
 /**
  * Aviso discreto de "você está offline" + contagem de ações pendentes de
@@ -27,12 +22,12 @@ export function OfflineBanner() {
   // conexão volta; essa exige o aluno logar de novo).
   const mensagem =
     needsReauth && pendingCount > 0
-      ? `Entre novamente para sincronizar ${acoes(pendingCount)}`
+      ? `Entre novamente para sincronizar ${pendingCount} ${pluralizar(pendingCount, 'ação', 'ações')}`
       : !isOnline
         ? pendingCount > 0
-          ? `Você está offline · ${acoes(pendingCount, { singular: 'pendente', plural: 'pendentes' })}`
+          ? `Você está offline · ${pendingCount} ${pluralizar(pendingCount, 'ação pendente', 'ações pendentes')}`
           : 'Você está offline'
-        : `Sincronizando ${acoes(pendingCount)}...`;
+        : `Sincronizando ${pendingCount} ${pluralizar(pendingCount, 'ação', 'ações')}...`;
 
   return (
     <View

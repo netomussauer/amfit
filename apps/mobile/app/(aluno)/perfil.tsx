@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Film, Wallet } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronRight, Film, RefreshCw, Wallet } from 'lucide-react-native';
 import { useLogout } from '@/features/auth/hooks/useLogout';
 import { useAlunoMe } from '@/features/perfil/hooks/useAlunoMe';
+import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
+import { usePendingSyncCount } from '@/features/execucao/hooks/usePendingSyncCount';
+import { useNeedsReauth } from '@/features/execucao/hooks/useNeedsReauth';
+import { runDrain } from '@/features/execucao/lib/offlineSyncEngine';
+import { pluralizar } from '@/shared/lib/pluralize';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
@@ -30,13 +37,78 @@ function ProfileSkeleton() {
   );
 }
 
+type SincronizacaoPendenteCardProps = {
+  pendingCount: number;
+  needsReauth: boolean;
+  isOnline: boolean;
+  isSyncing: boolean;
+  onSincronizar: () => void;
+};
+
+function SincronizacaoPendenteCard({
+  pendingCount,
+  needsReauth,
+  isOnline,
+  isSyncing,
+  onSincronizar,
+}: SincronizacaoPendenteCardProps) {
+  if (pendingCount === 0) return null;
+
+  // Mesma prioridade de mensagem do OfflineBanner: needsReauth é a única
+  // pendência acionável por aqui (as outras se resolvem sozinhas quando a
+  // conexão volta).
+  const hint = needsReauth
+    ? 'Entre novamente para sincronizar'
+    : !isOnline
+      ? 'Aguardando conexão'
+      : null;
+  const podeSincronizar = isOnline && !needsReauth && !isSyncing;
+
+  return (
+    <View className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <Text className="text-sm font-medium text-amber-800">
+        {pendingCount} {pluralizar(pendingCount, 'ação pendente', 'ações pendentes')} de
+        sincronizar
+      </Text>
+      {hint && <Text className="mt-1 text-xs text-amber-700">{hint}</Text>}
+      <TouchableOpacity
+        onPress={onSincronizar}
+        disabled={!podeSincronizar}
+        className="mt-3 flex-row items-center justify-center gap-2 self-start rounded-lg bg-amber-600 px-4 py-2 disabled:opacity-50"
+        accessibilityRole="button"
+        accessibilityLabel="Sincronizar agora"
+        accessibilityState={{ disabled: !podeSincronizar, busy: isSyncing }}
+      >
+        <RefreshCw color="#fff" size={14} />
+        <Text className="text-sm font-medium text-white">
+          {isSyncing ? 'Sincronizando...' : 'Sincronizar agora'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function PerfilScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { mutate: doLogout, isPending: isLoggingOut } = useLogout();
   const { data: aluno, isLoading, isError, refetch } = useAlunoMe();
+  const pendingCount = usePendingSyncCount();
+  const needsReauth = useNeedsReauth();
+  const isOnline = useOnlineStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   function handleLogout() {
     doLogout();
+  }
+
+  async function handleSincronizar() {
+    setIsSyncing(true);
+    try {
+      await runDrain(queryClient);
+    } finally {
+      setIsSyncing(false);
+    }
   }
 
   return (
@@ -48,6 +120,14 @@ export default function PerfilScreen() {
       <Text className="mt-1 text-sm text-gray-500">
         Suas informações pessoais.
       </Text>
+
+      <SincronizacaoPendenteCard
+        pendingCount={pendingCount}
+        needsReauth={needsReauth}
+        isOnline={isOnline}
+        isSyncing={isSyncing}
+        onSincronizar={handleSincronizar}
+      />
 
       {isLoading && <ProfileSkeleton />}
 
