@@ -100,9 +100,20 @@ async function processConcluirItem(queryClient: QueryClient, item: ConcluirItem)
  * definitivo), descarta o item com aviso — sem reconciliação de conflito
  * nesta v1 (as mutations offline são, por desenho, quase sempre válidas;
  * validação client-side já cobre os casos de negócio comuns).
+ *
+ * Se `needsReauth` já está marcado (uma tentativa anterior bateu num 401
+ * que nem o refresh token resolveu), nem tenta — sem isso, toda
+ * reconexão/novo item enfileirado dispara `runDrain` de novo (já é o
+ * comportamento existente) e cada uma dessas chamadas gastaria uma
+ * tentativa contra um refresh token que já sabemos estar morto, até o
+ * aluno logar de novo (`useLogin` limpa a flag e retoma a fila).
  */
 export async function runDrain(queryClient: QueryClient): Promise<void> {
-  if (isDraining || !onlineManager.isOnline()) return;
+  // getSnapshotNeedsReauth() (não getNeedsReauth()) de propósito — é o
+  // mesmo cache síncrono já mantido em dia a cada escrita da fila (usado
+  // por useNeedsReauth), então não vale a pena um round-trip a mais no
+  // AsyncStorage só pra reler o que o cache já reflete corretamente.
+  if (isDraining || !onlineManager.isOnline() || offlineQueue.getSnapshotNeedsReauth()) return;
   isDraining = true;
 
   try {

@@ -103,6 +103,36 @@ describe('apiRequest', () => {
     expect(onAuthFailed).not.toHaveBeenCalled();
   });
 
+  it('401 fora de /auth/ quando o refresh falha por falta de conexão lança NetworkError (não sessão expirada)', async () => {
+    // Uma instabilidade de rede bem no meio do refresh não significa que
+    // o token esteja realmente inválido — não deve derrubar a sessão nem
+    // (em background sync) marcar "precisa logar de novo".
+    const onAuthFailed = jest.fn();
+    setAuthFailedHandler(onAuthFailed);
+    mockedAuth.getRefreshToken.mockResolvedValue('refresh-token');
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonResponse(401, 'expirado'))
+      .mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const error = await apiRequest('/sessoes/abc').catch((e) => e);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(mockedAuth.clearAll).not.toHaveBeenCalled();
+    expect(onAuthFailed).not.toHaveBeenCalled();
+  });
+
+  it('401 fora de /auth/ com isBackgroundSync quando o refresh falha por falta de conexão lança NetworkError (não SyncAuthExpiredError)', async () => {
+    mockedAuth.getRefreshToken.mockResolvedValue('refresh-token');
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonResponse(401, 'expirado'))
+      .mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const error = await apiRequest('/sessoes/abc', { isBackgroundSync: true }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(error).not.toBeInstanceOf(SyncAuthExpiredError);
+  });
+
   it('401 seguido de refresh bem-sucedido reexecuta a request uma vez e retorna o resultado', async () => {
     mockedAuth.getRefreshToken.mockResolvedValue('refresh-token');
     (global.fetch as jest.Mock)

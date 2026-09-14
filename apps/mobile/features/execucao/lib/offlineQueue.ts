@@ -67,13 +67,22 @@ async function readEnvelope(): Promise<QueueEnvelope> {
 // incorretamente "0" até a próxima mutação, escondendo pendências reais
 // de um cold start offline.
 let cachedCount = 0;
+let cachedNeedsReauth = false;
 void readEnvelope().then((envelope) => {
   cachedCount = envelope.items.length;
+  cachedNeedsReauth = envelope.needsReauth;
   notifyListeners();
 });
 
 export function getSnapshotCount(): number {
   return cachedCount;
+}
+
+/** Snapshot síncrono de `needsReauth` — mesmo motivo de `getSnapshotCount`
+ * (useSyncExternalStore, usado por `useNeedsReauth`, exige um getSnapshot
+ * síncrono). */
+export function getSnapshotNeedsReauth(): boolean {
+  return cachedNeedsReauth;
 }
 
 type Listener = () => void;
@@ -86,6 +95,7 @@ function notifyListeners(): void {
 async function writeEnvelope(envelope: QueueEnvelope): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
   cachedCount = envelope.items.length;
+  cachedNeedsReauth = envelope.needsReauth;
   notifyListeners();
 }
 
@@ -107,9 +117,9 @@ function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-/** Pub/sub simples pra usePendingSyncCount via useSyncExternalStore — não
- * depende do MutationCache do React Query de propósito (ver decisão de
- * arquitetura no plano do modo offline). */
+/** Pub/sub simples pra usePendingSyncCount/useNeedsReauth via
+ * useSyncExternalStore — não depende do MutationCache do React Query de
+ * propósito (ver decisão de arquitetura no plano do modo offline). */
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
   return () => {

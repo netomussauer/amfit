@@ -1,4 +1,5 @@
 import { QueryClient, onlineManager } from '@tanstack/react-query';
+import { waitFor } from '@testing-library/react-native';
 import type { RegistroSerieResponse, SessaoResponse } from '@amfit/shared';
 import { runDrain } from './offlineSyncEngine';
 import { execucaoService } from '../services/execucao.service';
@@ -27,6 +28,7 @@ jest.mock('./offlineQueue', () => ({
   dequeue: jest.fn(),
   updateItem: jest.fn(),
   setNeedsReauth: jest.fn(),
+  getSnapshotNeedsReauth: jest.fn(),
   rewriteSessaoRef: jest.fn(),
 }));
 
@@ -46,6 +48,9 @@ const mockedUpdateItem = offlineQueue.updateItem as jest.MockedFunction<
 >;
 const mockedSetNeedsReauth = offlineQueue.setNeedsReauth as jest.MockedFunction<
   typeof offlineQueue.setNeedsReauth
+>;
+const mockedGetSnapshotNeedsReauth = offlineQueue.getSnapshotNeedsReauth as jest.MockedFunction<
+  typeof offlineQueue.getSnapshotNeedsReauth
 >;
 const mockedRewriteSessaoRef = offlineQueue.rewriteSessaoRef as jest.MockedFunction<
   typeof offlineQueue.rewriteSessaoRef
@@ -106,10 +111,23 @@ describe('offlineSyncEngine.runDrain', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     onlineManager.setOnline(true);
+    mockedGetSnapshotNeedsReauth.mockReturnValue(false);
   });
 
   it('não faz nada quando está offline', async () => {
     onlineManager.setOnline(false);
+    const queryClient = new QueryClient();
+
+    await runDrain(queryClient);
+
+    expect(mockedGetAll).not.toHaveBeenCalled();
+  });
+
+  it('não tenta nada quando needsReauth já está marcado', async () => {
+    // Sem isso, cada reconexão/novo item enfileirado bateria de novo
+    // contra um refresh token que já sabemos estar morto, até o aluno
+    // logar de novo.
+    mockedGetSnapshotNeedsReauth.mockReturnValue(true);
     const queryClient = new QueryClient();
 
     await runDrain(queryClient);
@@ -384,7 +402,7 @@ describe('offlineSyncEngine.runDrain', () => {
     const first = runDrain(queryClient);
     await runDrain(queryClient);
 
-    expect(mockedRegistrarSerie).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockedRegistrarSerie).toHaveBeenCalledTimes(1));
 
     resolve(makeRegistroSerieResponse());
     await first;

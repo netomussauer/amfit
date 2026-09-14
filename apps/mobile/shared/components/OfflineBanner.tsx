@@ -1,6 +1,13 @@
 import { Text, View } from 'react-native';
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
 import { usePendingSyncCount } from '@/features/execucao/hooks/usePendingSyncCount';
+import { useNeedsReauth } from '@/features/execucao/hooks/useNeedsReauth';
+
+function acoes(count: number, adjetivo?: { singular: string; plural: string }): string {
+  const substantivo = count === 1 ? 'ação' : 'ações';
+  const sufixo = adjetivo ? ` ${count === 1 ? adjetivo.singular : adjetivo.plural}` : '';
+  return `${count} ${substantivo}${sufixo}`;
+}
 
 /**
  * Aviso discreto de "você está offline" + contagem de ações pendentes de
@@ -11,14 +18,21 @@ import { usePendingSyncCount } from '@/features/execucao/hooks/usePendingSyncCou
 export function OfflineBanner() {
   const isOnline = useOnlineStatus();
   const pendingCount = usePendingSyncCount();
+  const needsReauth = useNeedsReauth();
 
   if (isOnline && pendingCount === 0) return null;
 
-  const mensagem = !isOnline
-    ? pendingCount > 0
-      ? `Você está offline · ${pendingCount} ${pendingCount === 1 ? 'ação pendente' : 'ações pendentes'}`
-      : 'Você está offline'
-    : `Sincronizando ${pendingCount} ${pendingCount === 1 ? 'ação' : 'ações'}...`;
+  // needsReauth tem prioridade sobre online/offline/sincronizando — é a
+  // única mensagem acionável (as outras se resolvem sozinhas quando a
+  // conexão volta; essa exige o aluno logar de novo).
+  const mensagem =
+    needsReauth && pendingCount > 0
+      ? `Entre novamente para sincronizar ${acoes(pendingCount)}`
+      : !isOnline
+        ? pendingCount > 0
+          ? `Você está offline · ${acoes(pendingCount, { singular: 'pendente', plural: 'pendentes' })}`
+          : 'Você está offline'
+        : `Sincronizando ${acoes(pendingCount)}...`;
 
   return (
     <View

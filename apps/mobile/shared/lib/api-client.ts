@@ -88,32 +88,45 @@ export function setAuthFailedHandler(handler: (() => void) | null): void {
   onAuthFailed = handler;
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+type RefreshOutcome = 'refreshed' | 'invalid' | 'network-error';
 
-async function performRefresh(): Promise<boolean> {
+let refreshPromise: Promise<RefreshOutcome> | null = null;
+
+async function performRefresh(): Promise<RefreshOutcome> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
     try {
       const refreshToken = await getRefreshToken();
-      if (!refreshToken) return false;
+      if (!refreshToken) return 'invalid';
 
-      const response = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
+      // Só a chamada de fetch() em si distingue "sem conectividade" de
+      // "token realmente inválido" — sem essa distinção (o código antigo
+      // tratava as duas igual, como falha de refresh), uma instabilidade
+      // de rede bem no meio de um refresh seria lida como sessão
+      // expirada de verdade: derrubaria a sessão no fluxo interativo
+      // (clearAll + logout por causa de um soluço de conexão) e, desde a
+      // Fase 5 do modo offline, travaria a fila de sync pra sempre (fica
+      // marcada "precisa logar de novo" mesmo com credenciais válidas).
+      let response: Response;
+      try {
+        response = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+      } catch {
+        return 'network-error';
+      }
 
-      if (!response.ok) return false;
+      if (!response.ok) return 'invalid';
 
       const data = (await response.json()) as RefreshResponse;
       await setAccessToken(data.access_token);
       if (data.refresh_token) {
         await setRefreshToken(data.refresh_token);
       }
-      return true;
-    } catch {
-      return false;
+      return 'refreshed';
     } finally {
       refreshPromise = null;
     }
@@ -189,9 +202,17 @@ export async function apiRequest<T>(
     }
 
     if (!_retry) {
-      const refreshed = await performRefresh();
-      if (refreshed) {
+      const refreshResult = await performRefresh();
+      if (refreshResult === 'refreshed') {
         return apiRequest<T>(path, { ...options, _retry: true });
+      }
+      if (refreshResult === 'network-error') {
+        // Não conseguimos nem tentar o refresh (sem conectividade) — não
+        // é sessão expirada de verdade, é falta de conexão. Não faz
+        // sentido derrubar a sessão (fluxo interativo) nem marcar
+        // "precisa logar de novo" (sync em segundo plano) por causa
+        // disso; quem chamou já sabe lidar com NetworkError.
+        throw new NetworkError();
       }
     }
 

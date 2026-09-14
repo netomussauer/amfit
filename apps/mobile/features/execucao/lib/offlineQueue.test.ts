@@ -176,6 +176,22 @@ describe('offlineQueue', () => {
     unsubscribe();
   });
 
+  it('getSnapshotNeedsReauth reflete setNeedsReauth e notifica os inscritos', async () => {
+    expect(offlineQueue.getSnapshotNeedsReauth()).toBe(false);
+    const listener = jest.fn();
+    const unsubscribe = offlineQueue.subscribe(listener);
+
+    await offlineQueue.setNeedsReauth(true);
+
+    expect(offlineQueue.getSnapshotNeedsReauth()).toBe(true);
+    expect(listener).toHaveBeenCalled();
+
+    await offlineQueue.setNeedsReauth(false);
+
+    expect(offlineQueue.getSnapshotNeedsReauth()).toBe(false);
+    unsubscribe();
+  });
+
   it('serializa operações concorrentes de leitura-modificação-escrita, sem perder nenhuma', async () => {
     // Sem serialização, três `enqueue` disparados ao mesmo tempo leriam o
     // envelope quase simultaneamente (get, get, get) antes de qualquer
