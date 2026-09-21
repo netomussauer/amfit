@@ -5,6 +5,7 @@ import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import { useLogout } from './useLogout';
 import { clearAll } from '@/shared/lib/auth';
 import { pluralizar } from '@/shared/lib/pluralize';
+import { limparCache } from '@/shared/lib/query-persist';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 
 /**
@@ -35,8 +36,8 @@ export function useConfirmarLogout() {
   // precisa reautenticar e não quer perder o que ainda não sincronizou.
   // useLogin limpa needsReauth e retoma a fila no próximo login.
   async function reautenticar() {
+    await limparCache(queryClient);
     await clearAll();
-    queryClient.clear();
     router.replace('/(auth)/login');
   }
 

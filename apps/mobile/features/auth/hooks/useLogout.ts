@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { apiRequest } from '@/shared/lib/api-client';
 import { clearAll, getRefreshToken } from '@/shared/lib/auth';
+import { limparCache } from '@/shared/lib/query-persist';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 
 export function useLogout() {
@@ -27,8 +28,12 @@ export function useLogout() {
       // por um usuário poderia ser sincronizada depois na sessão de outro
       // usuário no mesmo aparelho.
       await offlineQueue.clear();
+      // Cache (memória + disco) ANTES dos tokens: se o processo morrer
+      // entre os dois passos, é melhor sobrar um login ainda válido (sem
+      // cache, só refaz as buscas) do que sobrar o cache do usuário
+      // anterior sem ninguém logado.
+      await limparCache(queryClient);
       await clearAll();
-      queryClient.clear();
       router.replace('/(auth)/login');
     },
   });

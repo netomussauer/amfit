@@ -2,13 +2,18 @@ import '../global.css';
 
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ROLES } from '@amfit/shared';
 import { setAuthFailedHandler } from '@/shared/lib/api-client';
 import { clearAll, getAccessToken, parseJwt } from '@/shared/lib/auth';
 import { queryClient } from '@/shared/lib/query-client';
+import {
+  descartarTreinoHojeVencido,
+  limparCache,
+  persistOptions,
+} from '@/shared/lib/query-persist';
 import { configureOfflineSync } from '@/shared/lib/offline-sync';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
 import { configurarNotificationHandler } from '@/features/notificacoes';
@@ -27,10 +32,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setAuthFailedHandler(() => {
-      void clearAll().finally(() => {
-        queryClient.clear();
-        router.replace('/(auth)/login');
-      });
+      // Memória + disco juntos: sem apagar o cache em disco, o próximo
+      // login neste aparelho veria treino/ficha da sessão que acabou de
+      // cair, mesmo offline.
+      void limparCache(queryClient)
+        .then(() => clearAll())
+        .finally(() => {
+          router.replace('/(auth)/login');
+        });
     });
 
     return () => {
@@ -95,13 +104,17 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={persistOptions}
+        onSuccess={() => descartarTreinoHojeVencido(queryClient)}
+      >
         <ThemeProvider>
           <AuthGuard>
             <Stack screenOptions={{ headerShown: false }} />
           </AuthGuard>
         </ThemeProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </SafeAreaProvider>
   );
 }

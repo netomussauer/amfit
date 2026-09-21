@@ -5,6 +5,7 @@ import { renderHook, act } from '@testing-library/react-native';
 import { useConfirmarLogout } from './useConfirmarLogout';
 import { useLogout } from './useLogout';
 import { clearAll } from '@/shared/lib/auth';
+import { limparCache } from '@/shared/lib/query-persist';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 
 // Factory (não automock): o automock carregaria o módulo real só pra
@@ -12,6 +13,7 @@ import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 // no jest).
 jest.mock('./useLogout', () => ({ useLogout: jest.fn() }));
 jest.mock('@/shared/lib/auth', () => ({ clearAll: jest.fn() }));
+jest.mock('@/shared/lib/query-persist', () => ({ limparCache: jest.fn() }));
 jest.mock('@/features/execucao/lib/offlineQueue', () => ({
   getPendingCount: jest.fn(),
   getNeedsReauth: jest.fn(),
@@ -24,6 +26,7 @@ jest.mock('expo-router', () => ({
 
 const mockUseLogout = useLogout as jest.Mock;
 const mockedClearAll = clearAll as jest.Mock;
+const mockedLimparCache = limparCache as jest.Mock;
 const mockedGetPendingCount = offlineQueue.getPendingCount as jest.Mock;
 const mockedGetNeedsReauth = offlineQueue.getNeedsReauth as jest.Mock;
 
@@ -56,6 +59,12 @@ describe('useConfirmarLogout', () => {
     doLogout.mockReset();
     mockedReplace.mockReset();
     mockedClearAll.mockReset();
+    // O helper real também esvazia o cache em memória — o mock mantém esse
+    // efeito, pra o teste continuar observando o `queryClient.clear()`.
+    mockedLimparCache.mockReset();
+    mockedLimparCache.mockImplementation(async (client: QueryClient) => {
+      client.clear();
+    });
     mockUseLogout.mockReturnValue({ mutate: doLogout, isPending: false });
     mockedGetPendingCount.mockResolvedValue(0);
     mockedGetNeedsReauth.mockResolvedValue(false);
@@ -222,6 +231,9 @@ describe('useConfirmarLogout', () => {
 
       expect(mockedClearAll).toHaveBeenCalledTimes(1);
       expect(clearSpy).toHaveBeenCalled();
+      // Cache em disco também: senão o próximo login neste aparelho veria
+      // treino/ficha da sessão que acabou de expirar, mesmo offline.
+      expect(mockedLimparCache).toHaveBeenCalledWith(queryClient);
       expect(mockedReplace).toHaveBeenCalledWith('/(auth)/login');
       expect(doLogout).not.toHaveBeenCalled();
     });

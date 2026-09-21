@@ -8,7 +8,12 @@ import { registrarPushTokenExpo } from '@/features/notificacoes';
 import { requestThemeRefresh } from '@/features/tenant';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 import { runDrain } from '@/features/execucao/lib/offlineSyncEngine';
+import { limparCache } from '@/shared/lib/query-persist';
 import { makeAuthResponse, makeLoginRequest } from '../__fixtures__/auth.fixtures';
+
+jest.mock('@/shared/lib/query-persist', () => ({
+  limparCache: jest.fn(),
+}));
 
 jest.mock('@/shared/lib/api-client', () => ({
   apiRequest: jest.fn(),
@@ -50,6 +55,7 @@ const mockedSetNeedsReauth = offlineQueue.setNeedsReauth as jest.MockedFunction<
   typeof offlineQueue.setNeedsReauth
 >;
 const mockedRunDrain = runDrain as jest.MockedFunction<typeof runDrain>;
+const mockedLimparCache = limparCache as jest.MockedFunction<typeof limparCache>;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -72,6 +78,7 @@ describe('useLogin', () => {
     mockedRequestThemeRefresh.mockReset();
     mockedSetNeedsReauth.mockReset();
     mockedRunDrain.mockReset();
+    mockedLimparCache.mockReset();
   });
 
   it('chama POST /auth/login com as credenciais informadas', async () => {
@@ -162,6 +169,33 @@ describe('useLogin', () => {
     expect(mockedRequestThemeRefresh).not.toHaveBeenCalled();
     expect(mockedSetNeedsReauth).not.toHaveBeenCalled();
     expect(mockedRunDrain).not.toHaveBeenCalled();
+    // Credencial recusada: nada de limpar o cache de uma sessão que segue válida.
+    expect(mockedLimparCache).not.toHaveBeenCalled();
+  });
+
+  it('limpa o cache (memória + disco) ANTES de gravar os tokens do novo login', async () => {
+    // Arrange — se o encerramento da sessão anterior falhou no meio, o
+    // cache persistido do usuário anterior ainda estaria no aparelho e o
+    // novo usuário o veria offline; o login é o ponto que garante a troca.
+    const ordem: string[] = [];
+    mockedLimparCache.mockImplementation(async () => {
+      ordem.push('limpar-cache');
+    });
+    mockedSetAccessToken.mockImplementation(async () => {
+      ordem.push('gravar-token');
+    });
+    mockedApiRequest.mockResolvedValue(makeAuthResponse());
+    const { result } = await renderHook(() => useLogin(), { wrapper: createWrapper() });
+
+    // Act
+    await act(async () => {
+      result.current.mutate(makeLoginRequest());
+    });
+
+    // Assert
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLimparCache).toHaveBeenCalledTimes(1);
+    expect(ordem).toEqual(['limpar-cache', 'gravar-token']);
   });
 
   it('limpa needsReauth e retoma a fila offline após login bem-sucedido', async () => {

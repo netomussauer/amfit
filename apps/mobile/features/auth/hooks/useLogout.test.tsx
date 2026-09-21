@@ -5,9 +5,14 @@ import { useLogout } from './useLogout';
 import { apiRequest } from '@/shared/lib/api-client';
 import { clearAll, getRefreshToken } from '@/shared/lib/auth';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
+import { limparCache } from '@/shared/lib/query-persist';
 
 jest.mock('@/shared/lib/api-client', () => ({
   apiRequest: jest.fn(),
+}));
+
+jest.mock('@/shared/lib/query-persist', () => ({
+  limparCache: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/auth', () => ({
@@ -30,6 +35,7 @@ const mockedGetRefreshToken = getRefreshToken as jest.MockedFunction<
   typeof getRefreshToken
 >;
 const mockedClearQueue = offlineQueue.clear as jest.MockedFunction<typeof offlineQueue.clear>;
+const mockedLimparCache = limparCache as jest.MockedFunction<typeof limparCache>;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -50,6 +56,12 @@ describe('useLogout', () => {
     mockedGetRefreshToken.mockReset();
     mockedReplace.mockReset();
     mockedClearQueue.mockReset();
+    // O helper real também esvazia o cache em memória — o mock mantém esse
+    // efeito, pra os testes continuarem observando o `queryClient.clear()`.
+    mockedLimparCache.mockReset();
+    mockedLimparCache.mockImplementation(async (queryClient) => {
+      queryClient.clear();
+    });
   });
 
   it('chama POST /auth/logout com o refresh_token quando existente', async () => {
@@ -123,5 +135,43 @@ describe('useLogout', () => {
     // Assert
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedClearQueue).toHaveBeenCalled();
+  });
+
+  it('apaga o cache (memória + disco) ANTES dos tokens, e só então volta pro login', async () => {
+    // Arrange — sem apagar o disco, o próximo login neste aparelho veria
+    // treino/ficha do usuário anterior mesmo offline (Fase 6). A ordem
+    // importa: se o processo morrer entre os passos, é melhor sobrar um
+    // login válido sem cache do que o cache do usuário anterior sem
+    // ninguém logado.
+    mockedGetRefreshToken.mockResolvedValue('refresh-token-atual');
+    mockedApiRequest.mockResolvedValue(undefined);
+    const ordem: string[] = [];
+    mockedLimparCache.mockImplementation(async (queryClient) => {
+      queryClient.clear();
+      ordem.push('limpar-cache');
+    });
+    mockedClearAll.mockImplementation(async () => {
+      ordem.push('limpar-tokens');
+    });
+    mockedReplace.mockImplementation(() => {
+      ordem.push('redirect');
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    const clearSpy = jest.spyOn(queryClient, 'clear');
+    const { result } = await renderHook(() => useLogout(), { wrapper: Wrapper });
+
+    // Act
+    await act(async () => {
+      result.current.mutate();
+    });
+
+    // Assert — o redirect acontece dentro do onSettled, antes do estado
+    // final da mutation ser publicado; esperar o isSuccess evita o teste
+    // terminar com uma atualização de estado ainda pendente fora do act().
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedLimparCache).toHaveBeenCalledWith(queryClient);
+    expect(clearSpy).toHaveBeenCalled();
+    expect(ordem).toEqual(['limpar-cache', 'limpar-tokens', 'redirect']);
+    expect(mockedReplace).toHaveBeenCalledWith('/(auth)/login');
   });
 });
