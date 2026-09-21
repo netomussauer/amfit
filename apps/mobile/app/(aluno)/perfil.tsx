@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Film, RefreshCw, Wallet } from 'lucide-react-native';
-import { useLogout } from '@/features/auth/hooks/useLogout';
+import { useConfirmarLogout } from '@/features/auth/hooks/useConfirmarLogout';
 import { useAlunoMe } from '@/features/perfil/hooks/useAlunoMe';
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus';
 import { usePendingSyncCount } from '@/features/execucao/hooks/usePendingSyncCount';
@@ -91,16 +91,12 @@ function SincronizacaoPendenteCard({
 export default function PerfilScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { mutate: doLogout, isPending: isLoggingOut } = useLogout();
+  const { logout, isLoggingOut } = useConfirmarLogout();
   const { data: aluno, isLoading, isError, refetch } = useAlunoMe();
   const pendingCount = usePendingSyncCount();
   const needsReauth = useNeedsReauth();
   const isOnline = useOnlineStatus();
   const [isSyncing, setIsSyncing] = useState(false);
-
-  function handleLogout() {
-    doLogout();
-  }
 
   async function handleSincronizar() {
     setIsSyncing(true);
@@ -197,7 +193,7 @@ export default function PerfilScreen() {
       <View className="mt-auto pt-8">
         <TouchableOpacity
           className="items-center rounded-lg border border-red-200 bg-red-50 py-3 disabled:opacity-50"
-          onPress={handleLogout}
+          onPress={logout}
           disabled={isLoggingOut}
           accessibilityRole="button"
           accessibilityLabel="Sair da conta"
