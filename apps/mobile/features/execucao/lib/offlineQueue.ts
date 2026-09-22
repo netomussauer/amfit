@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RegistrarSerieRequest } from '@amfit/shared';
+import { getCurrentUser } from '@/shared/lib/auth';
 
 const STORAGE_KEY = 'execucao_offline_queue';
 
@@ -35,9 +36,20 @@ export type OfflineQueueItem = IniciarItem | RegistrarItem | ConcluirItem;
 type QueueEnvelope = {
   items: OfflineQueueItem[];
   needsReauth: boolean;
+  /** `sub` do JWT do usuário dono da fila — ver `garantirDonoAtual`. */
+  ownerId: string | null;
 };
 
-const EMPTY_ENVELOPE: QueueEnvelope = { items: [], needsReauth: false };
+// Fábrica, não uma constante compartilhada: um envelope "vazio" precisa de
+// um array `items` NOVO a cada chamada. Um objeto único reaproveitado em
+// todo lugar que precisa de um envelope vazio (achado real de
+// code-review) faria um `envelope.items.push(...)` posterior mutar esse
+// MESMO array pra sempre — inclusive nos outros lugares que devolvem
+// "vazio" (storage corrompido/ausente, `clear()`), deixando itens de uma
+// fila anterior "grudados" num `clear()` de logout futuro.
+function emptyEnvelope(): QueueEnvelope {
+  return { items: [], needsReauth: false, ownerId: null };
+}
 
 function generateItemId(): string {
   return `queue-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -48,14 +60,18 @@ function generateItemId(): string {
 async function readEnvelope(): Promise<QueueEnvelope> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_ENVELOPE;
+    if (!raw) return emptyEnvelope();
     const parsed = JSON.parse(raw) as Partial<QueueEnvelope>;
     return {
       items: Array.isArray(parsed.items) ? parsed.items : [],
       needsReauth: parsed.needsReauth === true,
+      // `null`/ausente cobre filas gravadas antes desta mudança — não é
+      // tratado como "dono divergente" (ver garantirDonoAtual), só ainda
+      // não tem dono registrado.
+      ownerId: typeof parsed.ownerId === 'string' ? parsed.ownerId : null,
     };
   } catch {
-    return EMPTY_ENVELOPE;
+    return emptyEnvelope();
   }
 }
 
@@ -127,6 +143,70 @@ export function subscribe(listener: Listener): () => void {
   };
 }
 
+/**
+ * Confere o envelope já lido contra o usuário logado agora, devolvendo a
+ * versão a gravar (ela mesma, sem mudança nenhuma na maioria das vezes).
+ * Chamada só de dentro de um `withQueueLock` — não faz leitura/escrita
+ * própria, pra poder ser fundida na mesma seção crítica de quem já leu o
+ * envelope, em vez de virar uma segunda transação separada (que deixaria
+ * uma janela pra outra operação, como um `clear()` de logout, se
+ * intercalar entre a verificação e a escrita de quem chamou).
+ *
+ * Sem itens, ou sem `ownerId` ainda registrado (fila vazia, ou gravada
+ * antes desta mudança): só grava o dono atual. Com itens de um dono
+ * diferente do atual: descarta tudo — sincronizar sob a identidade
+ * errada é pior do que perder a ação. Nunca lança: se não der pra
+ * descobrir o usuário atual, devolve o envelope como veio.
+ */
+async function envelopeComDonoVerificado(envelope: QueueEnvelope): Promise<QueueEnvelope> {
+  let ownerId: string | null;
+  try {
+    const user = await getCurrentUser();
+    ownerId = user?.sub ?? null;
+  } catch (err) {
+    console.warn('[offlineQueue] não foi possível determinar o usuário atual', err);
+    return envelope;
+  }
+
+  if (envelope.items.length > 0 && envelope.ownerId && envelope.ownerId !== ownerId) {
+    console.warn(
+      `[offlineQueue] fila pertencia a outro usuário — descartando ${envelope.items.length} ${
+        envelope.items.length === 1 ? 'item' : 'itens'
+      }`,
+    );
+    return { ...emptyEnvelope(), ownerId };
+  }
+  if (envelope.ownerId !== ownerId) {
+    return { ...envelope, ownerId };
+  }
+  return envelope;
+}
+
+/**
+ * Garante que a fila pertence ao usuário logado agora, descartando-a se
+ * não (ver `envelopeComDonoVerificado`). A fila não tem dono por
+ * padrão — o logout voluntário já limpa (`useLogout`), mas uma sessão
+ * que termina de outro jeito (401 interativo, app fechado à força,
+ * crash) deixaria a fila órfã, e o próximo usuário a logar neste
+ * aparelho teria as ações dele sincronizadas por engano.
+ *
+ * `enqueue` já faz essa verificação como parte da sua própria transação
+ * (não precisa chamar esta função à parte). Usada diretamente no início
+ * de cada volta de `runDrain` — um drain pode processar vários itens em
+ * sequência (cada um com sua própria chamada de rede); se o usuário
+ * logado trocar no meio disso, o restante da fila não pode continuar
+ * sendo sincronizado sob a conta nova.
+ */
+export function garantirDonoAtual(): Promise<void> {
+  return withQueueLock(async () => {
+    const envelope = await readEnvelope();
+    const verificado = await envelopeComDonoVerificado(envelope);
+    if (verificado !== envelope) {
+      await writeEnvelope(verificado);
+    }
+  });
+}
+
 export function enqueue(
   item:
     | Omit<IniciarItem, 'id' | 'createdAt' | 'attempts'>
@@ -134,7 +214,7 @@ export function enqueue(
     | Omit<ConcluirItem, 'id' | 'createdAt' | 'attempts'>,
 ): Promise<OfflineQueueItem> {
   return withQueueLock(async () => {
-    const envelope = await readEnvelope();
+    const envelope = await envelopeComDonoVerificado(await readEnvelope());
     const fullItem = {
       ...item,
       id: generateItemId(),
@@ -211,5 +291,5 @@ export async function getNeedsReauth(): Promise<boolean> {
 
 /** Só pra testes/depuração explícita — nunca chamada implicitamente. */
 export function clear(): Promise<void> {
-  return withQueueLock(() => writeEnvelope(EMPTY_ENVELOPE));
+  return withQueueLock(() => writeEnvelope(emptyEnvelope()));
 }

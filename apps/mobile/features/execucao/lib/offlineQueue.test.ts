@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as offlineQueue from './offlineQueue';
+import { getCurrentUser } from '@/shared/lib/auth';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
@@ -9,8 +10,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
+jest.mock('@/shared/lib/auth', () => ({
+  getCurrentUser: jest.fn(),
+}));
+
 const mockedGetItem = AsyncStorage.getItem as jest.MockedFunction<typeof AsyncStorage.getItem>;
 const mockedSetItem = AsyncStorage.setItem as jest.MockedFunction<typeof AsyncStorage.setItem>;
+const mockedGetCurrentUser = getCurrentUser as jest.MockedFunction<typeof getCurrentUser>;
 
 const registrarPayload = {
   item_treino_id: '30000000-0000-0000-0000-000000000001',
@@ -31,6 +37,9 @@ describe('offlineQueue', () => {
     mockedSetItem.mockImplementation(async (_key: string, value: string) => {
       storedRaw = value;
     });
+    // Um usuário único por padrão — os testes que não são sobre posse da
+    // fila não precisam se preocupar com isso.
+    mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
     // Sincroniza o cachedCount interno do módulo com o storage zerado
     // deste teste (o módulo mantém seu próprio snapshot em memória pra
     // atender useSyncExternalStore).
@@ -194,17 +203,17 @@ describe('offlineQueue', () => {
 
   it('serializa operações concorrentes de leitura-modificação-escrita, sem perder nenhuma', async () => {
     // Sem serialização, três `enqueue` disparados ao mesmo tempo leriam o
-    // envelope quase simultaneamente (get, get, get) antes de qualquer
-    // escrita — cada `setItem` sobrescreveria o anterior, e só o último
-    // item sobreviveria. Rastreamos a ordem das chamadas pra confirmar
-    // que elas alternam get→set→get→set (nunca get→get antes de um set).
-    const callOrder: string[] = [];
-    mockedGetItem.mockImplementation(async () => {
-      callOrder.push('get');
-      return storedRaw;
-    });
+    // envelope quase simultaneamente antes de qualquer escrita — cada
+    // `setItem` sobrescreveria o anterior, e só o último item
+    // sobreviveria (ou, pior, um item de outro sobrescrevendo o de um
+    // terceiro por baixo). A verificação de dono acontece dentro da MESMA
+    // transação travada da escrita do item (não uma transação à parte),
+    // então cada `enqueue` continua sendo exatamente um ciclo
+    // leitura-escrita — a contagem de itens em cada escrita nunca regride
+    // e termina em 3, com os três `sessaoRef` distintos presentes.
+    const contagensNasEscritas: number[] = [];
     mockedSetItem.mockImplementation(async (_key: string, value: string) => {
-      callOrder.push('set');
+      contagensNasEscritas.push((JSON.parse(value) as { items: unknown[] }).items.length);
       storedRaw = value;
     });
 
@@ -226,8 +235,143 @@ describe('offlineQueue', () => {
       }),
     ]);
 
-    expect(callOrder).toEqual(['get', 'set', 'get', 'set', 'get', 'set']);
+    expect(contagensNasEscritas).toEqual([1, 2, 3]);
     const todos = await offlineQueue.getAll();
     expect(todos).toHaveLength(3);
+    expect(todos.map((item) => (item as { sessaoRef: string }).sessaoRef).sort()).toEqual([
+      'sessao-a',
+      'sessao-b',
+      'sessao-c',
+    ]);
+  });
+
+  describe('posse da fila (garantirDonoAtual)', () => {
+    it('mantém a fila quando o mesmo usuário volta a enfileirar', async () => {
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+      const primeiro = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: registrarPayload,
+      });
+      const segundo = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: { ...registrarPayload, numero_serie: 2 },
+      });
+
+      const todos = await offlineQueue.getAll();
+      expect(todos.map((item) => item.id)).toEqual([primeiro.id, segundo.id]);
+    });
+
+    it('descarta a fila de um usuário anterior ao enfileirar como outro usuário', async () => {
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+      await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: registrarPayload,
+      });
+      expect(await offlineQueue.getPendingCount()).toBe(1);
+
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-b' });
+      const novoItem = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-2',
+        payload: registrarPayload,
+      });
+
+      const todos = await offlineQueue.getAll();
+      expect(todos.map((item) => item.id)).toEqual([novoItem.id]);
+    });
+
+    it('não descarta uma fila gravada antes desta mudança (sem ownerId)', async () => {
+      storedRaw = JSON.stringify({
+        items: [
+          {
+            id: 'item-antigo',
+            type: 'registrar_serie',
+            sessaoRef: 'sessao-1',
+            payload: registrarPayload,
+            createdAt: new Date().toISOString(),
+            attempts: 0,
+          },
+        ],
+        needsReauth: false,
+        // sem `ownerId` — simula um envelope gravado antes deste campo existir
+      });
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+
+      const novo = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-2',
+        payload: registrarPayload,
+      });
+
+      const todos = await offlineQueue.getAll();
+      expect(todos.map((item) => item.id)).toEqual(['item-antigo', novo.id]);
+    });
+
+    it('garantirDonoAtual descarta sozinha, sem precisar enfileirar nada', async () => {
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+      await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: registrarPayload,
+      });
+
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-b' });
+      await offlineQueue.garantirDonoAtual();
+
+      expect(await offlineQueue.getAll()).toEqual([]);
+    });
+
+    it('um clear() após um descarte não deixa nenhum item "grudado" pra próxima fila', async () => {
+      // Regressão: "envelope vazio" precisa ser um objeto novo a cada
+      // vez, não uma constante reaproveitada — um `envelope.items.push`
+      // de uma fila descartada mutaria essa MESMA constante pra sempre, e
+      // um `clear()` bem depois (outro logout, outro usuário) devolveria
+      // esses itens antigos em vez de uma fila de verdade vazia.
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+      await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: registrarPayload,
+      });
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-b' });
+      await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-2',
+        payload: registrarPayload,
+      }); // descarta a fila de user-a por baixo dos panos
+
+      await offlineQueue.clear();
+
+      expect(await offlineQueue.getAll()).toEqual([]);
+      // Uma terceira fila (outro usuário, outro dia) não pode nascer com
+      // os itens de user-b grudados por causa do clear() anterior.
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-c' });
+      const item = await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-3',
+        payload: registrarPayload,
+      });
+      expect(await offlineQueue.getAll()).toEqual([item]);
+    });
+
+    it('nunca lança, mesmo se getCurrentUser falhar — e não mexe na fila', async () => {
+      mockedGetCurrentUser.mockResolvedValue({ sub: 'user-a' });
+      await offlineQueue.enqueue({
+        type: 'registrar_serie',
+        sessaoRef: 'sessao-1',
+        payload: registrarPayload,
+      });
+
+      mockedGetCurrentUser.mockRejectedValue(new Error('SecureStore indisponível'));
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await expect(offlineQueue.garantirDonoAtual()).resolves.toBeUndefined();
+
+      expect(await offlineQueue.getPendingCount()).toBe(1);
+      warnSpy.mockRestore();
+    });
   });
 });

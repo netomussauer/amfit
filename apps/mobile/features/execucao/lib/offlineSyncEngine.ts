@@ -119,6 +119,15 @@ export async function runDrain(queryClient: QueryClient): Promise<void> {
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      // A cada volta, não só antes do laço: cobre tanto o drain de
+      // boot/reconexão (pode rodar antes de qualquer `enqueue` novo desta
+      // sessão) quanto uma troca de usuário no MEIO de um drain com vários
+      // itens (cada um com sua própria chamada de rede) — sem isso, o
+      // restante da fila de um usuário anterior seria sincronizado sob a
+      // conta de quem está logado agora. Se o dono mudou, descarta a fila
+      // inteira; o próximo `getAll()` já devolve vazio e o laço para.
+      await offlineQueue.garantirDonoAtual();
+
       const items = await offlineQueue.getAll();
       const item = items[0];
       if (!item) break;

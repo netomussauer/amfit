@@ -23,10 +23,11 @@ export function useLogout() {
       }
     },
     onSettled: async () => {
-      // A fila offline não tem dono (chave única no AsyncStorage, sem
-      // vínculo com o usuário logado) — sem isso, uma ação enfileirada
-      // por um usuário poderia ser sincronizada depois na sessão de outro
-      // usuário no mesmo aparelho.
+      // A fila offline tem dono (offlineQueue.garantirDonoAtual), mas só
+      // detecta a troca de usuário na próxima vez que a fila for usada
+      // (enqueue/drain) — um logout explícito é a oportunidade de limpar
+      // na hora, sem depender disso: um usuário saindo por vontade própria
+      // não deveria deixar rastro nenhum pro próximo a logar.
       await offlineQueue.clear();
       // Cache (memória + disco) ANTES dos tokens: se o processo morrer
       // entre os dois passos, é melhor sobrar um login ainda válido (sem

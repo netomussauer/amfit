@@ -30,6 +30,7 @@ jest.mock('./offlineQueue', () => ({
   setNeedsReauth: jest.fn(),
   getSnapshotNeedsReauth: jest.fn(),
   rewriteSessaoRef: jest.fn(),
+  garantirDonoAtual: jest.fn(),
 }));
 
 const mockedRegistrarSerie = execucaoService.registrarSerie as jest.MockedFunction<
@@ -54,6 +55,9 @@ const mockedGetSnapshotNeedsReauth = offlineQueue.getSnapshotNeedsReauth as jest
 >;
 const mockedRewriteSessaoRef = offlineQueue.rewriteSessaoRef as jest.MockedFunction<
   typeof offlineQueue.rewriteSessaoRef
+>;
+const mockedGarantirDonoAtual = offlineQueue.garantirDonoAtual as jest.MockedFunction<
+  typeof offlineQueue.garantirDonoAtual
 >;
 
 function deferred<T>() {
@@ -112,6 +116,7 @@ describe('offlineSyncEngine.runDrain', () => {
     jest.clearAllMocks();
     onlineManager.setOnline(true);
     mockedGetSnapshotNeedsReauth.mockReturnValue(false);
+    mockedGarantirDonoAtual.mockResolvedValue(undefined);
   });
 
   it('não faz nada quando está offline', async () => {
@@ -121,6 +126,18 @@ describe('offlineSyncEngine.runDrain', () => {
     await runDrain(queryClient);
 
     expect(mockedGetAll).not.toHaveBeenCalled();
+  });
+
+  it('garante o dono da fila antes de olhar qualquer item — cobre o drain de boot, antes de qualquer enqueue novo', async () => {
+    const queryClient = new QueryClient();
+    mockedGetAll.mockResolvedValueOnce([]);
+
+    await runDrain(queryClient);
+
+    expect(mockedGarantirDonoAtual).toHaveBeenCalledTimes(1);
+    const ordemDono = mockedGarantirDonoAtual.mock.invocationCallOrder[0];
+    const ordemGetAll = mockedGetAll.mock.invocationCallOrder[0];
+    expect(ordemDono).toBeLessThan(ordemGetAll);
   });
 
   it('não tenta nada quando needsReauth já está marcado', async () => {
