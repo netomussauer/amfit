@@ -1870,7 +1870,7 @@ Alinhado ao stack existente no infra-lab (kube-prometheus-stack + Loki + Grafana
 | Vídeo demonstrativo de exercício no app (HLS streaming via MinIO) |
 | Temporizador de descanso com vibração (expo-haptics) |
 | Integração com balança Bluetooth (bare workflow) |
-| Modo offline com sync (WatermelonDB) |
+| ~~Modo offline com sync (WatermelonDB)~~ **Implementado** (Fases 0-6): fila de sincronização própria em AsyncStorage + cache do React Query persistido (`@tanstack/react-query-persist-client`) — WatermelonDB exigiria bare workflow, incompatível com o Expo Go usado para testes em lab |
 | App mobile [Personal]: montagem de fichas de treino diretamente no mobile |
 
 ---
@@ -3404,7 +3404,7 @@ A tabela abaixo redistribui os novos itens das seções 13-18 nas fases existent
 | Vídeo demonstrativo de exercício no app (HLS streaming via MinIO) |
 | Temporizador de descanso com vibração (expo-haptics) |
 | Integração com balança Bluetooth (bare workflow) |
-| Modo offline com sync (WatermelonDB) |
+| ~~Modo offline com sync (WatermelonDB)~~ **Implementado** (Fases 0-6): fila de sincronização própria em AsyncStorage + cache do React Query persistido (`@tanstack/react-query-persist-client`) — WatermelonDB exigiria bare workflow, incompatível com o Expo Go usado para testes em lab |
 | App mobile [Personal]: montagem de fichas de treino diretamente no mobile |
 | **[NOVO] Conciliação financeira automática: relatório mensal de receita vs. inadimplência** |
 | **[NOVO] Gamificação: desafios personalizados criados pelo personal (ex: "5 treinos esta semana")** |
