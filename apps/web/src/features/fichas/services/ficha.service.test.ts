@@ -46,6 +46,21 @@ const treinoFixture = {
   itens: [itemFixture],
 };
 
+// POST /treinos/:id/itens e PATCH /itens/:id devolvem um exercício
+// "mínimo" de propósito — o backend não recarrega o exercício inteiro
+// nessas duas rotas (ver itemSimplesToResponse no Go e
+// ItemTreinoCriadoResponseSchema): só `id` vem confiável, o resto do
+// exercício vem zerado. É o formato real que a API manda nessas rotas —
+// diferente de `itemFixture`/`exercicioFixture` (usados no GET completo
+// da ficha), que têm o exercício inteiro.
+const itemCriadoRawFixture = {
+  id: itemId,
+  ordem: 0,
+  exercicio: { id: exercicioId, nome: '', grupo_muscular: { id: '', nome: '' }, is_global: false },
+  series: 3,
+  repeticoes: '8-12',
+};
+
 const fichaFixture = {
   id: fichaId,
   nome: 'Hipertrofia — Maio/2026',
@@ -294,7 +309,12 @@ describe('fichaService.createItem', () => {
   });
 
   it('valida e envia POST /treinos/:treinoId/itens', async () => {
-    mockedPost.mockResolvedValueOnce({ data: itemFixture });
+    // Regressão: usar ItemTreinoResponseSchema (que exige um
+    // ExercicioResponse completo) aqui faria o parse lançar mesmo com o
+    // item já criado com sucesso no banco — bug real encontrado ao
+    // adicionar exercício numa ficha pelo app web (o exercício vem
+    // "mínimo" nesta rota, ver itemCriadoRawFixture acima).
+    mockedPost.mockResolvedValueOnce({ data: itemCriadoRawFixture });
 
     const resultado = await fichaService.createItem(treinoId, {
       exercicio_id: exercicioId,
@@ -314,7 +334,13 @@ describe('fichaService.createItem', () => {
       carga_sugerida: null,
       descanso_segundos: null,
     });
-    expect(resultado).toEqual(itemFixture);
+    expect(resultado).toEqual({
+      id: itemId,
+      ordem: 0,
+      exercicio: { id: exercicioId },
+      series: 3,
+      repeticoes: '8-12',
+    });
   });
 });
 
@@ -324,12 +350,19 @@ describe('fichaService.updateItem', () => {
   });
 
   it('valida e envia PATCH /itens/:itemId apenas com os campos preenchidos', async () => {
-    mockedPatch.mockResolvedValueOnce({ data: itemFixture });
+    // Mesma regressão do createItem: o exercício vem "mínimo" nesta rota.
+    mockedPatch.mockResolvedValueOnce({ data: itemCriadoRawFixture });
 
     const resultado = await fichaService.updateItem(itemId, { series: 4 });
 
     expect(mockedPatch).toHaveBeenCalledWith(`/itens/${itemId}`, { series: 4 });
-    expect(resultado).toEqual(itemFixture);
+    expect(resultado).toEqual({
+      id: itemId,
+      ordem: 0,
+      exercicio: { id: exercicioId },
+      series: 3,
+      repeticoes: '8-12',
+    });
   });
 });
 

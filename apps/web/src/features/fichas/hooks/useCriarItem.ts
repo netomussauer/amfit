@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import type { CriarItemTreinoRequest, ItemTreinoResponse } from '@amfit/shared';
+import type { CriarItemTreinoRequest, ItemTreinoCriadoResponse } from '@amfit/shared';
 import { fichaService } from '../services/ficha.service';
 import { fichaKeys } from './query-keys';
 
@@ -13,7 +13,7 @@ type Variables = {
 export function useCriarItem() {
   const queryClient = useQueryClient();
 
-  return useMutation<ItemTreinoResponse, AxiosError, Variables>({
+  return useMutation<ItemTreinoCriadoResponse, AxiosError, Variables>({
     mutationFn: ({ treinoId, payload }) =>
       fichaService.createItem(treinoId, payload),
     onSuccess: (_data, { fichaId }) => {

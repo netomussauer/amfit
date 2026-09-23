@@ -8,7 +8,7 @@ import {
   CriarTreinoRequestSchema,
   FichaListResponseSchema,
   FichaResponseSchema,
-  ItemTreinoResponseSchema,
+  ItemTreinoCriadoResponseSchema,
   ReordenarItensRequestSchema,
   TreinoResponseSchema,
   type AtualizarFichaRequest,
@@ -20,7 +20,7 @@ import {
   type CriarTreinoRequest,
   type FichaListResponse,
   type FichaResponse,
-  type ItemTreinoResponse,
+  type ItemTreinoCriadoResponse,
   type ReordenarItensRequest,
   type TreinoResponse,
 } from '@amfit/shared';
@@ -108,22 +108,24 @@ export const fichaService = {
 
   // ── Itens ───────────────────────────────────────────────────────────
 
+  // POST/PATCH devolvem um item "mínimo" (ver ItemTreinoCriadoResponseSchema)
+  // — o backend não recarrega o exercício inteiro nessas duas rotas.
   async createItem(
     treinoId: string,
     payload: CriarItemTreinoRequest,
-  ): Promise<ItemTreinoResponse> {
+  ): Promise<ItemTreinoCriadoResponse> {
     const body = CriarItemTreinoRequestSchema.parse(stripEmpty(payload));
     const { data } = await apiClient.post(`/treinos/${treinoId}/itens`, body);
-    return ItemTreinoResponseSchema.parse(data);
+    return ItemTreinoCriadoResponseSchema.parse(data);
   },
 
   async updateItem(
     itemId: string,
     payload: AtualizarItemTreinoRequest,
-  ): Promise<ItemTreinoResponse> {
+  ): Promise<ItemTreinoCriadoResponse> {
     const body = AtualizarItemTreinoRequestSchema.parse(stripEmpty(payload));
     const { data } = await apiClient.patch(`/itens/${itemId}`, body);
-    return ItemTreinoResponseSchema.parse(data);
+    return ItemTreinoCriadoResponseSchema.parse(data);
   },
 
   async deleteItem(itemId: string): Promise<void> {

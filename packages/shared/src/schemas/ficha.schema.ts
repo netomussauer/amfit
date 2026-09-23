@@ -16,6 +16,22 @@ export const ItemTreinoResponseSchema = z.object({
   observacao: z.string().nullable().optional(),
 });
 
+/**
+ * Resposta de POST /treinos/:id/itens e PATCH /itens/:id — de propósito
+ * mais enxuta que `ItemTreinoResponseSchema`: o backend (ver
+ * `itemSimplesToResponse` em apps/api/internal/training/application/
+ * service.go) não recarrega o exercício inteiro nessas duas rotas — quem
+ * chama já escolheu o exercício e já o tem em memória — então só
+ * `exercicio.id` vem confiável; os demais campos do exercício (nome,
+ * grupo_muscular, etc.) vêm zerados/vazios e falhariam a validação de
+ * `ExercicioResponseSchema` (ex.: `grupo_muscular.id` como `""` não é um
+ * UUID válido). Usar `ItemTreinoResponseSchema` aqui faria o parse
+ * lançar mesmo com o item já criado/atualizado com sucesso no banco.
+ */
+export const ItemTreinoCriadoResponseSchema = ItemTreinoResponseSchema.extend({
+  exercicio: z.object({ id: z.string().uuid() }),
+});
+
 export const TreinoResponseSchema = z.object({
   id: z.string().uuid(),
   letra: z.string(),

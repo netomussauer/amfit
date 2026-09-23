@@ -25,6 +25,7 @@ import {
 } from '../schemas/exercicio.schema';
 import {
   ItemTreinoResponseSchema,
+  ItemTreinoCriadoResponseSchema,
   TreinoResponseSchema,
   FichaResponseSchema,
   FichaListResponseSchema,
@@ -107,6 +108,7 @@ export type AtualizarExercicioRequest = z.infer<typeof AtualizarExercicioRequest
 
 // Ficha
 export type ItemTreinoResponse = z.infer<typeof ItemTreinoResponseSchema>;
+export type ItemTreinoCriadoResponse = z.infer<typeof ItemTreinoCriadoResponseSchema>;
 export type TreinoResponse = z.infer<typeof TreinoResponseSchema>;
 export type FichaResponse = z.infer<typeof FichaResponseSchema>;
 export type FichaListResponse = z.infer<typeof FichaListResponseSchema>;

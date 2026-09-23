@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
-import type { ItemTreinoResponse } from '@amfit/shared';
+import type { ItemTreinoCriadoResponse } from '@amfit/shared';
 import { QueryWrapper, createTestQueryClient } from '@/shared/test-utils/setup-query';
 import { fichaService } from '../services/ficha.service';
 import { fichaKeys } from './query-keys';
@@ -17,15 +17,12 @@ vi.mock('../services/ficha.service', () => ({
 
 const mockedUpdateItem = vi.mocked(fichaService.updateItem);
 
-const itemFixture: ItemTreinoResponse = {
+// PATCH /itens/:id devolve um exercício "mínimo" (só id) — ver
+// ItemTreinoCriadoResponseSchema.
+const itemFixture: ItemTreinoCriadoResponse = {
   id: 'item-1',
   ordem: 0,
-  exercicio: {
-    id: 'exercicio-1',
-    nome: 'Supino reto',
-    grupo_muscular: { id: 'grupo-1', nome: 'Peito' },
-    is_global: true,
-  },
+  exercicio: { id: 'exercicio-1' },
   series: 4,
   repeticoes: '6-10',
 };
