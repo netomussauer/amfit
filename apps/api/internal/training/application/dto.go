@@ -130,7 +130,8 @@ type GrupoMuscularResposta struct {
 }
 
 // TreinoHojeResponse encapsula a resposta de GET /alunos/me/treino-hoje.
-// SessaoHojeID será preenchido por Execution (Fase 1.4) — aqui sempre nil.
+// SessaoHojeID é o ID da sessão EM_ANDAMENTO de hoje para o treino devolvido
+// (nil quando não há).
 type TreinoHojeResponse struct {
 	Treino       *TreinoResponse `json:"treino"`
 	SessaoHojeID *string         `json:"sessao_hoje_id,omitempty"`

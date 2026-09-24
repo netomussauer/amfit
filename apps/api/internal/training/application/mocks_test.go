@@ -206,6 +206,22 @@ func (m *mockAlunoLookup) BelongsToPersonal(
 	return true, nil
 }
 
+// ── SessaoHojeLookup mock ──────────────────────────────────────────────────
+
+type mockSessaoHojeLookup struct {
+	findFn func(ctx context.Context, alunoID, treinoID uuid.UUID) (*uuid.UUID, error)
+}
+
+func (m *mockSessaoHojeLookup) FindEmAndamentoHojeID(
+	ctx context.Context,
+	alunoID, treinoID uuid.UUID,
+) (*uuid.UUID, error) {
+	if m.findFn != nil {
+		return m.findFn(ctx, alunoID, treinoID)
+	}
+	return nil, nil
+}
+
 // ── TemplateTreino mock ─────────────────────────────────────────────────────
 
 type mockTemplateTreinoRepo struct {

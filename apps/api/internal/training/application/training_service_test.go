@@ -28,7 +28,7 @@ func newServiceForTest() (
 	treinoHoje := &mockTreinoHojeRepo{}
 	alunos := &mockAlunoLookup{}
 
-	svc := NewTrainingService(fichas, treinos, itens, fichaCompleta, treinoHoje, alunos, &mockTemplateTreinoRepo{})
+	svc := NewTrainingService(fichas, treinos, itens, fichaCompleta, treinoHoje, alunos, &mockTemplateTreinoRepo{}, &mockSessaoHojeLookup{})
 	return svc, fichas, treinos, itens, fichaCompleta, treinoHoje, alunos
 }
 
@@ -46,6 +46,7 @@ func newTemplateServiceForTest() (
 	svc := NewTrainingService(
 		&mockFichaRepo{}, &mockTreinoRepo{}, &mockItemRepo{},
 		&mockFichaCompletaRepo{}, &mockTreinoHojeRepo{}, alunos, templates,
+		&mockSessaoHojeLookup{},
 	)
 	return svc, templates, alunos
 }
@@ -380,7 +381,62 @@ func TestObterTreinoHoje_SemSessaoAnterior_RetornaTreinoA(t *testing.T) {
 		t.Errorf("esperado letra A, got %s", resp.Treino.Letra)
 	}
 	if resp.SessaoHojeID != nil {
-		t.Errorf("sessao_hoje_id deveria ser nil na fatia atual, got %v", resp.SessaoHojeID)
+		t.Errorf("sessao_hoje_id deveria ser nil sem sessão em andamento, got %v", *resp.SessaoHojeID)
+	}
+}
+
+func treinoHojeParaTeste() domain.TreinoCompleto {
+	return domain.TreinoCompleto{Treino: domain.Treino{ID: uuid.New(), Letra: "A"}}
+}
+
+func TestObterTreinoHoje_ComSessaoEmAndamento_PreencheSessaoHojeID(t *testing.T) {
+	svc, _, _, _, _, treinoHoje, _ := newServiceForTest()
+	treino := treinoHojeParaTeste()
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+	treinoHoje.getTreinoHojeFn = func(context.Context, uuid.UUID) (*domain.TreinoCompleto, error) {
+		return &treino, nil
+	}
+	svc.sessoesHoje = &mockSessaoHojeLookup{
+		findFn: func(_ context.Context, gotAluno, gotTreino uuid.UUID) (*uuid.UUID, error) {
+			if gotAluno != alunoID || gotTreino != treino.Treino.ID {
+				t.Errorf("lookup chamado com (%s, %s), esperado (%s, %s)",
+					gotAluno, gotTreino, alunoID, treino.Treino.ID)
+			}
+			return &sessaoID, nil
+		},
+	}
+
+	resp, err := svc.ObterTreinoHoje(context.Background(), alunoID)
+	if err != nil {
+		t.Fatalf("ObterTreinoHoje: %v", err)
+	}
+	if resp.SessaoHojeID == nil || *resp.SessaoHojeID != sessaoID.String() {
+		t.Errorf("sessao_hoje_id esperado %s, got %v", sessaoID, resp.SessaoHojeID)
+	}
+}
+
+func TestObterTreinoHoje_FalhaNoLookupDaSessao_NaoDerrubaOTreino(t *testing.T) {
+	svc, _, _, _, _, treinoHoje, _ := newServiceForTest()
+	treino := treinoHojeParaTeste()
+	treinoHoje.getTreinoHojeFn = func(context.Context, uuid.UUID) (*domain.TreinoCompleto, error) {
+		return &treino, nil
+	}
+	svc.sessoesHoje = &mockSessaoHojeLookup{
+		findFn: func(context.Context, uuid.UUID, uuid.UUID) (*uuid.UUID, error) {
+			return nil, errors.New("banco fora")
+		},
+	}
+
+	resp, err := svc.ObterTreinoHoje(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("falha no lookup não deveria derrubar o treino, got %v", err)
+	}
+	if resp.Treino == nil {
+		t.Fatal("treino esperado mesmo com o lookup falhando")
+	}
+	if resp.SessaoHojeID != nil {
+		t.Errorf("sessao_hoje_id deveria ser nil quando o lookup falha, got %v", *resp.SessaoHojeID)
 	}
 }
 

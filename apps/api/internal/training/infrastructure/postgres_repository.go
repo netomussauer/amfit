@@ -29,6 +29,7 @@ type PostgresRepositories struct {
 	TreinoHoje    domain.TreinoHojeRepository
 	AlunoLookup   application.AlunoLookup
 	Templates     domain.TemplateTreinoRepository
+	SessaoHoje    application.SessaoHojeLookup
 }
 
 // NewPostgresRepositories cria a instância com o pool compartilhado e expõe
@@ -43,6 +44,7 @@ func NewPostgresRepositories(pool *pgxpool.Pool) *PostgresRepositories {
 		TreinoHoje:    &treinoHojeRepo{pool: pool},
 		AlunoLookup:   &alunoLookup{pool: pool},
 		Templates:     &templateTreinoRepo{pool: pool},
+		SessaoHoje:    &sessaoHojeLookup{pool: pool},
 	}
 }
 
@@ -755,6 +757,40 @@ func (l *alunoLookup) BelongsToPersonal(
 		return false, fmt.Errorf("infrastructure: aluno lookup: %w", err)
 	}
 	return ok, nil
+}
+
+// ── SessaoHojeLookup ───────────────────────────────────────────────────────
+
+// sessaoHojeLookup lê sessao_treino direto (mesma razão do alunoLookup:
+// Training não importa o contexto Execution). Espelha o critério de
+// FindEmAndamentoHoje do Execution, que é o que IniciarSessao usa pra
+// retomar — assim o ID devolvido aqui é o mesmo que "iniciar" devolveria.
+type sessaoHojeLookup struct {
+	pool *pgxpool.Pool
+}
+
+func (l *sessaoHojeLookup) FindEmAndamentoHojeID(
+	ctx context.Context,
+	alunoID, treinoID uuid.UUID,
+) (*uuid.UUID, error) {
+	const q = `
+		SELECT id
+		FROM sessao_treino
+		WHERE aluno_id = $1
+		  AND treino_id = $2
+		  AND data_execucao = CURRENT_DATE
+		  AND status = 'EM_ANDAMENTO'
+		ORDER BY iniciado_em DESC
+		LIMIT 1`
+
+	var id uuid.UUID
+	if err := l.pool.QueryRow(ctx, q, alunoID, treinoID).Scan(&id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("infrastructure: sessão em andamento de hoje: %w", err)
+	}
+	return &id, nil
 }
 
 // ── TemplateTreino ─────────────────────────────────────────────────────────

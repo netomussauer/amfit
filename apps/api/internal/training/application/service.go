@@ -26,6 +26,14 @@ type AlunoLookup interface {
 	BelongsToPersonal(ctx context.Context, alunoID, personalID uuid.UUID) (bool, error)
 }
 
+// SessaoHojeLookup descobre se o aluno já tem uma sessão EM_ANDAMENTO hoje
+// para um treino. Port próprio (como AlunoLookup) pra Training não importar
+// o contexto Execution; o wiring injeta uma query direta em sessao_treino.
+// Devolve nil (sem erro) quando não há sessão em andamento.
+type SessaoHojeLookup interface {
+	FindEmAndamentoHojeID(ctx context.Context, alunoID, treinoID uuid.UUID) (*uuid.UUID, error)
+}
+
 // TrainingService implementa os casos de uso de gestão de fichas de treino.
 type TrainingService struct {
 	fichas       domain.FichaRepository
@@ -35,6 +43,7 @@ type TrainingService struct {
 	treinoHoje   domain.TreinoHojeRepository
 	alunos       AlunoLookup
 	templates    domain.TemplateTreinoRepository
+	sessoesHoje  SessaoHojeLookup
 }
 
 // NewTrainingService monta o service com todas as suas dependências.
@@ -46,6 +55,7 @@ func NewTrainingService(
 	treinoHoje domain.TreinoHojeRepository,
 	alunos AlunoLookup,
 	templates domain.TemplateTreinoRepository,
+	sessoesHoje SessaoHojeLookup,
 ) *TrainingService {
 	return &TrainingService{
 		fichas:       fichas,
@@ -55,6 +65,7 @@ func NewTrainingService(
 		treinoHoje:   treinoHoje,
 		alunos:       alunos,
 		templates:    templates,
+		sessoesHoje:  sessoesHoje,
 	}
 }
 
@@ -483,10 +494,23 @@ func (s *TrainingService) ObterTreinoHoje(
 	}
 
 	tr := treinoCompletoToResponse(*completo)
+
+	// Só o "Continuar" da home depende disso — uma falha aqui não pode
+	// derrubar o treino de hoje, então degrada pra "sem sessão em andamento".
+	var sessaoHojeID *string
+	sessaoID, err := s.sessoesHoje.FindEmAndamentoHojeID(ctx, alunoID, completo.Treino.ID)
+	if err != nil {
+		log.Warn().Err(err).
+			Str("aluno_id", alunoID.String()).
+			Msg("falha ao buscar sessão em andamento de hoje; seguindo sem sessao_hoje_id")
+	} else if sessaoID != nil {
+		id := sessaoID.String()
+		sessaoHojeID = &id
+	}
+
 	return &TreinoHojeResponse{
-		Treino: &tr,
-		// SessaoHojeID será preenchido pelo contexto Execution na Fase 1.4.
-		SessaoHojeID: nil,
+		Treino:       &tr,
+		SessaoHojeID: sessaoHojeID,
 	}, nil
 }
 

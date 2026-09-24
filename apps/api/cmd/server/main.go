@@ -175,6 +175,7 @@ func main() {
 		trainingRepos.TreinoHoje,
 		trainingRepos.AlunoLookup,
 		trainingRepos.Templates,
+		trainingRepos.SessaoHoje,
 	)
 	trainingH := traininghandlers.NewTrainingHandler(trainingSvc)
 
