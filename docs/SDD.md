@@ -11,6 +11,8 @@
 
 AMFIT é uma plataforma de gestão de treinos de musculação com dois perfis de usuário distintos: o personal trainer e o aluno. O personal trainer acessa a plataforma tanto pelo **portal web** (administração completa: gestão de alunos, montagem de fichas, biblioteca de exercícios, dashboard) quanto pelo **app mobile** (cadastro de exercícios, acompanhamento de alunos em campo). O aluno utiliza exclusivamente o aplicativo mobile Android/iOS para executar e registrar seus treinos.
 
+AMFIT é **white label por personal**: cada personal trainer é um tenant e apresenta a plataforma com a própria marca (logo, cores e nome do app) aos seus alunos, no portal web e no aplicativo, inclusive na tela de login a partir de um código de convite. O escopo é entregue em níveis (ADR-007) e o detalhamento está na §20.4.
+
 A solução adota arquitetura de microserviços leve (monolito modular no MVP, preparado para extração de serviços), backend Go com Fiber, banco PostgreSQL, storage MinIO, frontend web em Next.js 14 (App Router) e aplicativo mobile em React Native com Expo. Todo o stack é self-hostable no cluster K3s existente.
 
 ---
@@ -106,6 +108,30 @@ A solução adota arquitetura de microserviços leve (monolito modular no MVP, p
 - Schemas Zod, tipos TypeScript e constantes de domínio são compartilhados entre web e mobile via pacote `@amfit/shared`.
 - Um único repositório simplifica CI/CD no pipeline Tekton do infra-lab.
 - Go não participa do workspace pnpm — tem seu próprio `go.mod` em `apps/api/`.
+
+---
+
+### ADR-007 — White label por personal (branding em níveis)
+
+**Contexto:** cada personal trainer vende o acompanhamento com a própria marca. O produto precisa parecer "do personal" para o aluno, sem custo de manter um build por personal.
+
+**Decisão:** o produto é white label por personal (tenant = personal trainer). A marca é **dado** (`tenant_config`), não build: um único binário do app e um único portal web atendem todos os personals. O escopo é entregue em níveis incrementais:
+
+| Nível | O que entrega | Status |
+|---|---|---|
+| 1 — Branding dentro do app | Logo, cores e nome do app aplicados depois do login (web e mobile) | Implementado |
+| 2 — Branding antes do login | Código de convite, deep link `amfit://entrar/{codigo}`, página web `/entrar/{codigo}` e endpoint público de configuração; o aluno vê a marca do personal já na tela de login | Em implementação |
+| 3 — Domínio próprio | Subdomínio/domínio do personal (CNAME + IngressRoute + TLS) | Futuro — exige ingress e TLS no cluster, hoje inexistentes |
+| 4 — App próprio nas lojas | Nome, ícone e bundle por personal (build EAS por tenant) | Futuro — custo de publicação e operação |
+
+Fora de escopo por ora: scanner de QR dentro do app (o QR exibido no portal é lido pela câmera do celular e abre o link) e universal links (exigem domínio e TLS).
+
+**Justificativa e consequências:**
+- O aluno identifica o personal pelo **código de convite**; o login segue sendo e-mail e senha (e-mail de aluno é único globalmente), então o código serve só para o branding pré-login.
+- O código tem 8 caracteres aleatórios (alfabeto sem caracteres ambíguos, ~8,5 × 10¹¹ combinações), é independente do UUID do personal e pode ser regenerado por ele (o link anterior deixa de funcionar).
+- O endpoint público expõe só logo, cores e nome do app, com limite de requisições por IP e resposta 404 uniforme para código inexistente ou malformado (anti-enumeração).
+- Risco aceito: a URL pública do logo contém o UUID do personal (`tenant-logos/{personal_id}`). O UUID não é credencial (toda operação exige autenticação); migrar a chave do logo para o código fica como melhoria futura.
+- Depois do login vale sempre a configuração autenticada (`/tenants/me/config`); o cache local dela é limpo no logout.
 
 ---
 
@@ -3393,7 +3419,7 @@ A tabela abaixo redistribui os novos itens das seções 13-18 nas fases existent
 | **[NOVO] Notificações in-app: centro de notificações no app mobile (histórico)** | Notification |
 | **[NOVO] Chat: indicador de digitando (typing indicator) via WebSocket** | Chat |
 | **[NOVO] Tela de evolução biométrica com gráficos (peso, % gordura) — mobile** | Progress |
-| **[DIFERENCIAL] White Label Multi-Tenant: entidade tenant_config, injeção de CSS vars server-side no Next.js, ThemeProvider NativeWind no mobile, IngressRoute dinâmica no Traefik** | Identity |
+| **[DIFERENCIAL] White Label Multi-Tenant (ADR-007, §20.4): entidade tenant_config, injeção de CSS vars server-side no Next.js, ThemeProvider NativeWind no mobile, código de convite e branding antes do login. Domínio próprio (IngressRoute no Traefik) e app por personal nas lojas ficam como níveis futuros** | Identity |
 | **[DIFERENCIAL] Coach Assíncrono por Vídeo: upload para MinIO bucket coach-videos/, entidade coach_video, feedback com áudio, integração com Chat** | Execution + Chat |
 | **[DIFERENCIAL] Geração de Ficha com IA (Claude API): POST /fichas/gerar-ia, prompt caching, rascunho editável no FichaBuilder, tabela ia_usage** | Training |
 
@@ -3798,7 +3824,20 @@ export const ShareCard = React.forwardRef<View, ShareCardProps>(({ data }, ref) 
 
 #### Descrição
 
-Cada personal trainer pode configurar a identidade visual da plataforma para seus alunos: logo, cores primária e secundária, nome do app e domínio customizado. No portal web, as CSS vars são injetadas server-side no `<html>` sem rebuild. No mobile, o `ThemeProvider` do NativeWind lê os tokens do `AsyncStorage`.
+Cada personal trainer pode configurar a identidade visual da plataforma para seus alunos: logo, cores primária e secundária e nome do app. No portal web, as CSS vars são injetadas server-side no `<html>` sem rebuild. No mobile, o `ThemeProvider` do NativeWind lê os tokens do `AsyncStorage`. O posicionamento e os níveis de escopo estão no **ADR-007**; esta seção detalha o desenho.
+
+**Identificação do personal pelo aluno:** cada personal tem um **código de convite** (`personal_trainer.codigo`, 8 caracteres aleatórios sem ambiguidade, regenerável). O aluno o recebe como link web (`/entrar/{codigo}`), QR desse link, deep link (`amfit://entrar/{codigo}`) ou digita o código no app. Com ele o cliente busca a configuração **pública** do personal e mostra a marca já na tela de login. O login continua por e-mail e senha.
+
+#### Status de implementação
+
+| Item | Nível (ADR-007) | Status |
+|---|---|---|
+| `tenant_config`, `GET`/`PATCH /tenants/me/config` (autenticado) | 1 | Implementado |
+| Web: CSS vars no layout; mobile: `ThemeProvider` com cache de 24h | 1 | Implementado |
+| Código de convite, `GET /public/tenants/{codigo}/config` e `POST /tenants/me/codigo/regenerar` | 2 | Em implementação |
+| Login com marca do personal: web `/entrar/{codigo}` e mobile (deep link ou código digitado) | 2 | Em implementação |
+| Domínio customizado por personal (IngressRoute + TLS) | 3 | Futuro |
+| App próprio por personal nas lojas | 4 | Futuro |
 
 #### Modelo de Dados
 
@@ -3810,12 +3849,18 @@ erDiagram
         string cor_primaria "hex sem # — ex: ea580c"
         string cor_secundaria "hex sem # — ex: f97316"
         string nome_app "nullable — default: AMFIT"
-        string dominio_customizado "nullable — ex: app.meuStudio.com.br"
         timestamp atualizado_em "default now()"
+    }
+
+    PERSONAL_TRAINER {
+        uuid id PK
+        string codigo "UNIQUE — 8 caracteres aleatórios; código de convite"
     }
 
     PERSONAL_TRAINER ||--o| TENANT_CONFIG : "possui"
 ```
+
+`tenant_config` só tem linha depois que o personal configura algo; sem linha, a API devolve os defaults (`f97316`/`ea580c`, sem logo nem nome). Por isso o `codigo` fica em `personal_trainer`, que sempre existe. O campo `dominio_customizado` previsto inicialmente foi retirado do modelo: pertence ao nível 3 (futuro).
 
 #### Fluxo Web — Injeção Server-Side de CSS Vars
 
@@ -3868,16 +3913,21 @@ sequenceDiagram
     participant STORE as AsyncStorage
     participant API as AMFIT API
 
-    APP->>APP: Startup — lê código do personal no convite (deep link ou QR code)
-    APP->>API: GET /tenants/{codigo}/config (sem autenticação — público)
-    API-->>APP: { cor_primaria, cor_secundaria, logo_url, nome_app }
+    APP->>APP: Recebe o código do personal (deep link amfit://entrar/{codigo} ou digitado na tela "Tenho um código")
+    APP->>API: GET /public/tenants/{codigo}/config (sem autenticação — público, com limite por IP)
+    API-->>APP: { cor_primaria, cor_secundaria, logo_url, nome_app } (404 uniforme se o código não existe)
 
-    APP->>STORE: AsyncStorage.setItem('tenant_config', JSON.stringify(config))
-    APP->>APP: ThemeProvider lê STORE → sobrescreve tokens NativeWind
+    APP->>STORE: AsyncStorage.setItem('tenant_public_config', { codigo, config, cachedAt })
+    APP->>APP: ThemeProvider (sem token) lê STORE → aplica tokens NativeWind; login mostra logo e nome_app
 
-    Note over APP: Sessões subsequentes: lê do AsyncStorage sem nova chamada de API
-    Note over APP: TTL de 24h — revalida em background se cache expirado
+    Note over APP: Depois do login: config autenticada (GET /tenants/me/config, cache 'tenant_config') tem precedência
+    Note over APP: TTL de 24h em ambos os caches — revalida em background se expirado
+    Note over APP: Logout limpa 'tenant_config' (evita a marca do usuário anterior); 'tenant_public_config' permanece
 ```
+
+#### Fluxo Web — Login com a marca do personal
+
+A página pública `/entrar/{codigo}` (server component) busca a configuração pública sem cookie de sessão, aplica as CSS vars num wrapper, mostra logo e `nome_app` acima do formulário de login e oferece o link "Abrir no app" (`amfit://entrar/{codigo}`). Código inexistente mostra uma mensagem e leva ao `/login` padrão. No portal, o personal vê em Configurações o código, o link, o QR desse link e o botão "Gerar novo código" (invalida o link anterior).
 
 **ThemeProvider mobile:**
 
@@ -3904,7 +3954,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 ```
 
-#### Infraestrutura — Domínio Customizado no Traefik
+#### Infraestrutura — Domínio Customizado no Traefik (nível 3 — futuro, não implementado)
+
+> Hoje o cluster expõe API e web por `Service` `LoadBalancer` (MetalLB) em HTTP, sem Ingress nem TLS. O desenho abaixo só se aplica quando houver ingress e certificados; até lá os convites usam o link `/entrar/{codigo}` no host padrão e o deep link `amfit://`.
 
 ```yaml
 # infra/k8s/web/ingress-tenant.yaml
@@ -3941,7 +3993,7 @@ spec:
             application/json:
               schema:
                 $ref: "#/components/schemas/TenantConfigResponse"
-    put:
+    patch:
       tags: [Tenant]
       summary: Atualiza configuração de branding
       requestBody:
@@ -3955,7 +4007,6 @@ spec:
                 cor_primaria:    { type: string, pattern: "^[0-9a-fA-F]{6}$" }
                 cor_secundaria:  { type: string, pattern: "^[0-9a-fA-F]{6}$" }
                 nome_app:        { type: string }
-                dominio_customizado: { type: string }
       responses:
         "200":
           content:
@@ -3963,16 +4014,31 @@ spec:
               schema:
                 $ref: "#/components/schemas/TenantConfigResponse"
 
-  /tenants/{codigo}/config:
+  /tenants/me/codigo/regenerar:
+    post:
+      tags: [Tenant]
+      summary: Gera um novo código de convite (role=PERSONAL); o link anterior deixa de funcionar
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantConfigResponse"
+
+  /public/tenants/{codigo}/config:
     get:
       tags: [Tenant]
-      summary: Retorna configuração pública pelo código do personal (para mobile onboarding)
+      summary: Configuração pública pelo código de convite (branding antes do login — web e mobile)
+      description: >
+        Sem autenticação e com limite de requisições por IP. Devolve só logo_url, cor_primaria,
+        cor_secundaria e nome_app (o campo codigo não é repetido). Código inexistente ou
+        malformado responde 404 idêntico (anti-enumeração).
       security: []
       parameters:
         - name: codigo
           in: path
           required: true
-          schema: { type: string }
+          schema: { type: string, pattern: "^[A-HJKMNP-Z2-9]{8}$" }
       responses:
         "200":
           content:
@@ -3981,7 +4047,11 @@ spec:
                 $ref: "#/components/schemas/TenantConfigResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          description: Limite de requisições por IP excedido
 ```
+
+`TenantConfigResponse` ganha o campo opcional `codigo` (8 caracteres), preenchido apenas nas rotas autenticadas do personal (`GET /tenants/me/config` e `POST /tenants/me/codigo/regenerar`).
 
 ---
 
