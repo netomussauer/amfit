@@ -132,8 +132,8 @@ export const AnamneseResponseSchema = z.object({
   nivel_sugerido: NivelAnamneseEnum,
   template_ficha_id: z.string().uuid().nullable().optional(),
   template_ficha_nome: z.string().nullable().optional(),
-  preenchido_em: z.string().datetime(),
-  atualizado_em: z.string().datetime(),
+  preenchido_em: z.string().datetime({ offset: true }),
+  atualizado_em: z.string().datetime({ offset: true }),
 });
 
 // Types inferidos sao exportados centralmente em ../types/index.ts

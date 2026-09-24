@@ -34,7 +34,7 @@ export const RegistroSerieResponseSchema = z.object({
   carga_realizada: z.number().nullable().optional(),
   repeticoes_realizadas: z.number().int().nonnegative().nullable().optional(),
   // Só preenchido quando concluida=true (Execution registra o instante).
-  executado_em: z.string().datetime().nullable().optional(),
+  executado_em: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 export const SessaoResponseSchema = z.object({
@@ -42,8 +42,8 @@ export const SessaoResponseSchema = z.object({
   treino_id: z.string().uuid(),
   data_execucao: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: SessaoStatusEnum,
-  iniciado_em: z.string().datetime(),
-  concluido_em: z.string().datetime().nullable().optional(),
+  iniciado_em: z.string().datetime({ offset: true }),
+  concluido_em: z.string().datetime({ offset: true }).nullable().optional(),
   series: z.array(RegistroSerieResponseSchema),
   /**
    * Treino executado, populado pelo backend no GET /sessoes/:id para que
@@ -67,8 +67,8 @@ export const SessaoResumoResponseSchema = z.object({
   treino_nome: z.string().optional().nullable(),
   data_execucao: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   status: SessaoStatusEnum,
-  iniciado_em: z.string().datetime(),
-  concluido_em: z.string().datetime().nullable().optional(),
+  iniciado_em: z.string().datetime({ offset: true }),
+  concluido_em: z.string().datetime({ offset: true }).nullable().optional(),
   total_series: z.number().int().nonnegative(),
   series_concluidas: z.number().int().nonnegative(),
 });

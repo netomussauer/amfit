@@ -12,7 +12,7 @@ export const EnviarFeedbackRequestSchema = z.object({
 
 export const CoachVideoFeedbackResponseSchema = z.object({
   texto: z.string(),
-  enviado_em: z.string().datetime(),
+  enviado_em: z.string().datetime({ offset: true }),
 });
 
 export const CoachVideoResponseSchema = z.object({
@@ -25,7 +25,7 @@ export const CoachVideoResponseSchema = z.object({
   duracao_segundos: z.number().int(),
   status: StatusCoachVideoEnum,
   descricao: z.string().nullable().optional(),
-  criado_em: z.string().datetime(),
+  criado_em: z.string().datetime({ offset: true }),
   feedback: CoachVideoFeedbackResponseSchema.nullable().optional(),
 });
 

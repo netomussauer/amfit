@@ -51,8 +51,8 @@ export const PlanoResponseSchema = z.object({
   vigencia_fim: z.string().nullable().optional(),
   status: StatusPlanoEnum,
   observacao: z.string().nullable().optional(),
-  criado_em: z.string().datetime(),
-  atualizado_em: z.string().datetime(),
+  criado_em: z.string().datetime({ offset: true }),
+  atualizado_em: z.string().datetime({ offset: true }),
 });
 
 export const MarcarPagaRequestSchema = z.object({
@@ -84,8 +84,8 @@ export const MensalidadeResponseSchema = z.object({
   data_pagamento: z.string().nullable().optional(),
   forma_pagamento: FormaPagamentoEnum.nullable().optional(),
   observacao: z.string().nullable().optional(),
-  criado_em: z.string().datetime(),
-  atualizado_em: z.string().datetime(),
+  criado_em: z.string().datetime({ offset: true }),
+  atualizado_em: z.string().datetime({ offset: true }),
 });
 
 export const MensalidadeListResponseSchema = z.object({

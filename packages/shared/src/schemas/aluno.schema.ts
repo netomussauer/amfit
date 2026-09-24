@@ -44,8 +44,8 @@ export const AlunoResponseSchema = z.object({
   data_nascimento: z.string().nullable().optional(),
   sexo: SexoEnum.nullable().optional(),
   ativo: z.boolean(),
-  criado_em: z.string().datetime(),
-  atualizado_em: z.string().datetime().optional(),
+  criado_em: z.string().datetime({ offset: true }),
+  atualizado_em: z.string().datetime({ offset: true }).optional(),
 });
 
 export const AlunoListResponseSchema = z.object({

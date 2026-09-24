@@ -22,7 +22,7 @@ export const PersonalResponseSchema = z.object({
   telefone: z.string().nullable().optional(),
   cref: z.string().nullable().optional(),
   ativo: z.boolean(),
-  criado_em: z.string().datetime(),
+  criado_em: z.string().datetime({ offset: true }),
 });
 
 export const AlterarSenhaRequestSchema = z.object({
