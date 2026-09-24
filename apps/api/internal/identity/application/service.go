@@ -30,7 +30,7 @@ func NewIdentityService(
 	authSvc := NewAuthService(personals, alunos, credenciais, refreshTokens, privateKey, publicKey)
 	alunoSvc := NewAlunoService(alunos, credenciais)
 	personalSvc := NewPersonalService(personals, credenciais, refreshTokens)
-	tenantSvc := NewTenantService(tenantConfigs, logoStorage)
+	tenantSvc := NewTenantService(tenantConfigs, personals, logoStorage)
 
 	return &IdentityService{
 		Auth:     authSvc,

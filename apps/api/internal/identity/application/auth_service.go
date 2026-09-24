@@ -69,7 +69,7 @@ func (s *AuthService) RegisterPersonal(ctx context.Context, req RegisterPersonal
 		Ativo:    true,
 	}
 
-	if err := s.personals.Create(ctx, personal); err != nil {
+	if err := s.criarPersonalComCodigo(ctx, personal); err != nil {
 		return nil, fmt.Errorf("application: create personal: %w", err)
 	}
 
@@ -89,6 +89,25 @@ func (s *AuthService) RegisterPersonal(ctx context.Context, req RegisterPersonal
 		Msg("personal registered")
 
 	return s.issueTokens(ctx, personal.ID, personal.ID, personal.Nome, domain.OwnerTypePersonal)
+}
+
+// criarPersonalComCodigo grava o personal com um código de convite sorteado,
+// sorteando outro se houver colisão de unicidade do código.
+func (s *AuthService) criarPersonalComCodigo(ctx context.Context, personal *domain.PersonalTrainer) error {
+	for i := 0; i < tentativasCodigoConvite; i++ {
+		codigo, err := domain.GerarCodigoConvite()
+		if err != nil {
+			return err
+		}
+		personal.Codigo = codigo
+
+		err = s.personals.Create(ctx, personal)
+		if errors.Is(err, domain.ErrCodigoEmUso) {
+			continue
+		}
+		return err
+	}
+	return domain.ErrCodigoEmUso
 }
 
 // Login autentica um personal ou aluno comparando o hash de senha.

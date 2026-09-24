@@ -126,12 +126,17 @@ type AtualizarTenantConfigRequest struct {
 	NomeApp       *string `validate:"omitempty,max=100"`
 }
 
-// TenantConfigResponse é o DTO de saída de GET/PUT /tenants/me/config.
+// TenantConfigResponse é o DTO de saída de GET/PATCH /tenants/me/config,
+// POST /tenants/me/codigo/regenerar e GET /public/tenants/:codigo/config.
 // CorPrimaria/CorSecundaria nunca ficam vazias — sem config customizada,
 // o service devolve os defaults (idênticos ao visual atual do app).
+//
+// Codigo (código de convite) só vem nas rotas autenticadas do próprio
+// personal; a resposta do aluno e a pública não o incluem.
 type TenantConfigResponse struct {
 	LogoURL       *string `json:"logo_url,omitempty"`
 	CorPrimaria   string  `json:"cor_primaria"`
 	CorSecundaria string  `json:"cor_secundaria"`
 	NomeApp       *string `json:"nome_app,omitempty"`
+	Codigo        string  `json:"codigo,omitempty"`
 }

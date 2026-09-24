@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/amfit/api/internal/identity/application"
 	"github.com/amfit/api/internal/identity/domain"
@@ -28,11 +29,28 @@ func NewIdentityHandler(svc *application.IdentityService) *IdentityHandler {
 	}
 }
 
+// maxConfigPublicaPorMinuto é o teto de GET /public/tenants/:codigo/config
+// por IP. Generoso de propósito: atrás do proxy do Next.js e do LoadBalancer
+// vários usuários podem compartilhar o mesmo IP de origem, e mesmo assim
+// 120/min tornam inviável enumerar os ~8,5e11 códigos possíveis.
+const maxConfigPublicaPorMinuto = 120
+
 // RegisterPublic registra as rotas públicas do contexto Identity.
 func (h *IdentityHandler) RegisterPublic(router fiber.Router) {
 	router.Post("/auth/register-personal", h.RegisterPersonal)
 	router.Post("/auth/login", h.Login)
 	router.Post("/auth/refresh", h.Refresh)
+
+	// Branding antes do login (ADR-007, nível 2): sem autenticação, com
+	// limite por IP. Caminho /public/... evita ambiguidade com
+	// /tenants/me/config.
+	limite := middleware.RateLimitByIP(maxConfigPublicaPorMinuto, time.Minute, func(c fiber.Ctx) error {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusTooManyRequests, "too-many-requests", "Too Many Requests",
+			"muitas requisições; tente novamente em instantes",
+		))
+	})
+	middleware.Get(router, "/public/tenants/:codigo/config", []fiber.Handler{limite}, h.ObterTenantConfigPublica)
 }
 
 // RegisterAuthenticated registra rotas que exigem qualquer usuário autenticado.
@@ -57,6 +75,7 @@ func (h *IdentityHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fib
 	// SDD §20.4 foi um deslize de nomenclatura em relação ao próprio
 	// contrato já estabelecido pelos outros endpoints de Identity).
 	middleware.Patch(router, "/tenants/me/config", mws, h.AtualizarTenantConfig)
+	middleware.Post(router, "/tenants/me/codigo/regenerar", mws, h.RegenerarCodigoTenant)
 }
 
 // RegisterAlunoRoutes registra rotas restritas ao role ALUNO.
@@ -551,15 +570,61 @@ func firstFormValue(values map[string][]string, key string) string {
 
 // ── Tenant (White Label — SDD §20.4) ────────────────────────────────────────
 
+// ObterTenantConfigPublica trata GET /public/tenants/:codigo/config (sem
+// autenticação). Código inexistente ou malformado dá o mesmo 404.
+func (h *IdentityHandler) ObterTenantConfigPublica(c fiber.Ctx) error {
+	resp, err := h.svc.Tenant.ObterConfigPorCodigo(c.Context(), c.Params("codigo"))
+	if err != nil {
+		if errors.Is(err, domain.ErrCodigoNotFound) {
+			return middleware.WriteProblem(c, middleware.NewProblem(
+				fiber.StatusNotFound, "not-found", "Not Found",
+				"código de convite não encontrado",
+			))
+		}
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao buscar configuração de branding",
+		))
+	}
+	return c.JSON(resp)
+}
+
+// RegenerarCodigoTenant trata POST /tenants/me/codigo/regenerar
+// (role=PERSONAL): o código anterior deixa de funcionar.
+func (h *IdentityHandler) RegenerarCodigoTenant(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+
+	resp, err := h.svc.Tenant.RegenerarCodigo(c.Context(), personalID)
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao gerar novo código de convite",
+		))
+	}
+	return c.JSON(resp)
+}
+
 // ObterTenantConfig trata GET /tenants/me/config (qualquer role autenticada).
-// Para ALUNO, devolve a config do personal dele (ver personalIDFromCtx).
+// Para ALUNO, devolve a config do personal dele (ver personalIDFromCtx), sem
+// o código de convite; para PERSONAL, a própria config com o código.
 func (h *IdentityHandler) ObterTenantConfig(c fiber.Ctx) error {
 	personalID, ok := personalIDFromCtx(c)
 	if !ok {
 		return nil
 	}
 
-	resp, err := h.svc.Tenant.ObterConfig(c.Context(), personalID)
+	var (
+		resp *application.TenantConfigResponse
+		err  error
+	)
+	if role, _ := c.Locals("role").(string); role == "PERSONAL" {
+		resp, err = h.svc.Tenant.ObterConfigDoPersonal(c.Context(), personalID)
+	} else {
+		resp, err = h.svc.Tenant.ObterConfig(c.Context(), personalID)
+	}
 	if err != nil {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusInternalServerError, "internal", "Internal Server Error",

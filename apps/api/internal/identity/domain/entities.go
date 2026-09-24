@@ -35,6 +35,10 @@ type PersonalTrainer struct {
 	Ativo        bool
 	CriadoEm     time.Time
 	AtualizadoEm time.Time
+
+	// Codigo é o código de convite (8 caracteres, ver GerarCodigoConvite)
+	// que o aluno usa para ver o branding do personal antes do login.
+	Codigo string
 }
 
 // FullName retorna o nome do personal já normalizado (trim).

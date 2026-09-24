@@ -10,10 +10,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// codigoTeste é um código de convite válido usado como padrão nos testes.
+const codigoTeste = "K7M2QX9P"
+
 func newTenantServiceForTest() (*TenantService, *mockTenantConfigRepo, *mockLogoStorage) {
+	svc, configs, storage, _ := newTenantServiceComPersonais()
+	return svc, configs, storage
+}
+
+// newTenantServiceComPersonais também expõe o mock de personal, para os
+// testes do código de convite. Por padrão qualquer id de personal existe e
+// tem `codigoTeste`.
+func newTenantServiceComPersonais() (*TenantService, *mockTenantConfigRepo, *mockLogoStorage, *mockPersonalRepo) {
 	configs := &mockTenantConfigRepo{}
 	storage := &mockLogoStorage{}
-	return NewTenantService(configs, storage), configs, storage
+	personais := &mockPersonalRepo{
+		findByIDFn: func(_ context.Context, id uuid.UUID) (*domain.PersonalTrainer, error) {
+			return &domain.PersonalTrainer{ID: id, Codigo: codigoTeste}, nil
+		},
+	}
+	return NewTenantService(configs, personais, storage), configs, storage, personais
 }
 
 // ── ObterConfig ────────────────────────────────────────────────────────────
@@ -229,5 +245,235 @@ func TestAtualizarConfig_LogoTamanhoExcedido_RetornaErro(t *testing.T) {
 	_, err := svc.AtualizarConfig(context.Background(), uuid.New(), AtualizarTenantConfigRequest{}, logo)
 	if !errors.Is(err, domain.ErrLogoTamanhoExcedido) {
 		t.Fatalf("esperado ErrLogoTamanhoExcedido, got %v", err)
+	}
+}
+
+// ── Código de convite (white label nível 2, ADR-007) ──────────────────────
+
+func TestObterConfigPorCodigo_Achado_DevolveConfigDoPersonalSemCodigo(t *testing.T) {
+	svc, configs, _, personais := newTenantServiceComPersonais()
+	personalID := uuid.New()
+	personais.findByCodigoFn = func(_ context.Context, codigo string) (*domain.PersonalTrainer, error) {
+		if codigo != codigoTeste {
+			t.Errorf("FindByCodigo com %q, esperado %q", codigo, codigoTeste)
+		}
+		return &domain.PersonalTrainer{ID: personalID, Codigo: codigo, Ativo: true}, nil
+	}
+	configs.findByPersonalIDFn = func(_ context.Context, id uuid.UUID) (*domain.TenantConfig, error) {
+		if id != personalID {
+			t.Errorf("config buscada para %s, esperado %s", id, personalID)
+		}
+		return &domain.TenantConfig{
+			PersonalID: id, CorPrimaria: "112233", CorSecundaria: "445566", NomeApp: "Studio X",
+		}, nil
+	}
+
+	resp, err := svc.ObterConfigPorCodigo(context.Background(), codigoTeste)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.CorPrimaria != "112233" || resp.NomeApp == nil || *resp.NomeApp != "Studio X" {
+		t.Errorf("config incorreta: %+v", resp)
+	}
+	if resp.Codigo != "" {
+		t.Errorf("resposta publica nao deve repetir o codigo, got %q", resp.Codigo)
+	}
+}
+
+func TestObterConfigPorCodigo_SemConfigCustomizada_DevolveDefaults(t *testing.T) {
+	svc, configs, _, personais := newTenantServiceComPersonais()
+	personais.findByCodigoFn = func(_ context.Context, codigo string) (*domain.PersonalTrainer, error) {
+		return &domain.PersonalTrainer{ID: uuid.New(), Codigo: codigo, Ativo: true}, nil
+	}
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+
+	resp, err := svc.ObterConfigPorCodigo(context.Background(), codigoTeste)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.CorPrimaria != corPrimariaDefault || resp.CorSecundaria != corSecundariaDefault {
+		t.Errorf("esperados defaults, got %+v", resp)
+	}
+}
+
+func TestObterConfigPorCodigo_Inexistente_RetornaCodigoNotFound(t *testing.T) {
+	svc, _, _, _ := newTenantServiceComPersonais() // FindByCodigo padrao: nao encontrado
+
+	_, err := svc.ObterConfigPorCodigo(context.Background(), codigoTeste)
+	if !errors.Is(err, domain.ErrCodigoNotFound) {
+		t.Fatalf("esperado ErrCodigoNotFound, got %v", err)
+	}
+}
+
+func TestObterConfigPorCodigo_PersonalDesativado_RetornaCodigoNotFound(t *testing.T) {
+	svc, _, _, personais := newTenantServiceComPersonais()
+	personais.findByCodigoFn = func(_ context.Context, codigo string) (*domain.PersonalTrainer, error) {
+		return &domain.PersonalTrainer{ID: uuid.New(), Codigo: codigo, Ativo: false}, nil
+	}
+
+	_, err := svc.ObterConfigPorCodigo(context.Background(), codigoTeste)
+	if !errors.Is(err, domain.ErrCodigoNotFound) {
+		t.Fatalf("link de personal desativado deve dar ErrCodigoNotFound, got %v", err)
+	}
+}
+
+func TestObterConfigPorCodigo_Malformado_NemConsultaOBanco(t *testing.T) {
+	svc, _, _, personais := newTenantServiceComPersonais()
+	consultou := false
+	personais.findByCodigoFn = func(context.Context, string) (*domain.PersonalTrainer, error) {
+		consultou = true
+		return nil, domain.ErrPersonalNotFound
+	}
+
+	for _, codigo := range []string{"", "abc", "K7M2QX9", "K7M2QX9PZ", "k7m2qx9p", "K7M2QX0P"} {
+		_, err := svc.ObterConfigPorCodigo(context.Background(), codigo)
+		if !errors.Is(err, domain.ErrCodigoNotFound) {
+			t.Errorf("codigo %q: esperado ErrCodigoNotFound, got %v", codigo, err)
+		}
+	}
+	if consultou {
+		t.Error("codigo malformado nao deveria consultar o repositorio")
+	}
+}
+
+func TestObterConfigPorCodigo_ErroDeBanco_NaoViraNotFound(t *testing.T) {
+	svc, _, _, personais := newTenantServiceComPersonais()
+	personais.findByCodigoFn = func(context.Context, string) (*domain.PersonalTrainer, error) {
+		return nil, errors.New("banco fora")
+	}
+
+	_, err := svc.ObterConfigPorCodigo(context.Background(), codigoTeste)
+	if err == nil || errors.Is(err, domain.ErrCodigoNotFound) {
+		t.Fatalf("erro de infraestrutura deve propagar (nao 404), got %v", err)
+	}
+}
+
+func TestObterConfigDoPersonal_IncluiOCodigo(t *testing.T) {
+	svc, configs, _, _ := newTenantServiceComPersonais()
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+
+	resp, err := svc.ObterConfigDoPersonal(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.Codigo != codigoTeste {
+		t.Errorf("codigo esperado %q, got %q", codigoTeste, resp.Codigo)
+	}
+}
+
+func TestObterConfig_Aluno_NaoIncluiOCodigo(t *testing.T) {
+	svc, configs, _, _ := newTenantServiceComPersonais()
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+
+	resp, err := svc.ObterConfig(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.Codigo != "" {
+		t.Errorf("ObterConfig (usado pelo aluno) nao deve incluir o codigo, got %q", resp.Codigo)
+	}
+}
+
+func TestAtualizarConfig_RespostaIncluiOCodigo(t *testing.T) {
+	svc, configs, _, _ := newTenantServiceComPersonais()
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+
+	nome := "Studio X"
+	resp, err := svc.AtualizarConfig(context.Background(), uuid.New(), AtualizarTenantConfigRequest{NomeApp: &nome}, nil)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.Codigo != codigoTeste {
+		t.Errorf("a resposta do PATCH deve manter o codigo (o portal grava no cache), got %q", resp.Codigo)
+	}
+}
+
+func TestRegenerarCodigo_GravaNovoCodigoValidoEDevolveNaResposta(t *testing.T) {
+	svc, configs, _, personais := newTenantServiceComPersonais()
+	personalID := uuid.New()
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+
+	var gravado string
+	personais.updateCodigoFn = func(_ context.Context, id uuid.UUID, codigo string) error {
+		if id != personalID {
+			t.Errorf("UpdateCodigo para %s, esperado %s", id, personalID)
+		}
+		gravado = codigo
+		return nil
+	}
+	personais.findByIDFn = func(_ context.Context, id uuid.UUID) (*domain.PersonalTrainer, error) {
+		return &domain.PersonalTrainer{ID: id, Codigo: gravado}, nil
+	}
+
+	resp, err := svc.RegenerarCodigo(context.Background(), personalID)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if !domain.CodigoConviteValido(gravado) {
+		t.Errorf("codigo gravado invalido: %q", gravado)
+	}
+	if resp.Codigo != gravado {
+		t.Errorf("resposta deve trazer o codigo novo %q, got %q", gravado, resp.Codigo)
+	}
+}
+
+func TestRegenerarCodigo_ColisaoSorteiaOutro(t *testing.T) {
+	svc, configs, _, personais := newTenantServiceComPersonais()
+	configs.findByPersonalIDFn = func(context.Context, uuid.UUID) (*domain.TenantConfig, error) {
+		return nil, nil
+	}
+	chamadas := 0
+	personais.updateCodigoFn = func(context.Context, uuid.UUID, string) error {
+		chamadas++
+		if chamadas == 1 {
+			return domain.ErrCodigoEmUso
+		}
+		return nil
+	}
+
+	if _, err := svc.RegenerarCodigo(context.Background(), uuid.New()); err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if chamadas != 2 {
+		t.Errorf("esperadas 2 chamadas a UpdateCodigo, got %d", chamadas)
+	}
+}
+
+func TestRegenerarCodigo_ColisaoPersistente_Desiste(t *testing.T) {
+	svc, _, _, personais := newTenantServiceComPersonais()
+	chamadas := 0
+	personais.updateCodigoFn = func(context.Context, uuid.UUID, string) error {
+		chamadas++
+		return domain.ErrCodigoEmUso
+	}
+
+	_, err := svc.RegenerarCodigo(context.Background(), uuid.New())
+	if !errors.Is(err, domain.ErrCodigoEmUso) {
+		t.Fatalf("esperado ErrCodigoEmUso, got %v", err)
+	}
+	if chamadas != tentativasCodigoConvite {
+		t.Errorf("esperadas %d tentativas, got %d", tentativasCodigoConvite, chamadas)
+	}
+}
+
+func TestRegenerarCodigo_PersonalInexistente_PropagaErro(t *testing.T) {
+	svc, _, _, personais := newTenantServiceComPersonais()
+	personais.updateCodigoFn = func(context.Context, uuid.UUID, string) error {
+		return domain.ErrPersonalNotFound
+	}
+
+	_, err := svc.RegenerarCodigo(context.Background(), uuid.New())
+	if !errors.Is(err, domain.ErrPersonalNotFound) {
+		t.Fatalf("esperado ErrPersonalNotFound, got %v", err)
 	}
 }

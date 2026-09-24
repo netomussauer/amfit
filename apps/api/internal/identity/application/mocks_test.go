@@ -12,10 +12,26 @@ import (
 // ── Personal mock ──────────────────────────────────────────────────────────
 
 type mockPersonalRepo struct {
-	createFn    func(ctx context.Context, pt *domain.PersonalTrainer) error
-	findByIDFn  func(ctx context.Context, id uuid.UUID) (*domain.PersonalTrainer, error)
-	findByEmail func(ctx context.Context, email string) (*domain.PersonalTrainer, error)
-	updateFn    func(ctx context.Context, pt *domain.PersonalTrainer) error
+	createFn       func(ctx context.Context, pt *domain.PersonalTrainer) error
+	findByIDFn     func(ctx context.Context, id uuid.UUID) (*domain.PersonalTrainer, error)
+	findByEmail    func(ctx context.Context, email string) (*domain.PersonalTrainer, error)
+	updateFn       func(ctx context.Context, pt *domain.PersonalTrainer) error
+	findByCodigoFn func(ctx context.Context, codigo string) (*domain.PersonalTrainer, error)
+	updateCodigoFn func(ctx context.Context, id uuid.UUID, codigo string) error
+}
+
+func (m *mockPersonalRepo) FindByCodigo(ctx context.Context, codigo string) (*domain.PersonalTrainer, error) {
+	if m.findByCodigoFn != nil {
+		return m.findByCodigoFn(ctx, codigo)
+	}
+	return nil, domain.ErrPersonalNotFound
+}
+
+func (m *mockPersonalRepo) UpdateCodigo(ctx context.Context, id uuid.UUID, codigo string) error {
+	if m.updateCodigoFn != nil {
+		return m.updateCodigoFn(ctx, id, codigo)
+	}
+	return nil
 }
 
 func (m *mockPersonalRepo) Create(ctx context.Context, pt *domain.PersonalTrainer) error {

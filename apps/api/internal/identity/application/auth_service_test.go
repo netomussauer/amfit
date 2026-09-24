@@ -179,6 +179,70 @@ func TestRefresh_TokenRevogado_RetornaErro(t *testing.T) {
 	}
 }
 
+func TestRegisterPersonal_GravaCodigoDeConviteValido(t *testing.T) {
+	svc, personals, _, _, _ := newAuthServiceForTest(t)
+
+	var gravado string
+	personals.createFn = func(_ context.Context, pt *domain.PersonalTrainer) error {
+		gravado = pt.Codigo
+		return nil
+	}
+
+	if _, err := svc.RegisterPersonal(context.Background(), RegisterPersonalRequest{
+		Nome: "Coach", Email: "novo@example.com", Senha: fixedPassword,
+	}); err != nil {
+		t.Fatalf("RegisterPersonal: %v", err)
+	}
+	if !domain.CodigoConviteValido(gravado) {
+		t.Errorf("codigo gravado invalido: %q", gravado)
+	}
+}
+
+func TestRegisterPersonal_ColisaoDeCodigo_SorteiaOutroETenta(t *testing.T) {
+	svc, personals, _, _, _ := newAuthServiceForTest(t)
+
+	var codigos []string
+	personals.createFn = func(_ context.Context, pt *domain.PersonalTrainer) error {
+		codigos = append(codigos, pt.Codigo)
+		if len(codigos) < 3 {
+			return domain.ErrCodigoEmUso
+		}
+		return nil
+	}
+
+	if _, err := svc.RegisterPersonal(context.Background(), RegisterPersonalRequest{
+		Nome: "Coach", Email: "novo@example.com", Senha: fixedPassword,
+	}); err != nil {
+		t.Fatalf("RegisterPersonal deveria vencer a colisao, got %v", err)
+	}
+	if len(codigos) != 3 {
+		t.Fatalf("esperadas 3 tentativas, got %d", len(codigos))
+	}
+	if codigos[0] == codigos[1] && codigos[1] == codigos[2] {
+		t.Errorf("deveria sortear codigos diferentes a cada tentativa: %v", codigos)
+	}
+}
+
+func TestRegisterPersonal_ColisaoPersistente_DesisteAposAsTentativas(t *testing.T) {
+	svc, personals, _, _, _ := newAuthServiceForTest(t)
+
+	tentativas := 0
+	personals.createFn = func(context.Context, *domain.PersonalTrainer) error {
+		tentativas++
+		return domain.ErrCodigoEmUso
+	}
+
+	_, err := svc.RegisterPersonal(context.Background(), RegisterPersonalRequest{
+		Nome: "Coach", Email: "novo@example.com", Senha: fixedPassword,
+	})
+	if !errors.Is(err, domain.ErrCodigoEmUso) {
+		t.Fatalf("esperado ErrCodigoEmUso, got %v", err)
+	}
+	if tentativas != tentativasCodigoConvite {
+		t.Errorf("esperadas %d tentativas, got %d", tentativasCodigoConvite, tentativas)
+	}
+}
+
 func TestRegisterPersonal_PropagaErroEmailExistente(t *testing.T) {
 	svc, personals, _, _, _ := newAuthServiceForTest(t)
 

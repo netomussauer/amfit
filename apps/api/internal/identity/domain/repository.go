@@ -12,6 +12,14 @@ type PersonalTrainerRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*PersonalTrainer, error)
 	FindByEmail(ctx context.Context, email string) (*PersonalTrainer, error)
 	Update(ctx context.Context, pt *PersonalTrainer) error
+
+	// FindByCodigo devolve ErrPersonalNotFound quando nenhum personal tem o código.
+	FindByCodigo(ctx context.Context, codigo string) (*PersonalTrainer, error)
+
+	// UpdateCodigo troca o código de convite do personal. Devolve
+	// ErrCodigoEmUso em colisão de unicidade e ErrPersonalNotFound se o
+	// personal não existe. Create também devolve ErrCodigoEmUso na colisão.
+	UpdateCodigo(ctx context.Context, id uuid.UUID, codigo string) error
 }
 
 // AlunoFilter agrupa parâmetros opcionais de busca paginada de alunos.

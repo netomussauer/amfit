@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -40,31 +41,106 @@ type LogoStorage interface {
 	UploadLogo(ctx context.Context, personalID uuid.UUID, logo *LogoUpload) (string, error)
 }
 
-// TenantService implementa os casos de uso de White Label (SDD §20.4):
-// branding (logo, cores, nome do app) por personal, lido pelo próprio
-// personal e por seus alunos.
+// tentativasCodigoConvite limita os sorteios ao trocar o código de convite:
+// com ~8,5e11 combinações a colisão é improvável, mas não impossível.
+const tentativasCodigoConvite = 5
+
+// TenantService implementa os casos de uso de White Label (SDD §20.4,
+// ADR-007): branding (logo, cores, nome do app) por personal, lido pelo
+// próprio personal, por seus alunos e, antes do login, por quem tem o
+// código de convite.
 type TenantService struct {
 	configs domain.TenantConfigRepository
-	storage LogoStorage
+	// personais resolve o código de convite (FindByCodigo/UpdateCodigo) e o
+	// personal dono de uma config.
+	personais domain.PersonalTrainerRepository
+	storage   LogoStorage
 }
 
 // NewTenantService monta o service com as dependências necessárias.
 func NewTenantService(
 	configs domain.TenantConfigRepository,
+	personais domain.PersonalTrainerRepository,
 	storage LogoStorage,
 ) *TenantService {
-	return &TenantService{configs: configs, storage: storage}
+	return &TenantService{configs: configs, personais: personais, storage: storage}
 }
 
-// ObterConfig devolve a config de branding do personal informado.
+// ObterConfigPorCodigo devolve o branding público do personal dono do código
+// de convite (GET /public/tenants/:codigo/config, sem autenticação). Código
+// malformado e código inexistente dão o mesmo ErrCodigoNotFound — a resposta
+// pública não deixa distinguir os dois (anti-enumeração). O código do
+// personal não é repetido na resposta.
+func (s *TenantService) ObterConfigPorCodigo(ctx context.Context, codigo string) (*TenantConfigResponse, error) {
+	if !domain.CodigoConviteValido(codigo) {
+		return nil, domain.ErrCodigoNotFound
+	}
+	pt, err := s.personais.FindByCodigo(ctx, codigo)
+	if err != nil {
+		if errors.Is(err, domain.ErrPersonalNotFound) {
+			return nil, domain.ErrCodigoNotFound
+		}
+		return nil, fmt.Errorf("application: find personal by codigo: %w", err)
+	}
+	// Personal desativado não tem mais marca pública: o link/QR antigo dá o
+	// mesmo 404 de um código inexistente.
+	if !pt.Ativo {
+		return nil, domain.ErrCodigoNotFound
+	}
+	return s.ObterConfig(ctx, pt.ID)
+}
+
+// ObterConfigDoPersonal é o ObterConfig do próprio personal: inclui o código
+// de convite, que o aluno não precisa receber.
+func (s *TenantService) ObterConfigDoPersonal(ctx context.Context, personalID uuid.UUID) (*TenantConfigResponse, error) {
+	resp, err := s.ObterConfig(ctx, personalID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.anexarCodigo(ctx, personalID, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// RegenerarCodigo troca o código de convite do personal por um novo; o
+// código (e portanto o link/QR) anterior deixa de funcionar.
+func (s *TenantService) RegenerarCodigo(ctx context.Context, personalID uuid.UUID) (*TenantConfigResponse, error) {
+	for i := 0; i < tentativasCodigoConvite; i++ {
+		codigo, err := domain.GerarCodigoConvite()
+		if err != nil {
+			return nil, fmt.Errorf("application: gerar codigo: %w", err)
+		}
+		err = s.personais.UpdateCodigo(ctx, personalID, codigo)
+		if errors.Is(err, domain.ErrCodigoEmUso) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("application: atualizar codigo: %w", err)
+		}
+
+		log.Info().Str("personal_id", personalID.String()).Msg("codigo de convite regenerado")
+		return s.ObterConfigDoPersonal(ctx, personalID)
+	}
+	return nil, fmt.Errorf("application: atualizar codigo: %w", domain.ErrCodigoEmUso)
+}
+
+func (s *TenantService) anexarCodigo(ctx context.Context, personalID uuid.UUID, resp *TenantConfigResponse) error {
+	pt, err := s.personais.FindByID(ctx, personalID)
+	if err != nil {
+		return fmt.Errorf("application: find personal: %w", err)
+	}
+	resp.Codigo = pt.Codigo
+	return nil
+}
+
+// ObterConfig devolve a config de branding do personal informado, sem o
+// código de convite (ver ObterConfigDoPersonal).
 //
 // Resolução de quem é "o personal" fica no handler (não aqui): o JWT do
 // aluno já carrega o claim `tenant_id` com o personal_id dele (mesmo
 // padrão usado em catalog/handlers/helpers.go, personalIDForList) — não
-// há necessidade de olhar a tabela `aluno`, nem de replicar aqui o design
-// original do SDD (GET público por "código", que pressupõe um fluxo de
-// convite/QR-code pré-login que este app não tem — alunos são criados
-// diretamente pelo personal).
+// há necessidade de olhar a tabela `aluno`.
 func (s *TenantService) ObterConfig(ctx context.Context, personalID uuid.UUID) (*TenantConfigResponse, error) {
 	cfg, err := s.configs.FindByPersonalID(ctx, personalID)
 	if err != nil {
@@ -137,7 +213,14 @@ func (s *TenantService) AtualizarConfig(
 
 	log.Info().Str("personal_id", personalID.String()).Msg("tenant config atualizada")
 
-	return tenantConfigToResponse(cfg), nil
+	// Rota só do personal: a resposta inclui o código de convite, porque o
+	// portal grava este payload no cache da config (sem o código o bloco
+	// "Convite para alunos" perderia o valor depois de salvar o branding).
+	resp := tenantConfigToResponse(cfg)
+	if err := s.anexarCodigo(ctx, personalID, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // normalizarCorHex aceita a cor com ou sem "#" e devolve sempre em

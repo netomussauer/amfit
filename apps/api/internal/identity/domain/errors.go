@@ -38,4 +38,13 @@ var (
 	// ErrLogoTamanhoExcedido indica que o logo enviado excede o limite de
 	// tamanho permitido.
 	ErrLogoTamanhoExcedido = errors.New("identity: tamanho do logo excede o limite")
+
+	// ErrCodigoNotFound indica que nenhum personal tem o código de convite
+	// informado — inclui o código malformado, para a resposta pública ser
+	// idêntica nos dois casos (anti-enumeração).
+	ErrCodigoNotFound = errors.New("identity: código de convite não encontrado")
+
+	// ErrCodigoEmUso indica colisão de unicidade ao gravar um código de
+	// convite; quem gerou o código sorteia outro e tenta de novo.
+	ErrCodigoEmUso = errors.New("identity: código de convite já em uso")
 )

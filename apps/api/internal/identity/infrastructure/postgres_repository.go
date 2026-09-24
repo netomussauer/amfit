@@ -48,15 +48,18 @@ type personalRepo struct {
 
 func (r *personalRepo) Create(ctx context.Context, pt *domain.PersonalTrainer) error {
 	const q = `
-		INSERT INTO personal_trainer (id, nome, email, telefone, cref, ativo)
-		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6)
+		INSERT INTO personal_trainer (id, nome, email, telefone, cref, ativo, codigo)
+		VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6, $7)
 		RETURNING criado_em, atualizado_em`
 
 	err := r.pool.QueryRow(ctx, q,
-		pt.ID, pt.Nome, pt.Email, pt.Telefone, pt.CREF, pt.Ativo,
+		pt.ID, pt.Nome, pt.Email, pt.Telefone, pt.CREF, pt.Ativo, pt.Codigo,
 	).Scan(&pt.CriadoEm, &pt.AtualizadoEm)
 
 	if err != nil {
+		if isUniqueViolationOn(err, personalCodigoConstraint) {
+			return domain.ErrCodigoEmUso
+		}
 		if isUniqueViolation(err) {
 			return domain.ErrEmailAlreadyExists
 		}
@@ -68,14 +71,14 @@ func (r *personalRepo) Create(ctx context.Context, pt *domain.PersonalTrainer) e
 func (r *personalRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.PersonalTrainer, error) {
 	const q = `
 		SELECT id, nome, email, COALESCE(telefone, ''), COALESCE(cref, ''),
-		       ativo, criado_em, atualizado_em
+		       ativo, criado_em, atualizado_em, codigo
 		FROM personal_trainer
 		WHERE id = $1`
 
 	var pt domain.PersonalTrainer
 	err := r.pool.QueryRow(ctx, q, id).Scan(
 		&pt.ID, &pt.Nome, &pt.Email, &pt.Telefone, &pt.CREF,
-		&pt.Ativo, &pt.CriadoEm, &pt.AtualizadoEm,
+		&pt.Ativo, &pt.CriadoEm, &pt.AtualizadoEm, &pt.Codigo,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -89,14 +92,14 @@ func (r *personalRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.Pers
 func (r *personalRepo) FindByEmail(ctx context.Context, email string) (*domain.PersonalTrainer, error) {
 	const q = `
 		SELECT id, nome, email, COALESCE(telefone, ''), COALESCE(cref, ''),
-		       ativo, criado_em, atualizado_em
+		       ativo, criado_em, atualizado_em, codigo
 		FROM personal_trainer
 		WHERE email = $1`
 
 	var pt domain.PersonalTrainer
 	err := r.pool.QueryRow(ctx, q, email).Scan(
 		&pt.ID, &pt.Nome, &pt.Email, &pt.Telefone, &pt.CREF,
-		&pt.Ativo, &pt.CriadoEm, &pt.AtualizadoEm,
+		&pt.Ativo, &pt.CriadoEm, &pt.AtualizadoEm, &pt.Codigo,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -105,6 +108,47 @@ func (r *personalRepo) FindByEmail(ctx context.Context, email string) (*domain.P
 		return nil, fmt.Errorf("infrastructure: find personal by email: %w", err)
 	}
 	return &pt, nil
+}
+
+func (r *personalRepo) FindByCodigo(ctx context.Context, codigo string) (*domain.PersonalTrainer, error) {
+	const q = `
+		SELECT id, nome, email, COALESCE(telefone, ''), COALESCE(cref, ''),
+		       ativo, criado_em, atualizado_em, codigo
+		FROM personal_trainer
+		WHERE codigo = $1`
+
+	var pt domain.PersonalTrainer
+	err := r.pool.QueryRow(ctx, q, codigo).Scan(
+		&pt.ID, &pt.Nome, &pt.Email, &pt.Telefone, &pt.CREF,
+		&pt.Ativo, &pt.CriadoEm, &pt.AtualizadoEm, &pt.Codigo,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrPersonalNotFound
+		}
+		return nil, fmt.Errorf("infrastructure: find personal by codigo: %w", err)
+	}
+	return &pt, nil
+}
+
+func (r *personalRepo) UpdateCodigo(ctx context.Context, id uuid.UUID, codigo string) error {
+	const q = `
+		UPDATE personal_trainer
+		   SET codigo = $2,
+		       atualizado_em = NOW()
+		 WHERE id = $1`
+
+	tag, err := r.pool.Exec(ctx, q, id, codigo)
+	if err != nil {
+		if isUniqueViolationOn(err, personalCodigoConstraint) {
+			return domain.ErrCodigoEmUso
+		}
+		return fmt.Errorf("infrastructure: update codigo do personal: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrPersonalNotFound
+	}
+	return nil
 }
 
 func (r *personalRepo) Update(ctx context.Context, pt *domain.PersonalTrainer) error {
@@ -458,6 +502,18 @@ func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		return pgErr.Code == pgUniqueViolation
+	}
+	return false
+}
+
+// personalCodigoConstraint é a UNIQUE de personal_trainer.codigo (migration
+// 000012) — distingue colisão de código de colisão de e-mail no mesmo INSERT.
+const personalCodigoConstraint = "personal_trainer_codigo_key"
+
+func isUniqueViolationOn(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == constraint
 	}
 	return false
 }
