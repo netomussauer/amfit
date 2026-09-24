@@ -174,6 +174,78 @@ func TestCriarTreino_FichaDeOutroPersonal_RetornaForbidden(t *testing.T) {
 	}
 }
 
+// ── AtualizarFicha / ListarFichas (contagem de treinos) ───────────────────
+
+func TestAtualizarFicha_DevolveFichaCompletaComTreinos(t *testing.T) {
+	svc, fichas, _, _, fichaCompleta, _, _ := newServiceForTest()
+
+	personalID := uuid.New()
+	ficha := domain.FichaTreino{
+		ID:             uuid.New(),
+		AlunoID:        uuid.New(),
+		PersonalID:     personalID,
+		Nome:           "Antigo",
+		VigenciaInicio: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+		Ativa:          true,
+	}
+	fichas.findByIDFn = func(context.Context, uuid.UUID) (*domain.FichaTreino, error) {
+		copia := ficha
+		return &copia, nil
+	}
+	fichaCompleta.getCompletaFn = func(_ context.Context, fid uuid.UUID) (*domain.FichaCompleta, error) {
+		atualizada := ficha
+		atualizada.Nome = "Novo nome"
+		return &domain.FichaCompleta{
+			Ficha: atualizada,
+			Treinos: []domain.TreinoCompleto{
+				{Treino: domain.Treino{ID: uuid.New(), FichaID: fid, Letra: "A"}},
+				{Treino: domain.Treino{ID: uuid.New(), FichaID: fid, Letra: "B", Ordem: 1}},
+			},
+		}, nil
+	}
+
+	novoNome := "Novo nome"
+	resp, err := svc.AtualizarFicha(context.Background(), personalID, ficha.ID, AtualizarFichaRequest{Nome: &novoNome})
+	if err != nil {
+		t.Fatalf("AtualizarFicha: %v", err)
+	}
+	if resp.Nome != "Novo nome" {
+		t.Errorf("nome esperado %q, got %q", "Novo nome", resp.Nome)
+	}
+	if len(resp.Treinos) != 2 || resp.TotalTreinos != 2 {
+		t.Errorf("esperados 2 treinos (total 2), got len=%d total=%d", len(resp.Treinos), resp.TotalTreinos)
+	}
+}
+
+func TestListarFichas_ExpoeTotalTreinosSemCarregarTreinos(t *testing.T) {
+	svc, fichas, _, _, _, _, _ := newServiceForTest()
+
+	personalID := uuid.New()
+	fichas.listFn = func(context.Context, domain.ListFichasFilter) ([]*domain.FichaTreino, error) {
+		return []*domain.FichaTreino{
+			{ID: uuid.New(), AlunoID: uuid.New(), PersonalID: personalID, Nome: "Com treinos", TotalTreinos: 3},
+			{ID: uuid.New(), AlunoID: uuid.New(), PersonalID: personalID, Nome: "Vazia", TotalTreinos: 0},
+		}, nil
+	}
+
+	resp, err := svc.ListarFichas(context.Background(), personalID, nil, nil)
+	if err != nil {
+		t.Fatalf("ListarFichas: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("esperadas 2 fichas, got %d", len(resp.Data))
+	}
+	if resp.Data[0].TotalTreinos != 3 {
+		t.Errorf("total_treinos esperado 3, got %d", resp.Data[0].TotalTreinos)
+	}
+	if resp.Data[1].TotalTreinos != 0 {
+		t.Errorf("total_treinos esperado 0, got %d", resp.Data[1].TotalTreinos)
+	}
+	if resp.Data[0].Treinos == nil || len(resp.Data[0].Treinos) != 0 {
+		t.Errorf("treinos deve ser array vazio (não carregado), got %v", resp.Data[0].Treinos)
+	}
+}
+
 // ── BuscarFicha (read-model completo) ─────────────────────────────────────
 
 func TestBuscarFicha_RetornaEstruturaCompleta(t *testing.T) {

@@ -216,7 +216,14 @@ func (s *TrainingService) AtualizarFicha(
 		Str("personal_id", personalID.String()).
 		Msg("ficha de treino atualizada")
 
-	resp := fichaToResponse(ficha, nil)
+	// Resposta completa (como GET /fichas/:id): o cliente grava este payload
+	// direto no cache do detalhe, e um `treinos: []` aqui esconderia os
+	// treinos da ficha até o próximo refetch.
+	completa, err := s.fichaLeitura.GetCompleta(ctx, ficha.ID)
+	if err != nil {
+		return nil, fmt.Errorf("application: get ficha completa: %w", err)
+	}
+	resp := fichaCompletaToResponse(completa)
 	return &resp, nil
 }
 
@@ -657,7 +664,10 @@ func (s *TrainingService) requireItemOfPersonal(
 // ── Mappers ────────────────────────────────────────────────────────────────
 
 // fichaToResponse converte a entidade em DTO. Quando treinos != nil, são
-// embutidos no campo Treinos; caso contrário, o slice é vazio (lista resumida).
+// embutidos no campo Treinos e TotalTreinos é o tamanho dele; caso
+// contrário, o slice é vazio (lista resumida) e TotalTreinos vem da
+// entidade (f.TotalTreinos, preenchido por FichaRepository.List, ou 0).
+// Passe sempre a lista COMPLETA de treinos ou nil — nunca uma parcial.
 func fichaToResponse(f *domain.FichaTreino, treinos []TreinoResponse) FichaResponse {
 	resp := FichaResponse{
 		ID:             f.ID.String(),
@@ -666,6 +676,7 @@ func fichaToResponse(f *domain.FichaTreino, treinos []TreinoResponse) FichaRespo
 		VigenciaInicio: f.VigenciaInicio.Format(dateLayout),
 		Ativa:          f.Ativa,
 		Treinos:        treinos,
+		TotalTreinos:   f.TotalTreinos,
 	}
 	if f.VigenciaFim != nil {
 		s := f.VigenciaFim.Format(dateLayout)
@@ -673,6 +684,8 @@ func fichaToResponse(f *domain.FichaTreino, treinos []TreinoResponse) FichaRespo
 	}
 	if resp.Treinos == nil {
 		resp.Treinos = []TreinoResponse{}
+	} else {
+		resp.TotalTreinos = len(resp.Treinos)
 	}
 	return resp
 }

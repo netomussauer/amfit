@@ -33,6 +33,8 @@ function mockUseFichasReturn(overrides: Partial<ReturnType<typeof useFichas>>) {
   } as unknown as ReturnType<typeof useFichas>);
 }
 
+// Formato real de GET /fichas: o backend não carrega os treinos na listagem
+// (`treinos` sempre vazio) e manda só a contagem em `total_treinos`.
 const fichasFixture: FichaListResponse = {
   data: [
     {
@@ -42,10 +44,8 @@ const fichasFixture: FichaListResponse = {
       vigencia_inicio: '2026-05-01',
       vigencia_fim: '2026-08-01',
       ativa: true,
-      treinos: [
-        { id: 'treino-1', letra: 'A', ordem: 0, itens: [] },
-        { id: 'treino-2', letra: 'B', ordem: 1, itens: [] },
-      ],
+      treinos: [],
+      total_treinos: 2,
     },
     {
       id: 'ficha-2',
@@ -54,6 +54,7 @@ const fichasFixture: FichaListResponse = {
       vigencia_inicio: '2026-01-01',
       ativa: false,
       treinos: [],
+      total_treinos: 0,
     },
   ],
 };

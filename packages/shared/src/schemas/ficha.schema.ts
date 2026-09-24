@@ -47,7 +47,11 @@ export const FichaResponseSchema = z.object({
   vigencia_inicio: dataIsoSchema,
   vigencia_fim: dataIsoSchema.nullable().optional(),
   ativa: z.boolean(),
+  // Na listagem (GET /fichas) o backend não carrega os treinos: `treinos`
+  // vem `[]` mesmo com treinos cadastrados. Pra exibir a contagem, use
+  // `total_treinos`, que vem preenchido em todas as respostas.
   treinos: z.array(TreinoResponseSchema),
+  total_treinos: z.number().int().nonnegative().optional(),
 });
 
 export const FichaListResponseSchema = z.object({

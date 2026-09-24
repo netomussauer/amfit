@@ -18,6 +18,11 @@ type FichaTreino struct {
 	Ativa          bool
 	CriadoEm       time.Time
 	AtualizadoEm   time.Time
+
+	// TotalTreinos só é preenchido por FichaRepository.List (contagem, sem
+	// carregar os treinos) — nas demais leituras fica zerado e o total vem
+	// dos treinos carregados.
+	TotalTreinos int
 }
 
 // Treino é um conjunto de exercícios identificado por letra (A, B, C...).

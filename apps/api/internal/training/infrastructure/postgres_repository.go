@@ -99,13 +99,14 @@ func (r *fichaRepo) List(
 	// em uma única consulta para preservar o uso do índice composto sem
 	// montagem dinâmica de SQL.
 	const q = `
-		SELECT id, aluno_id, personal_id, nome,
-		       vigencia_inicio, vigencia_fim, ativa, criado_em, atualizado_em
-		FROM ficha_treino
-		WHERE personal_id = $1
-		  AND ($2::uuid IS NULL OR aluno_id = $2)
-		  AND ($3::boolean IS NULL OR ativa = $3)
-		ORDER BY criado_em DESC`
+		SELECT f.id, f.aluno_id, f.personal_id, f.nome,
+		       f.vigencia_inicio, f.vigencia_fim, f.ativa, f.criado_em, f.atualizado_em,
+		       (SELECT COUNT(*) FROM treino t WHERE t.ficha_id = f.id) AS total_treinos
+		FROM ficha_treino f
+		WHERE f.personal_id = $1
+		  AND ($2::uuid IS NULL OR f.aluno_id = $2)
+		  AND ($3::boolean IS NULL OR f.ativa = $3)
+		ORDER BY f.criado_em DESC`
 
 	rows, err := r.pool.Query(ctx, q, filter.PersonalID, filter.AlunoID, filter.Ativa)
 	if err != nil {
@@ -119,6 +120,7 @@ func (r *fichaRepo) List(
 		if err := rows.Scan(
 			&f.ID, &f.AlunoID, &f.PersonalID, &f.Nome,
 			&f.VigenciaInicio, &f.VigenciaFim, &f.Ativa, &f.CriadoEm, &f.AtualizadoEm,
+			&f.TotalTreinos,
 		); err != nil {
 			return nil, fmt.Errorf("infrastructure: scan ficha: %w", err)
 		}

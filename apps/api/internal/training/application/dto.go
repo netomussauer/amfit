@@ -74,13 +74,16 @@ type CriarFichaFromTemplateRequest struct {
 
 // FichaResponse é o DTO de saída para uma ficha completa.
 type FichaResponse struct {
-	ID             string           `json:"id"`
-	AlunoID        string           `json:"aluno_id"`
-	Nome           string           `json:"nome"`
-	VigenciaInicio string           `json:"vigencia_inicio"`
-	VigenciaFim    *string          `json:"vigencia_fim,omitempty"`
-	Ativa          bool             `json:"ativa"`
-	Treinos        []TreinoResponse `json:"treinos"`
+	ID             string  `json:"id"`
+	AlunoID        string  `json:"aluno_id"`
+	Nome           string  `json:"nome"`
+	VigenciaInicio string  `json:"vigencia_inicio"`
+	VigenciaFim    *string `json:"vigencia_fim,omitempty"`
+	Ativa          bool    `json:"ativa"`
+	// Treinos vem vazio na listagem (que não carrega treinos) — quem precisa
+	// só da contagem usa TotalTreinos, que é preenchido em todas as respostas.
+	Treinos      []TreinoResponse `json:"treinos"`
+	TotalTreinos int              `json:"total_treinos"`
 }
 
 // FichaListResponse encapsula a lista de fichas (sem aninhar treinos).

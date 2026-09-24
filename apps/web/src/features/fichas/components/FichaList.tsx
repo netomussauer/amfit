@@ -87,7 +87,9 @@ function FichaCard({
   ficha: FichaResponse;
   alunoId: string;
 }) {
-  const totalTreinos = ficha.treinos.length;
+  // A listagem não carrega os treinos (`treinos` vem vazio) — a contagem
+  // vem em `total_treinos`.
+  const totalTreinos = ficha.total_treinos ?? ficha.treinos.length;
 
   return (
     <Link
