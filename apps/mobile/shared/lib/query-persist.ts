@@ -1,9 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  defaultShouldDehydrateQuery,
-  type Query,
-  type QueryClient,
-} from '@tanstack/react-query';
+import type { Query, QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { treinoKeys } from '@/features/treino/hooks/query-keys';
 import {
@@ -25,11 +21,16 @@ export const persister = createAsyncStoragePersister({
   key: STORAGE_KEY,
 });
 
-/** Só queries bem-sucedidas (padrão do React Query) e só das raízes da
- * allowlist — erro/pendente e o resto do app ficam fora do disco. */
+/** Só as raízes da allowlist, e só queries que TÊM dado — não as que
+ * estão com `status === 'success'` (o padrão do React Query). Um refetch
+ * que falha (API fora do ar, offline) muda o status pra `error` mas
+ * mantém o `data`; filtrar por status apagaria essa query do disco na
+ * próxima gravação (ex.: ao registrar uma série offline), e o app não
+ * abriria mais sem rede no cold start seguinte. Query sem dado (primeiro
+ * fetch pendente ou falho) continua fora. */
 export function shouldPersistQuery(query: Query): boolean {
   return (
-    defaultShouldDehydrateQuery(query) &&
+    query.state.data !== undefined &&
     PERSISTED_QUERY_ROOTS.includes(String(query.queryKey[0]))
   );
 }
@@ -71,6 +72,22 @@ export async function limparCachePersistido(): Promise<void> {
 export async function limparCache(queryClient: QueryClient): Promise<void> {
   queryClient.clear();
   await limparCachePersistido();
+}
+
+/**
+ * `shouldPersistQuery` grava queries que têm dado mesmo com `status:
+ * 'error'` (refetch offline falho). Restauradas assim, uma tela que olhe
+ * `isError`/`error` antes de `data` mostraria erro em vez do treino em
+ * cache, e o `error` voltaria do JSON sem ser um Error. Depois de
+ * restaurar, volta essas queries pra `success` sem erro — o React Query
+ * refaz o fetch sozinho quando o dado estiver velho.
+ */
+export function normalizarQueriesRestauradas(queryClient: QueryClient): void {
+  for (const query of queryClient.getQueryCache().getAll()) {
+    if (query.state.status === 'error' && query.state.data !== undefined) {
+      query.setState({ status: 'success', error: null, fetchFailureCount: 0, fetchFailureReason: null });
+    }
+  }
 }
 
 function mesmoDiaLocal(a: Date, b: Date): boolean {

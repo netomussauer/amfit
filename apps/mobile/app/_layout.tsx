@@ -12,6 +12,7 @@ import { queryClient } from '@/shared/lib/query-client';
 import {
   descartarTreinoHojeVencido,
   limparCache,
+  normalizarQueriesRestauradas,
   persistOptions,
 } from '@/shared/lib/query-persist';
 import { configureOfflineSync } from '@/shared/lib/offline-sync';
@@ -107,7 +108,10 @@ export default function RootLayout() {
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={persistOptions}
-        onSuccess={() => descartarTreinoHojeVencido(queryClient)}
+        onSuccess={() => {
+          normalizarQueriesRestauradas(queryClient);
+          descartarTreinoHojeVencido(queryClient);
+        }}
       >
         <ThemeProvider>
           <AuthGuard>

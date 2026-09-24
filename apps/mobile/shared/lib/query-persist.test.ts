@@ -12,6 +12,7 @@ import {
   descartarTreinoHojeVencido,
   limparCache,
   limparCachePersistido,
+  normalizarQueriesRestauradas,
   persistOptions,
   persister,
   shouldPersistQuery,
@@ -83,6 +84,24 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(buscar(client, ['treino', 'hoje'])!)).toBe(false);
   });
 
+  it('aceita uma query da allowlist cujo refetch falhou mas que mantém o dado', async () => {
+    const client = new QueryClient();
+    client.setQueryData(['treino', 'hoje'], treinoHoje);
+    await client
+      .fetchQuery({
+        queryKey: ['treino', 'hoje'],
+        queryFn: () => Promise.reject(new Error('sem rede')),
+        retry: false,
+        staleTime: 0,
+      })
+      .catch(() => undefined);
+
+    const query = buscar(client, ['treino', 'hoje'])!;
+    expect(query.state.status).toBe('error');
+    expect(query.state.data).toEqual(treinoHoje);
+    expect(shouldPersistQuery(query)).toBe(true);
+  });
+
   it('mantém a allowlist restrita ao fluxo de treino', () => {
     expect([...PERSISTED_QUERY_ROOTS].sort()).toEqual(['minha-ficha', 'sessoes', 'treino']);
   });
@@ -102,6 +121,25 @@ describe('ida e volta do cache pelo AsyncStorage', () => {
     expect(novo.getQueryData(['treino', 'hoje'])).toEqual(treinoHoje);
     expect(novo.getQueryData(['minha-ficha', 'ativa'])).toEqual(ficha);
     expect(novo.getQueryData(['sessoes', 'detail', 'local-1-abc'])).toEqual(sessaoLocal);
+  });
+
+  it('um refetch falho (offline) não tira a query do disco na gravação seguinte', async () => {
+    const client = clienteComDados();
+    await client
+      .fetchQuery({
+        queryKey: ['treino', 'hoje'],
+        queryFn: () => Promise.reject(new Error('sem rede')),
+        retry: false,
+        staleTime: 0,
+      })
+      .catch(() => undefined);
+    await persistQueryClientSave({ queryClient: client, ...opcoes });
+
+    const novo = new QueryClient();
+    await persistQueryClientRestore({ queryClient: novo, ...opcoes });
+
+    expect(novo.getQueryData(['treino', 'hoje'])).toEqual(treinoHoje);
+    expect(novo.getQueryData(['minha-ficha', 'ativa'])).toEqual(ficha);
   });
 
   it('não leva pro disco dado pessoal nem chaves sintéticas', async () => {
@@ -218,6 +256,49 @@ describe('mutations nunca vão pro disco', () => {
     const bruto = (await AsyncStorage.getItem(STORAGE_KEY)) ?? '';
     expect(bruto).not.toContain('senha-super-secreta');
     expect(JSON.parse(bruto).clientState.mutations).toEqual([]);
+  });
+});
+
+describe('normalizarQueriesRestauradas', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('devolve pra success (sem erro) a query restaurada que foi gravada em erro com dado', async () => {
+    const client = clienteComDados();
+    await client
+      .fetchQuery({
+        queryKey: ['treino', 'hoje'],
+        queryFn: () => Promise.reject(new Error('sem rede')),
+        retry: false,
+        staleTime: 0,
+      })
+      .catch(() => undefined);
+    await persistQueryClientSave({ queryClient: client, ...opcoes });
+
+    const novo = new QueryClient();
+    await persistQueryClientRestore({ queryClient: novo, ...opcoes });
+    normalizarQueriesRestauradas(novo);
+
+    const state = novo.getQueryState(['treino', 'hoje'])!;
+    expect(state.status).toBe('success');
+    expect(state.error).toBeNull();
+    expect(state.data).toEqual(treinoHoje);
+  });
+
+  it('não mexe numa query em erro sem dado', async () => {
+    const client = new QueryClient();
+    await client
+      .fetchQuery({
+        queryKey: ['treino', 'hoje'],
+        queryFn: () => Promise.reject(new Error('sem rede')),
+        retry: false,
+      })
+      .catch(() => undefined);
+
+    normalizarQueriesRestauradas(client);
+
+    expect(client.getQueryState(['treino', 'hoje'])!.status).toBe('error');
   });
 });
 
