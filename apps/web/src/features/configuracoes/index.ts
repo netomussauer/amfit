@@ -2,6 +2,7 @@
 export { ContaForm } from './components/ContaForm';
 export { AlterarSenhaForm } from './components/AlterarSenhaForm';
 export { BrandingForm } from './components/BrandingForm';
+export { ConviteAlunos } from './components/ConviteAlunos';
 
 // Hooks
 export { useMinhaConta } from './hooks/useMinhaConta';
@@ -9,4 +10,5 @@ export { useAtualizarConta } from './hooks/useAtualizarConta';
 export { useAlterarSenha } from './hooks/useAlterarSenha';
 export { useTenantConfig } from './hooks/useTenantConfig';
 export { useAtualizarTenantConfig } from './hooks/useAtualizarTenantConfig';
+export { useRegenerarCodigoTenant } from './hooks/useRegenerarCodigoTenant';
 export { personalKeys, tenantKeys } from './hooks/query-keys';

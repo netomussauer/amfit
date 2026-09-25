@@ -1,6 +1,7 @@
 import { ContaForm } from '@/features/configuracoes/components/ContaForm';
 import { AlterarSenhaForm } from '@/features/configuracoes/components/AlterarSenhaForm';
 import { BrandingForm } from '@/features/configuracoes/components/BrandingForm';
+import { ConviteAlunos } from '@/features/configuracoes/components/ConviteAlunos';
 
 export const metadata = {
   title: 'Configurações — AMFIT',
@@ -43,6 +44,21 @@ export default function ConfiguracoesPage() {
           </p>
           <div className="mt-4">
             <BrandingForm />
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="convite-heading" className="space-y-4">
+        <div className="rounded-lg border border-[--color-border] bg-[--color-bg] p-6 shadow-sm">
+          <h2 id="convite-heading" className="text-lg font-semibold text-[--color-text]">
+            Convite para alunos
+          </h2>
+          <p className="mt-1 text-sm text-[--color-text-muted]">
+            Compartilhe o link, o QR ou o código: seus alunos veem a sua marca já na tela de
+            login, no app e na web.
+          </p>
+          <div className="mt-4">
+            <ConviteAlunos />
           </div>
         </div>
       </section>

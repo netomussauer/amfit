@@ -7,6 +7,9 @@ const PERSONAL_PREFIXES = ['/dashboard', '/alunos', '/exercicios', '/configuraco
 const ALUNO_PREFIXES = ['/treino', '/historico', '/progresso', '/perfil'];
 const PROTECTED_PREFIXES = [...PERSONAL_PREFIXES, ...ALUNO_PREFIXES];
 const PUBLIC_AUTH_PATHS = ['/login', '/register'];
+// Página pública de convite (login com a marca do personal): tratada como o
+// /login — quem já tem sessão vai direto para a própria home.
+const INVITE_PREFIXES = ['/entrar'];
 
 function homeFor(role: string | undefined): string {
   return role === 'ALUNO' ? '/treino' : '/dashboard';
@@ -47,7 +50,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  if (token && PUBLIC_AUTH_PATHS.includes(pathname)) {
+  if (token && (PUBLIC_AUTH_PATHS.includes(pathname) || matchesPrefix(pathname, INVITE_PREFIXES))) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = homeFor(role);
     homeUrl.search = '';
@@ -69,5 +72,6 @@ export const config = {
     '/perfil/:path*',
     '/login',
     '/register',
+    '/entrar/:path*',
   ],
 };

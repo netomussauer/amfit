@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tenantService } from './tenant.service';
 
-const { mockedGet, mockedPatch } = vi.hoisted(() => ({
+const { mockedGet, mockedPatch, mockedPost } = vi.hoisted(() => ({
   mockedGet: vi.fn(),
   mockedPatch: vi.fn(),
+  mockedPost: vi.fn(),
 }));
 
 vi.mock('@/shared/lib/api-client', () => ({
-  apiClient: { get: mockedGet, patch: mockedPatch },
+  apiClient: { get: mockedGet, patch: mockedPatch, post: mockedPost },
 }));
 
 const configFixture = {
@@ -67,5 +68,26 @@ describe('tenantService.atualizarConfig', () => {
 
     const body = mockedPatch.mock.calls[0][1] as FormData;
     expect(body.get('logo')).toBe(logo);
+  });
+});
+
+describe('tenantService.regenerarCodigo', () => {
+  beforeEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('chama POST /tenants/me/codigo/regenerar e devolve a config com o código novo', async () => {
+    mockedPost.mockResolvedValueOnce({ data: { ...configFixture, codigo: 'K7M2QX9P' } });
+
+    const resultado = await tenantService.regenerarCodigo();
+
+    expect(mockedPost).toHaveBeenCalledWith('/tenants/me/codigo/regenerar');
+    expect(resultado.codigo).toBe('K7M2QX9P');
+  });
+
+  it('lança quando o código devolvido não tem o formato de convite', async () => {
+    mockedPost.mockResolvedValueOnce({ data: { ...configFixture, codigo: 'k7m2qx0p' } });
+
+    await expect(tenantService.regenerarCodigo()).rejects.toThrow();
   });
 });

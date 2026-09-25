@@ -1,5 +1,9 @@
 import { cookies } from 'next/headers';
-import type { TenantConfigResponse } from '@amfit/shared';
+import {
+  CODIGO_CONVITE_REGEX,
+  TenantConfigResponseSchema,
+  type TenantConfigResponse,
+} from '@amfit/shared';
 import { ACCESS_TOKEN_COOKIE } from './auth';
 
 // Mesma variável usada pelo proxy server-side em
@@ -32,6 +36,32 @@ export async function getTenantConfig(): Promise<TenantConfigResponse | null> {
     });
     if (!res.ok) return null;
     return (await res.json()) as TenantConfigResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca a config de branding PÚBLICA de um personal pelo código de convite
+ * (GET /public/tenants/:codigo/config), direto no servidor e sem cookie de
+ * sessão — usado pela página de convite `/entrar/[codigo]` (ADR-007,
+ * nível 2: marca antes do login).
+ *
+ * Nunca lança: código malformado, inexistente (404) ou qualquer falha do
+ * backend devolve null e a página cai no login padrão.
+ */
+export async function getPublicTenantConfig(
+  codigo: string,
+): Promise<TenantConfigResponse | null> {
+  if (!CODIGO_CONVITE_REGEX.test(codigo)) return null;
+
+  try {
+    const res = await fetch(`${API_ORIGIN}/api/v1/public/tenants/${codigo}/config`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const parsed = TenantConfigResponseSchema.safeParse(await res.json());
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }

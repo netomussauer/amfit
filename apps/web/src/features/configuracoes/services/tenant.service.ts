@@ -11,6 +11,12 @@ export const tenantService = {
     return TenantConfigResponseSchema.parse(data);
   },
 
+  /** Gera um novo código de convite; o link/QR anterior deixa de funcionar. */
+  async regenerarCodigo(): Promise<TenantConfigResponse> {
+    const { data } = await apiClient.post('/tenants/me/codigo/regenerar');
+    return TenantConfigResponseSchema.parse(data);
+  },
+
   async atualizarConfig(
     payload: AtualizarTenantConfigRequest,
     logo: File | null,
