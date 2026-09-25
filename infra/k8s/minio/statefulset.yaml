@@ -39,13 +39,15 @@ spec:
         fsGroup: 1000
       containers:
         - name: minio
-          # O Docker Hub descontinuou o repositório `minio/minio` (a MinIO
-          # Inc. migrou a distribuição oficial pro Quay.io) — `latest`
-          # passou a devolver "pull access denied" mesmo já tendo
-          # funcionado antes. Fixado numa release específica (não
-          # `:latest` do Quay também) pra não depender de qual tag esse
-          # alias aponta no futuro.
-          image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z.hotfix.7aa24e772
+          # A MinIO Inc. parou de distribuir imagens públicas: o Docker Hub
+          # foi descontinuado e o `quay.io/minio/minio` passou a devolver
+          # 401 UNAUTHORIZED em pull anônimo (ImagePullBackOff em 09/2026).
+          # Usa a imagem pública da Chainguard, fixada por digest (índice
+          # multi-arch, `latest` de 2026-09-24) pra não depender de tag
+          # mutável. Ao atualizar, troque o digest deliberadamente.
+          # A imagem é minimalista (não se presume o `mc` nela), por isso
+          # o liveness usa o endpoint HTTP nativo.
+          image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
           command:
             - minio
             - server
@@ -86,11 +88,9 @@ spec:
             failureThreshold: 3
             successThreshold: 1
           livenessProbe:
-            exec:
-              command:
-                - mc
-                - ready
-                - local
+            httpGet:
+              path: /minio/health/live
+              port: 9000
             initialDelaySeconds: 30
             periodSeconds: 30
             failureThreshold: 3
