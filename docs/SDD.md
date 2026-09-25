@@ -120,7 +120,7 @@ A solução adota arquitetura de microserviços leve (monolito modular no MVP, p
 | Nível | O que entrega | Status |
 |---|---|---|
 | 1 — Branding dentro do app | Logo, cores e nome do app aplicados depois do login (web e mobile) | Implementado |
-| 2 — Branding antes do login | Código de convite, deep link `amfit://entrar/{codigo}`, página web `/entrar/{codigo}` e endpoint público de configuração; o aluno vê a marca do personal já na tela de login | Em implementação |
+| 2 — Branding antes do login | Código de convite, deep link `amfit://entrar/{codigo}`, página web `/entrar/{codigo}` e endpoint público de configuração; o aluno vê a marca do personal já na tela de login | Implementado |
 | 3 — Domínio próprio | Subdomínio/domínio do personal (CNAME + IngressRoute + TLS) | Futuro — exige ingress e TLS no cluster, hoje inexistentes |
 | 4 — App próprio nas lojas | Nome, ícone e bundle por personal (build EAS por tenant) | Futuro — custo de publicação e operação |
 
@@ -3834,8 +3834,8 @@ Cada personal trainer pode configurar a identidade visual da plataforma para seu
 |---|---|---|
 | `tenant_config`, `GET`/`PATCH /tenants/me/config` (autenticado) | 1 | Implementado |
 | Web: CSS vars no layout; mobile: `ThemeProvider` com cache de 24h | 1 | Implementado |
-| Código de convite, `GET /public/tenants/{codigo}/config` e `POST /tenants/me/codigo/regenerar` | 2 | Em implementação |
-| Login com marca do personal: web `/entrar/{codigo}` e mobile (deep link ou código digitado) | 2 | Em implementação |
+| Código de convite, `GET /public/tenants/{codigo}/config` e `POST /tenants/me/codigo/regenerar` | 2 | Implementado |
+| Login com marca do personal: web `/entrar/{codigo}` e mobile (deep link ou código digitado) | 2 | Implementado |
 | Domínio customizado por personal (IngressRoute + TLS) | 3 | Futuro |
 | App próprio por personal nas lojas | 4 | Futuro |
 
