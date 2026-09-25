@@ -42,12 +42,14 @@ spec:
           # A MinIO Inc. parou de distribuir imagens públicas: o Docker Hub
           # foi descontinuado e o `quay.io/minio/minio` passou a devolver
           # 401 UNAUTHORIZED em pull anônimo (ImagePullBackOff em 09/2026).
-          # Usa a imagem pública da Chainguard, fixada por digest (índice
-          # multi-arch, `latest` de 2026-09-24) pra não depender de tag
-          # mutável. Ao atualizar, troque o digest deliberadamente.
-          # A imagem é minimalista (não se presume o `mc` nela), por isso
-          # o liveness usa o endpoint HTTP nativo.
-          image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+          # Usa `bitnamilegacy/minio` (Docker Hub, congelado: sem patches
+          # de segurança), fixado por digest. A alternativa Chainguard não
+          # roda nas VMs do lab: o binário exige x86-64-v2 e o CPU das VMs
+          # não expõe isso ("This program can only be run on AMD64
+          # processors with v2 microarchitecture support"). Rever se o
+          # CPU type das VMs for para `host` (aí dá pra voltar a uma
+          # imagem atual). O liveness usa o endpoint HTTP nativo.
+          image: bitnamilegacy/minio@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
           command:
             - minio
             - server
