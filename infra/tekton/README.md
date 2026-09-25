@@ -177,10 +177,15 @@ kubectl logs -n cicd -l tekton.dev/pipelineRun=<NAME> -f --all-containers
   com permissão de push nele. Crie via UI do Harbor ou:
 
   ```bash
-  curl -u <user>:<pass> -X POST http://harbor.lab.local/api/v2.0/projects \
+  curl -u <user>:<pass> -X POST https://harbor.lab.local/api/v2.0/projects \
+    --cacert <infra-lab>/kubernetes/cicd/harbor/harbor-ca.crt \
     -H 'Content-Type: application/json' \
     -d '{"project_name":"cache","public":false}'
   ```
+
+  O Harbor só responde em HTTPS (a porta 80 não é exposta desde 2026-09-25) e usa a
+  CA do lab, versionada em `infra-lab/kubernetes/cicd/harbor/harbor-ca.crt`
+  (`--cacert`; nunca `-k`).
 
 ### Kaniko: `pull rate limit` em imagens base do Dockerfile
 
