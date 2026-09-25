@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,9 +15,11 @@ import { useRouter } from 'expo-router';
 import { LoginRequestSchema, type LoginRequest, ROLES, type Role } from '@amfit/shared';
 import { useLogin } from '@/features/auth/hooks/useLogin';
 import { ApiError } from '@/shared/lib/api-client';
+import { useBranding } from '@/shared/providers/ThemeProvider';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { nomeApp, logoUrl } = useBranding();
   const [serverError, setServerError] = useState<string | null>(null);
   const { mutate: doLogin, isPending } = useLogin();
 
@@ -76,7 +79,20 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-1 items-center justify-center px-6 py-12">
-          <Text className="mb-2 text-4xl font-bold text-primary">AMFIT</Text>
+          {logoUrl ? (
+            <Image
+              source={{ uri: logoUrl }}
+              style={{ width: 96, height: 96, marginBottom: 12 }}
+              resizeMode="contain"
+              accessibilityLabel={`Logo ${nomeApp ?? 'AMFIT'}`}
+            />
+          ) : null}
+          <Text
+            className="mb-2 text-center text-4xl font-bold text-primary"
+            accessibilityRole="header"
+          >
+            {nomeApp ?? 'AMFIT'}
+          </Text>
           <Text className="mb-8 text-sm text-gray-500">
             Acesse sua conta para continuar
           </Text>
@@ -198,6 +214,17 @@ export default function LoginScreen() {
             >
               <Text className="font-semibold text-white">
                 {isPending ? 'Entrando...' : 'Entrar'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="mt-2 items-center py-2"
+              onPress={() => router.push('/(auth)/codigo')}
+              accessibilityRole="link"
+              accessibilityLabel="Tenho um código do meu personal"
+            >
+              <Text className="text-sm font-medium text-primary">
+                Tenho um código do meu personal
               </Text>
             </TouchableOpacity>
           </View>

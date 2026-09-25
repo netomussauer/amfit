@@ -16,6 +16,7 @@ import {
   persistOptions,
 } from '@/shared/lib/query-persist';
 import { configureOfflineSync } from '@/shared/lib/offline-sync';
+import { encerrarBrandingAutenticado } from '@/features/tenant/lib/branding-session';
 import { ThemeProvider } from '@/shared/providers/ThemeProvider';
 import { configurarNotificationHandler } from '@/features/notificacoes';
 
@@ -36,11 +37,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       // Memória + disco juntos: sem apagar o cache em disco, o próximo
       // login neste aparelho veria treino/ficha da sessão que acabou de
       // cair, mesmo offline.
-      void limparCache(queryClient)
-        .then(() => clearAll())
-        .finally(() => {
-          router.replace('/(auth)/login');
-        });
+      void (async () => {
+        // Cada passo é independente e best-effort: se um falhar (ex.:
+        // SecureStore ao apagar tokens), os seguintes ainda rodam — senão a
+        // marca do usuário que caiu ficaria no aparelho pro próximo a logar.
+        const passos = [
+          () => limparCache(queryClient),
+          () => clearAll(),
+          () => encerrarBrandingAutenticado(),
+        ];
+        for (const passo of passos) {
+          try {
+            await passo();
+          } catch (err) {
+            console.warn('[auth] falha ao limpar a sessão que expirou', err);
+          }
+        }
+        router.replace('/(auth)/login');
+      })();
     });
 
     return () => {
@@ -52,16 +66,19 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     async function checkAuth() {
       try {
         const token = await getAccessToken();
+        const inAuthGroup = segments[0] === '(auth)';
 
         if (!token) {
-          router.replace('/(auth)/login');
+          // Já dentro do grupo (auth) (login, código de convite, deep link
+          // amfit://entrar/<codigo>) não redireciona — senão o convite nunca
+          // chegaria a rodar.
+          if (!inAuthGroup) router.replace('/(auth)/login');
           return;
         }
 
         const payload = parseJwt(token);
         const role = payload?.role;
 
-        const inAuthGroup = segments[0] === '(auth)';
         const inAlunoGroup = segments[0] === '(aluno)';
         const inPersonalGroup = segments[0] === '(personal)';
         // Rotas compartilhadas pelo aluno fora do grupo (aluno) — ex.: player de treino.

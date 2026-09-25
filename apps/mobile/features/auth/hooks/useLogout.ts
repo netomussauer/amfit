@@ -4,6 +4,7 @@ import { apiRequest } from '@/shared/lib/api-client';
 import { clearAll, getRefreshToken } from '@/shared/lib/auth';
 import { limparCache } from '@/shared/lib/query-persist';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
+import { encerrarBrandingAutenticado } from '@/features/tenant/lib/branding-session';
 
 export function useLogout() {
   const router = useRouter();
@@ -35,6 +36,10 @@ export function useLogout() {
       // anterior sem ninguém logado.
       await limparCache(queryClient);
       await clearAll();
+      // Marca do usuário que saiu: apaga o cache da config autenticada (o
+      // próximo a logar neste aparelho não pode ver a marca dele) e volta o
+      // tema pro branding público do convite, ou pro padrão.
+      await encerrarBrandingAutenticado();
       router.replace('/(auth)/login');
     },
   });

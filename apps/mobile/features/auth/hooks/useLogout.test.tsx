@@ -6,6 +6,7 @@ import { apiRequest } from '@/shared/lib/api-client';
 import { clearAll, getRefreshToken } from '@/shared/lib/auth';
 import * as offlineQueue from '@/features/execucao/lib/offlineQueue';
 import { limparCache } from '@/shared/lib/query-persist';
+import { encerrarBrandingAutenticado } from '@/features/tenant/lib/branding-session';
 
 jest.mock('@/shared/lib/api-client', () => ({
   apiRequest: jest.fn(),
@@ -24,6 +25,10 @@ jest.mock('@/features/execucao/lib/offlineQueue', () => ({
   clear: jest.fn(),
 }));
 
+jest.mock('@/features/tenant/lib/branding-session', () => ({
+  encerrarBrandingAutenticado: jest.fn(),
+}));
+
 const mockedReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace }),
@@ -36,6 +41,9 @@ const mockedGetRefreshToken = getRefreshToken as jest.MockedFunction<
 >;
 const mockedClearQueue = offlineQueue.clear as jest.MockedFunction<typeof offlineQueue.clear>;
 const mockedLimparCache = limparCache as jest.MockedFunction<typeof limparCache>;
+const mockedEncerrarBranding = encerrarBrandingAutenticado as jest.MockedFunction<
+  typeof encerrarBrandingAutenticado
+>;
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -62,6 +70,7 @@ describe('useLogout', () => {
     mockedLimparCache.mockImplementation(async (queryClient) => {
       queryClient.clear();
     });
+    mockedEncerrarBranding.mockReset();
   });
 
   it('chama POST /auth/logout com o refresh_token quando existente', async () => {
@@ -153,6 +162,11 @@ describe('useLogout', () => {
     mockedClearAll.mockImplementation(async () => {
       ordem.push('limpar-tokens');
     });
+    // Marca do usuário que saiu: apagada depois dos tokens, antes do redirect
+    // (o próximo a logar neste aparelho não pode ver a marca dele).
+    mockedEncerrarBranding.mockImplementation(async () => {
+      ordem.push('limpar-branding');
+    });
     mockedReplace.mockImplementation(() => {
       ordem.push('redirect');
     });
@@ -171,7 +185,7 @@ describe('useLogout', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedLimparCache).toHaveBeenCalledWith(queryClient);
     expect(clearSpy).toHaveBeenCalled();
-    expect(ordem).toEqual(['limpar-cache', 'limpar-tokens', 'redirect']);
+    expect(ordem).toEqual(['limpar-cache', 'limpar-tokens', 'limpar-branding', 'redirect']);
     expect(mockedReplace).toHaveBeenCalledWith('/(auth)/login');
   });
 });
