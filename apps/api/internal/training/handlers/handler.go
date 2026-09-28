@@ -37,6 +37,7 @@ func (h *TrainingHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fib
 	middleware.Get(router, "/fichas/:id", mws, h.BuscarFicha)
 	middleware.Patch(router, "/fichas/:id", mws, h.AtualizarFicha)
 	middleware.Delete(router, "/fichas/:id", mws, h.DesativarFicha)
+	middleware.Post(router, "/fichas/:id/salvar-como-template", mws, h.SalvarFichaComoTemplate)
 
 	middleware.Get(router, "/templates-treino", mws, h.ListarTemplates)
 
@@ -189,6 +190,33 @@ func (h *TrainingHandler) DesativarFicha(c fiber.Ctx) error {
 		return writeFichaError(c, err, "falha ao desativar ficha")
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// SalvarFichaComoTemplate trata POST /fichas/:id/salvar-como-template
+// (role=PERSONAL).
+func (h *TrainingHandler) SalvarFichaComoTemplate(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	fichaID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusBadRequest, "bad-request", "Bad Request",
+			"id inválido",
+		))
+	}
+
+	var req application.SalvarFichaComoTemplateRequest
+	if !h.bindAndValidate(c, &req) {
+		return nil
+	}
+
+	resp, err := h.svc.SalvarFichaComoTemplate(c.Context(), personalID, fichaID, req)
+	if err != nil {
+		return writeFichaError(c, err, "falha ao salvar ficha como template")
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 // ── Templates ──────────────────────────────────────────────────────────────
@@ -549,6 +577,16 @@ func writeFichaError(c fiber.Ctx, err error, fallback string) error {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusNotFound, "not-found", "Not Found",
 			"ficha não encontrada",
+		))
+	case errors.Is(err, domain.ErrFichaSemItens):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+			"a ficha não tem nenhum item para salvar como template",
+		))
+	case errors.Is(err, domain.ErrNomeTemplateObrigatorio):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+			"nome do template não pode ficar em branco",
 		))
 	}
 	return middleware.WriteProblem(c, middleware.NewProblem(

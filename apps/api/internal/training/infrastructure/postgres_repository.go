@@ -1028,3 +1028,130 @@ func (r *templateTreinoRepo) AplicarTemplate(
 	completa := &fichaCompletaRepo{pool: r.pool}
 	return completa.GetCompleta(ctx, fichaID)
 }
+
+// CriarFromFicha copia os treinos/itens de uma ficha existente para um
+// TemplateTreino novo — o inverso de AplicarTemplate. A resposta é montada
+// em memória a partir do que acabou de ser inserido (mesmo shape dos dados
+// lidos de item_treino), sem uma segunda ida ao banco: templateComItensToResponse
+// só expõe o ID do exercício (não nome/grupo), então não há JOIN adicional
+// a buscar.
+func (r *templateTreinoRepo) CriarFromFicha(
+	ctx context.Context,
+	fichaID, personalID uuid.UUID,
+	nome, nivel, objetivo string,
+) (domain.TemplateComItens, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: begin tx criar template from ficha: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Ordenado pela ordem real dos treinos na ficha (não pela letra em si —
+	// nada garante que letra e ordem coincidam alfabeticamente).
+	const itensQ = `
+		SELECT it.exercicio_id, t.letra, it.ordem, it.series, it.repeticoes, it.carga_sugerida, it.descanso_segundos
+		FROM item_treino it
+		JOIN treino t ON t.id = it.treino_id
+		WHERE t.ficha_id = $1
+		ORDER BY t.ordem ASC, it.ordem ASC`
+
+	rows, err := tx.Query(ctx, itensQ, fichaID)
+	if err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: list itens criar template from ficha: %w", err)
+	}
+	type itemOrigem struct {
+		exercicioID      uuid.UUID
+		treinoLetra      string
+		ordem            int
+		series           int
+		repeticoes       string
+		cargaSugerida    *float64
+		descansoSegundos *int
+	}
+	origem := make([]itemOrigem, 0)
+	for rows.Next() {
+		var o itemOrigem
+		if err := rows.Scan(
+			&o.exercicioID, &o.treinoLetra, &o.ordem, &o.series, &o.repeticoes,
+			&o.cargaSugerida, &o.descansoSegundos,
+		); err != nil {
+			rows.Close()
+			return domain.TemplateComItens{}, fmt.Errorf("infrastructure: scan item criar template from ficha: %w", err)
+		}
+		origem = append(origem, o)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: iterate itens criar template from ficha: %w", err)
+	}
+	if len(origem) == 0 {
+		return domain.TemplateComItens{}, domain.ErrFichaSemItens
+	}
+
+	templateID := uuid.New()
+	const templateQ = `
+		INSERT INTO template_treino (id, nome, nivel, objetivo, criado_por, personal_id, ativo)
+		VALUES ($1, $2, $3, $4, 'PERSONAL', $5, TRUE)`
+	if _, err := tx.Exec(ctx, templateQ, templateID, nome, nivel, objetivo, personalID); err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: insert template from ficha: %w", err)
+	}
+
+	const itemQ = `
+		INSERT INTO template_item
+			(id, template_id, exercicio_id, treino_letra, ordem, series, repeticoes, carga_sugerida, descanso_segundos)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+	// Um INSERT por item em round trips separados escalaria linearmente com
+	// o tamanho da ficha (uma ficha de 6 dias com 8 exercícios cada já são
+	// 48 idas ao banco dentro de uma transação aberta). pgx.Batch manda
+	// tudo numa única ida à rede; cada QueueRewrittenSQL* é resolvido em
+	// ordem pelo BatchResults.
+	itens := make([]domain.TemplateItem, 0, len(origem))
+	batch := &pgx.Batch{}
+	for _, o := range origem {
+		item := domain.TemplateItem{
+			ID:               uuid.New(),
+			TemplateID:       templateID,
+			ExercicioID:      o.exercicioID,
+			TreinoLetra:      o.treinoLetra,
+			Ordem:            o.ordem,
+			Series:           o.series,
+			Repeticoes:       o.repeticoes,
+			CargaSugerida:    o.cargaSugerida,
+			DescansoSegundos: o.descansoSegundos,
+		}
+		batch.Queue(itemQ,
+			item.ID, item.TemplateID, item.ExercicioID, item.TreinoLetra, item.Ordem,
+			item.Series, item.Repeticoes, item.CargaSugerida, item.DescansoSegundos,
+		)
+		itens = append(itens, item)
+	}
+
+	br := tx.SendBatch(ctx, batch)
+	for range itens {
+		if _, err := br.Exec(); err != nil {
+			_ = br.Close()
+			return domain.TemplateComItens{}, fmt.Errorf("infrastructure: insert item template from ficha (batch): %w", err)
+		}
+	}
+	if err := br.Close(); err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: close batch item template from ficha: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.TemplateComItens{}, fmt.Errorf("infrastructure: commit tx criar template from ficha: %w", err)
+	}
+
+	return domain.TemplateComItens{
+		Template: domain.TemplateTreino{
+			ID:         templateID,
+			Nome:       nome,
+			Nivel:      nivel,
+			Objetivo:   objetivo,
+			CriadoPor:  domain.OrigemTemplatePersonal,
+			PersonalID: &personalID,
+			Ativo:      true,
+		},
+		Itens: itens,
+	}, nil
+}

@@ -149,5 +149,50 @@ export const CriarFichaFromTemplateRequestSchema = z.object({
   vigencia_inicio: dataIsoSchema,
 });
 
+// ── Salvar ficha como template (candidato de roadmap, SDD §20.8, item 5) ──
+// POST /fichas/{id}/salvar-como-template é o inverso de from-template: copia
+// os treinos/itens de uma ficha existente do personal para um template
+// PERSONAL novo, reaplicável depois via from-template a outro aluno.
+export const SalvarFichaComoTemplateRequestSchema = z.object({
+  nome: z
+    .string()
+    .min(2, 'Nome deve ter ao menos 2 caracteres')
+    .max(150, 'Nome muito longo'),
+  nivel: z.enum(['INICIANTE', 'INTERMEDIARIO', 'AVANCADO']),
+  objetivo: z.enum(['hipertrofia', 'emagrecimento', 'forca', 'condicionamento']),
+});
+
+/**
+ * O backend (`templateComItensToResponse` em apps/api/internal/training/
+ * application/service.go) só preenche o `id` do exercício dentro de um item
+ * de template — nunca nome/descrição/grupo muscular. Usar
+ * `ExercicioResponseSchema` aqui, como `ItemTreinoResponseSchema` faz,
+ * lançaria mesmo com o template criado/aplicado com sucesso (mesma lição de
+ * `ItemTreinoCriadoResponseSchema` acima).
+ */
+export const TemplateItemResponseSchema = z.object({
+  id: z.string().uuid(),
+  exercicio: z.object({ id: z.string().uuid() }),
+  treino_letra: z.string(),
+  ordem: z.number().int().nonnegative(),
+  series: z.number().int().positive(),
+  repeticoes: z.string(),
+  carga_sugerida: z.number().nullable().optional(),
+  descanso_segundos: z.number().int().nonnegative().nullable().optional(),
+});
+
+export const TemplateResponseSchema = z.object({
+  id: z.string().uuid(),
+  nome: z.string(),
+  nivel: z.enum(['INICIANTE', 'INTERMEDIARIO', 'AVANCADO']),
+  objetivo: z.string(),
+  criado_por: z.enum(['SISTEMA', 'PERSONAL']),
+  itens: z.array(TemplateItemResponseSchema),
+});
+
+export const TemplateListResponseSchema = z.object({
+  data: z.array(TemplateResponseSchema),
+});
+
 // Types inferidos sao exportados centralmente em ../types/index.ts
 // para evitar conflito de re-export em src/index.ts.

@@ -10,6 +10,8 @@ import {
   FichaResponseSchema,
   ItemTreinoCriadoResponseSchema,
   ReordenarItensRequestSchema,
+  SalvarFichaComoTemplateRequestSchema,
+  TemplateResponseSchema,
   TreinoResponseSchema,
   type AtualizarFichaRequest,
   type AtualizarItemTreinoRequest,
@@ -22,6 +24,8 @@ import {
   type FichaResponse,
   type ItemTreinoCriadoResponse,
   type ReordenarItensRequest,
+  type SalvarFichaComoTemplateRequest,
+  type TemplateResponse,
   type TreinoResponse,
 } from '@amfit/shared';
 import { apiClient } from '@/shared/lib/api-client';
@@ -80,6 +84,19 @@ export const fichaService = {
     const body = CriarFichaFromTemplateRequestSchema.parse(stripEmpty(payload));
     const { data } = await apiClient.post('/fichas/from-template', body);
     return FichaResponseSchema.parse(data);
+  },
+
+  /**
+   * Salva uma ficha existente como template PERSONAL, reaplicável depois a
+   * outro aluno via `fromTemplate` — POST /fichas/{id}/salvar-como-template.
+   */
+  async salvarComoTemplate(
+    fichaId: string,
+    payload: SalvarFichaComoTemplateRequest,
+  ): Promise<TemplateResponse> {
+    const body = SalvarFichaComoTemplateRequestSchema.parse(payload);
+    const { data } = await apiClient.post(`/fichas/${fichaId}/salvar-como-template`, body);
+    return TemplateResponseSchema.parse(data);
   },
 
   // ── Treinos ─────────────────────────────────────────────────────────

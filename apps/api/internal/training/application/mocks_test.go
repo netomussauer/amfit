@@ -233,6 +233,11 @@ type mockTemplateTreinoRepo struct {
 		nome string,
 		vigenciaInicio time.Time,
 	) (*domain.FichaCompleta, error)
+	criarFromFichaFn func(
+		ctx context.Context,
+		fichaID, personalID uuid.UUID,
+		nome, nivel, objetivo string,
+	) (domain.TemplateComItens, error)
 }
 
 func (m *mockTemplateTreinoRepo) List(
@@ -263,4 +268,15 @@ func (m *mockTemplateTreinoRepo) AplicarTemplate(
 		return m.aplicarTemplateFn(ctx, templateID, alunoID, personalID, nome, vigenciaInicio)
 	}
 	return nil, domain.ErrTemplateNotFound
+}
+
+func (m *mockTemplateTreinoRepo) CriarFromFicha(
+	ctx context.Context,
+	fichaID, personalID uuid.UUID,
+	nome, nivel, objetivo string,
+) (domain.TemplateComItens, error) {
+	if m.criarFromFichaFn != nil {
+		return m.criarFromFichaFn(ctx, fichaID, personalID, nome, nivel, objetivo)
+	}
+	return domain.TemplateComItens{}, domain.ErrFichaSemItens
 }

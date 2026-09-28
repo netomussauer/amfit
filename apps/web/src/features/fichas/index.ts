@@ -7,12 +7,14 @@ export { ItemTreinoRow } from './components/ItemTreinoRow';
 export { ItemTreinoForm } from './components/ItemTreinoForm';
 export { ExercicioSelector } from './components/ExercicioSelector';
 export { Modal } from './components/Modal';
+export { SalvarComoTemplateModal } from './components/SalvarComoTemplateModal';
 
 // Hooks
 export { useFichas } from './hooks/useFichas';
 export { useFicha } from './hooks/useFicha';
 export { useCriarFicha } from './hooks/useCriarFicha';
 export { useCriarFichaFromTemplate } from './hooks/useCriarFichaFromTemplate';
+export { useSalvarFichaComoTemplate } from './hooks/useSalvarFichaComoTemplate';
 export { useAtualizarFicha } from './hooks/useAtualizarFicha';
 export { useDesativarFicha } from './hooks/useDesativarFicha';
 export { useCriarTreino } from './hooks/useCriarTreino';

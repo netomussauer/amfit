@@ -402,3 +402,60 @@ describe('fichaService.reordenarItens', () => {
     expect(mockedPatch).not.toHaveBeenCalled();
   });
 });
+
+describe('fichaService.salvarComoTemplate', () => {
+  beforeEach(() => {
+    mockedPost.mockReset();
+  });
+
+  const templateFixture = {
+    id: '77777777-7777-7777-7777-777777777777',
+    nome: 'Full Body (modelo)',
+    nivel: 'INTERMEDIARIO' as const,
+    objetivo: 'hipertrofia',
+    criado_por: 'PERSONAL' as const,
+    itens: [],
+  };
+
+  it('valida e envia POST /fichas/:id/salvar-como-template', async () => {
+    mockedPost.mockResolvedValueOnce({ data: templateFixture });
+
+    const resultado = await fichaService.salvarComoTemplate(fichaId, {
+      nome: 'Full Body (modelo)',
+      nivel: 'INTERMEDIARIO',
+      objetivo: 'hipertrofia',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith(`/fichas/${fichaId}/salvar-como-template`, {
+      nome: 'Full Body (modelo)',
+      nivel: 'INTERMEDIARIO',
+      objetivo: 'hipertrofia',
+    });
+    expect(resultado).toEqual(templateFixture);
+  });
+
+  it('lanca erro de validacao quando o nivel nao e um dos valores aceitos', async () => {
+    await expect(
+      fichaService.salvarComoTemplate(fichaId, {
+        nome: 'Full Body',
+        // @ts-expect-error -- valor invalido de proposito para testar a validacao
+        nivel: 'MEDIANO',
+        objetivo: 'hipertrofia',
+      }),
+    ).rejects.toThrow();
+
+    expect(mockedPost).not.toHaveBeenCalled();
+  });
+
+  it('lanca erro de validacao quando a resposta nao bate com o schema', async () => {
+    mockedPost.mockResolvedValueOnce({ data: { ...templateFixture, nivel: 'MEDIANO' } });
+
+    await expect(
+      fichaService.salvarComoTemplate(fichaId, {
+        nome: 'Full Body',
+        nivel: 'INTERMEDIARIO',
+        objetivo: 'hipertrofia',
+      }),
+    ).rejects.toThrow();
+  });
+});

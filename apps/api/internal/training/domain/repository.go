@@ -106,4 +106,16 @@ type TemplateTreinoRepository interface {
 		nome string,
 		vigenciaInicio time.Time,
 	) (*FichaCompleta, error)
+
+	// CriarFromFicha é o inverso de AplicarTemplate: copia os treinos/itens
+	// de uma ficha existente do personal para um TemplateTreino novo
+	// (criado_por=PERSONAL), numa única transação. A checagem de ownership
+	// da ficha (pertence ao personalID) é responsabilidade de quem chama —
+	// aqui só se assume um fichaID já validado, para não duplicar a lógica
+	// que TrainingService.requireFichaOfPersonal já centraliza.
+	CriarFromFicha(
+		ctx context.Context,
+		fichaID, personalID uuid.UUID,
+		nome, nivel, objetivo string,
+	) (TemplateComItens, error)
 }

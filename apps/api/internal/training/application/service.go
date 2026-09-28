@@ -596,6 +596,44 @@ func (s *TrainingService) CriarFichaFromTemplate(
 	return &resp, nil
 }
 
+// SalvarFichaComoTemplate copia uma ficha existente do personal para um
+// template PERSONAL novo, reaproveitável depois via
+// POST /fichas/from-template para outro aluno (candidato #5 do discovery
+// competitivo, SDD §20.8). Verifica ownership da ficha antes de copiar —
+// mesma checagem usada por AtualizarFicha/DesativarFicha.
+func (s *TrainingService) SalvarFichaComoTemplate(
+	ctx context.Context,
+	personalID, fichaID uuid.UUID,
+	req SalvarFichaComoTemplateRequest,
+) (*TemplateResponse, error) {
+	if _, err := s.requireFichaOfPersonal(ctx, fichaID, personalID); err != nil {
+		return nil, err
+	}
+
+	// A validação do binding (min=2) conta os caracteres brutos, então um
+	// nome só de espaços passaria por ela — checagem extra depois do trim,
+	// já que aqui (diferente de CriarFichaFromTemplate) não há nome do
+	// template original para usar de fallback quando o campo vem vazio.
+	nome := strings.TrimSpace(req.Nome)
+	if nome == "" {
+		return nil, domain.ErrNomeTemplateObrigatorio
+	}
+
+	tc, err := s.templates.CriarFromFicha(ctx, fichaID, personalID, nome, req.Nivel, req.Objetivo)
+	if err != nil {
+		return nil, fmt.Errorf("application: criar template from ficha: %w", err)
+	}
+
+	log.Info().
+		Str("ficha_id", fichaID.String()).
+		Str("template_id", tc.Template.ID.String()).
+		Str("personal_id", personalID.String()).
+		Msg("template criado a partir de ficha")
+
+	resp := templateComItensToResponse(tc)
+	return &resp, nil
+}
+
 // ── Helpers de autorização ────────────────────────────────────────────────
 
 // requireFichaOfPersonal carrega a ficha e verifica ownership. Quando a ficha

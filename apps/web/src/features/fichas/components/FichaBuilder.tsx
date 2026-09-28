@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { BookmarkPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { TreinoResponse } from '@amfit/shared';
 import { useFicha } from '../hooks/useFicha';
 import { useCriarTreino } from '../hooks/useCriarTreino';
@@ -11,6 +11,7 @@ import { useDesativarFicha } from '../hooks/useDesativarFicha';
 import { TreinoCard } from './TreinoCard';
 import { Modal } from './Modal';
 import { FichaForm } from './FichaForm';
+import { SalvarComoTemplateModal } from './SalvarComoTemplateModal';
 
 type Props = {
   fichaId: string;
@@ -20,6 +21,8 @@ export function FichaBuilder({ fichaId }: Props) {
   const router = useRouter();
   const { data: ficha, isLoading, isError, refetch } = useFicha(fichaId);
   const [editMetaOpen, setEditMetaOpen] = useState(false);
+  const [salvarTemplateOpen, setSalvarTemplateOpen] = useState(false);
+  const [templateSalvo, setTemplateSalvo] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { mutate: criarTreino, isPending: isAddingTreino } = useCriarTreino();
@@ -139,6 +142,20 @@ export function FichaBuilder({ fichaId }: Props) {
             <Pencil aria-hidden="true" className="h-4 w-4" />
             Editar metadata
           </button>
+          <button
+            type="button"
+            onClick={() => setSalvarTemplateOpen(true)}
+            disabled={ficha.treinos.length === 0}
+            title={
+              ficha.treinos.length === 0
+                ? 'Adicione ao menos um treino com exercícios antes de salvar como modelo'
+                : undefined
+            }
+            className="inline-flex items-center gap-2 rounded-md border border-[--color-border] bg-[--color-bg] px-3 py-1.5 text-sm font-medium text-[--color-text] transition-colors hover:bg-[--color-bg-muted] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <BookmarkPlus aria-hidden="true" className="h-4 w-4" />
+            Salvar como modelo
+          </button>
           {ficha.ativa && (
             <button
               type="button"
@@ -160,6 +177,15 @@ export function FichaBuilder({ fichaId }: Props) {
           className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-[--color-danger]"
         >
           {actionError}
+        </p>
+      )}
+
+      {templateSalvo && (
+        <p
+          role="status"
+          className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-[--color-success]"
+        >
+          Modelo &quot;{templateSalvo}&quot; salvo com sucesso.
         </p>
       )}
 
@@ -213,6 +239,18 @@ export function FichaBuilder({ fichaId }: Props) {
           onSaved={() => setEditMetaOpen(false)}
         />
       </Modal>
+
+      {salvarTemplateOpen && (
+        <SalvarComoTemplateModal
+          fichaId={ficha.id}
+          fichaNome={ficha.nome}
+          onClose={() => setSalvarTemplateOpen(false)}
+          onSuccess={(template) => {
+            setSalvarTemplateOpen(false);
+            setTemplateSalvo(template.nome);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -52,4 +52,15 @@ var (
 	// aplicá-lo criaria uma ficha vazia, o que não faz sentido para o
 	// fluxo "aceitar sugestão".
 	ErrTemplateSemItens = errors.New("training: template de treino sem itens")
+
+	// ErrFichaSemItens indica que a ficha não tem nenhum item — salvá-la
+	// como template criaria um template vazio, sem nada para aplicar
+	// depois em outro aluno.
+	ErrFichaSemItens = errors.New("training: ficha sem itens")
+
+	// ErrNomeTemplateObrigatorio indica que o nome do template, depois de
+	// aparado (TrimSpace), ficou vazio — a validação do binding (min=2) não
+	// pega esse caso porque conta os caracteres brutos, então " " (dois
+	// espaços) passaria como "válido" sem esta checagem extra.
+	ErrNomeTemplateObrigatorio = errors.New("training: nome do template não pode ficar em branco")
 )

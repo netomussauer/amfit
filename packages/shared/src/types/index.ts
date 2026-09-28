@@ -37,6 +37,10 @@ import {
   AtualizarItemTreinoRequestSchema,
   ReordenarItensRequestSchema,
   CriarFichaFromTemplateRequestSchema,
+  SalvarFichaComoTemplateRequestSchema,
+  TemplateItemResponseSchema,
+  TemplateResponseSchema,
+  TemplateListResponseSchema,
 } from '../schemas/ficha.schema';
 import {
   RegistrarSerieRequestSchema,
@@ -121,6 +125,10 @@ export type CriarItemTreinoRequest = z.infer<typeof CriarItemTreinoRequestSchema
 export type AtualizarItemTreinoRequest = z.infer<typeof AtualizarItemTreinoRequestSchema>;
 export type ReordenarItensRequest = z.infer<typeof ReordenarItensRequestSchema>;
 export type CriarFichaFromTemplateRequest = z.infer<typeof CriarFichaFromTemplateRequestSchema>;
+export type SalvarFichaComoTemplateRequest = z.infer<typeof SalvarFichaComoTemplateRequestSchema>;
+export type TemplateItemResponse = z.infer<typeof TemplateItemResponseSchema>;
+export type TemplateResponse = z.infer<typeof TemplateResponseSchema>;
+export type TemplateListResponse = z.infer<typeof TemplateListResponseSchema>;
 
 // Sessao
 export type RegistrarSerieRequest = z.infer<typeof RegistrarSerieRequestSchema>;

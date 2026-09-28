@@ -70,6 +70,18 @@ type CriarFichaFromTemplateRequest struct {
 	VigenciaInicio string `json:"vigencia_inicio" validate:"required,datetime=2006-01-02"`
 }
 
+// SalvarFichaComoTemplateRequest é o payload de
+// POST /fichas/{id}/salvar-como-template. Nivel/objetivo usam o mesmo
+// vocabulário do bloco de anamnese (SDD §20.2) — obrigatórios porque
+// template_treino.nivel/objetivo são NOT NULL: o template salvo também
+// passa a ser candidato do matching automático de anamnese para outros
+// alunos, não só um atalho de "clonar ficha".
+type SalvarFichaComoTemplateRequest struct {
+	Nome     string `json:"nome" validate:"required,min=2,max=150"`
+	Nivel    string `json:"nivel" validate:"required,oneof=INICIANTE INTERMEDIARIO AVANCADO"`
+	Objetivo string `json:"objetivo" validate:"required,oneof=hipertrofia emagrecimento forca condicionamento"`
+}
+
 // ── Responses ─────────────────────────────────────────────────────────────
 
 // FichaResponse é o DTO de saída para uma ficha completa.
