@@ -4576,23 +4576,35 @@ sequenceDiagram
 
 ### 20.8 Candidatos de Roadmap — Discovery Competitivo (TreinoAI, 2026-09)
 
-**Fase:** a definir  
-**Origem:** discovery público sobre a plataforma concorrente TreinoAI (treinoai.com.br), feito em 2026-09 (site institucional, lojas de app, blog). Nenhum texto, nome de marca ou design visual do concorrente foi reaproveitado — os itens abaixo registram apenas o conceito/funcionalidade identificada, para discussão de priorização.
+**Fase:** priorizado em 2026-09 (ondas abaixo); datas seguem o roadmap geral  
+**Origem:** discovery público sobre a plataforma concorrente TreinoAI (treinoai.com.br), feito em 2026-09 (site institucional, lojas de app, blog). Nenhum texto, nome de marca ou design visual do concorrente foi reaproveitado — os itens abaixo registram apenas o conceito/funcionalidade identificada.
 
 #### Descrição
 
-Esta seção não fixa escopo nem ordem — é o registro dos candidatos levantados, para a próxima conversa de priorização com o time. Status `Proposto` significa "identificado, ainda sem data"; os dois últimos itens são notas estratégicas, não candidatos técnicos prontos para estimar.
+Os candidatos foram checados contra o código (não só contra o desenho do SDD) antes de priorizar, o que corrigiu três estimativas de esforço:
+- **RPE (#2):** a "Progressive Overload Automático" (§20.1) implementada é uma função pura simples (compara as 2 últimas sessões, incremento fixo de 2,5kg), bem mais enxuta que o desenho completo da §20.1 (goroutine, tabela `sugestao_progressao`, incrementos por grupo muscular). Adicionar RPE é plugar um sinal a mais nessa função — esforço menor do que a estimativa inicial.
+- **Templates de ficha (#5):** já existe `POST /fichas/from-template` e `GET /templates-treino`, mas são templates curados vinculados à anamnese (§20.2), não fichas do próprio personal salvas como modelo — o gap real é mais estreito e reaproveita essa infraestrutura.
+- **Relatórios financeiros (#3):** `FinancialService.Dashboard()` já existe; "comparativo mês a mês" é extensão, não construção do zero.
+- **Resumo de IA (#1) e adaptação por contexto (#6):** não existe nenhuma integração com LLM no código (nenhuma dependência no `go.mod`, nenhum cliente) — a §20.6 é 100% desenho. Isso eleva o esforço real desses dois, porque qualquer um paga o custo de montar essa integração pela primeira vez.
+
+#### Ordem acordada
+
+| Onda | Item | Esforço real | Racional |
+|---|---|---|---|
+| 1 — vitórias rápidas | #3, #5, #2 | P / P / P-M | Reaproveitam código já existente, sem dependência nova; entregam valor imediato ao personal |
+| 2 — piloto de IA | #1 | M | Menor primeiro contato possível com a integração Claude — valida custo/prompt/erro num caso pequeno antes de investir na geração de ficha completa (§20.6, o item mais arriscado do roadmap de IA); também é a resposta mais direta ao eixo de marketing do concorrente |
+| 3 — apostas maiores | #6, #4 | G / M-G | #6 fica mais barato depois que a onda 2 já validou a integração de IA; #4 é o maior potencial de receita, mas o único que exige validação de negócio (o personal realmente quer vender pelo app?) antes de desenhar |
 
 #### Candidatos
 
 | # | Candidato | Descrição | Esforço | Camadas | Relação com o que já existe | Status |
 |---|---|---|---|---|---|---|
-| 1 | Resumo diário de IA para o personal | Endpoint que agrega Dashboard + Financial + Notification e usa a integração Claude já prevista (§20.6) para gerar um resumo em linguagem natural das pendências do dia (ex.: "3 alunos sem treinar há 7 dias, 2 mensalidades vencendo") | P-M | API, Web | Reaproveita 100% de contextos e integração de IA já decididos; nenhuma infraestrutura nova | Proposto |
-| 2 | RPE + progressão sugerida por esforço percebido | Campo de RPE (escala de Borg, 1-10) ao registrar série; sugestão de carga/reps da próxima sessão combinando histórico + RPE | M | Shared, API, Mobile, Web | Complementa (não substitui) o **Progressive Overload Automático** (§20.1), que hoje decide só por completude objetiva de séries em 3 sessões, sem sinal subjetivo do aluno | Proposto |
-| 3 | Relatórios financeiros comparativos | Faturamento por competência, comparação mês a mês/ano a ano, taxa de inadimplência | P-M | API, Web | Agregação sobre `Mensalidade`/`LinkPagamento` já existentes no Financial Context | Proposto |
-| 4 | Página pública de checkout por personal | Landing page configurável (bio, planos, botão "assinar") que estende o branding nível 2 (§20.4) e cria `Mensalidade`/`LinkPagamento` via Financial Context | M-G | API, Web | Estende o branding nível 2 já implementado; reaproveita o Financial Context existente | Proposto |
-| 5 | Templates de ficha reutilizáveis | Salvar uma `FichaTreino` como modelo e cloná-la para outro aluno, ajustando cargas/repetições depois | P | Shared, API, Web | CRUD sobre entidades já existentes no Training Context | Proposto |
-| 6 | Adaptação de treino por contexto (casa/tempo curto) | Exercícios substitutos pré-configurados por equipamento/tempo disponível; variação do treino do dia gerada sob demanda do aluno | G | Shared, API, Mobile | Estende a IA de geração de ficha (§20.6), que hoje só gera a ficha inicial e não re-adapta em tempo real | Proposto |
+| 3 | Relatórios financeiros comparativos | Faturamento por competência, comparação mês a mês/ano a ano, taxa de inadimplência | P | API, Web | `FinancialService.Dashboard()` já existe — extensão, não construção do zero | Priorizado — onda 1 |
+| 5 | Templates de ficha reutilizáveis | Personal salva a própria `FichaTreino` como modelo (distinto dos templates curados de anamnese já existentes) e a clona para outro aluno | P | Shared, API, Web | Reaproveita `from-template`/`templates-treino` (Training Context) já implementados | Priorizado — onda 1 |
+| 2 | RPE + progressão sugerida por esforço percebido | Campo de RPE (escala de Borg, 1-10) ao registrar série; sugestão de carga/reps da próxima sessão combinando histórico + RPE | P-M | Shared, API, Mobile, Web | Estende a função pura de sugestão de progressão (§20.1) já implementada no Progress Context | Priorizado — onda 1 |
+| 1 | Resumo diário de IA para o personal | Endpoint que agrega Dashboard + Financial + Notification e chama a API Claude para gerar um resumo em linguagem natural das pendências do dia (ex.: "3 alunos sem treinar há 7 dias, 2 mensalidades vencendo") | M | API, Web | Primeira integração de IA do produto — nenhum cliente LLM existe ainda; contextos-fonte já existem | Priorizado — onda 2 (piloto de IA) |
+| 6 | Adaptação de treino por contexto (casa/tempo curto) | Exercícios substitutos pré-configurados por equipamento/tempo disponível; variação do treino do dia gerada sob demanda do aluno | G | Shared, API, Mobile | Estende a IA de geração de ficha (§20.6); depende da integração validada na onda 2 | Priorizado — onda 3 |
+| 4 | Página pública de checkout por personal | Landing page configurável (bio, planos, botão "assinar") que estende o branding nível 2 (§20.4) e cria `Mensalidade`/`LinkPagamento` via Financial Context | M-G | API, Web | Estende o branding nível 2 já implementado; reaproveita o Financial Context existente; nenhum embrião de checkout público existe ainda | Priorizado — onda 3, sujeito a validação de negócio |
 | 7 | Notificação via WhatsApp Business API (fallback) | Lembretes de mensalidade vencendo/treino não feito via WhatsApp, complementar ao push/WebSocket já planejado (Notification Context) | M | API | Risco predominantemente operacional (custo por mensagem, aprovação e compliance de opt-in com a Meta), não técnico | Nota estratégica — não priorizar sem avaliar custo/compliance |
 | 8 | Nutrição como bounded context novo | Espaço de mercado que o próprio concorrente admite não atacar — não é resposta a uma funcionalidade dele, é whitespace | G (contexto novo) | Todas | Nenhuma sobreposição com o SDD atual; exigiria validar demanda com personals reais antes de desenhar | Nota estratégica — não priorizar sem validação de demanda |
 
