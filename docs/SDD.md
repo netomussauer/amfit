@@ -4574,6 +4574,38 @@ sequenceDiagram
 
 ---
 
+### 20.8 Candidatos de Roadmap — Discovery Competitivo (TreinoAI, 2026-09)
+
+**Fase:** a definir  
+**Origem:** discovery público sobre a plataforma concorrente TreinoAI (treinoai.com.br), feito em 2026-09 (site institucional, lojas de app, blog). Nenhum texto, nome de marca ou design visual do concorrente foi reaproveitado — os itens abaixo registram apenas o conceito/funcionalidade identificada, para discussão de priorização.
+
+#### Descrição
+
+Esta seção não fixa escopo nem ordem — é o registro dos candidatos levantados, para a próxima conversa de priorização com o time. Status `Proposto` significa "identificado, ainda sem data"; os dois últimos itens são notas estratégicas, não candidatos técnicos prontos para estimar.
+
+#### Candidatos
+
+| # | Candidato | Descrição | Esforço | Camadas | Relação com o que já existe | Status |
+|---|---|---|---|---|---|---|
+| 1 | Resumo diário de IA para o personal | Endpoint que agrega Dashboard + Financial + Notification e usa a integração Claude já prevista (§20.6) para gerar um resumo em linguagem natural das pendências do dia (ex.: "3 alunos sem treinar há 7 dias, 2 mensalidades vencendo") | P-M | API, Web | Reaproveita 100% de contextos e integração de IA já decididos; nenhuma infraestrutura nova | Proposto |
+| 2 | RPE + progressão sugerida por esforço percebido | Campo de RPE (escala de Borg, 1-10) ao registrar série; sugestão de carga/reps da próxima sessão combinando histórico + RPE | M | Shared, API, Mobile, Web | Complementa (não substitui) o **Progressive Overload Automático** (§20.1), que hoje decide só por completude objetiva de séries em 3 sessões, sem sinal subjetivo do aluno | Proposto |
+| 3 | Relatórios financeiros comparativos | Faturamento por competência, comparação mês a mês/ano a ano, taxa de inadimplência | P-M | API, Web | Agregação sobre `Mensalidade`/`LinkPagamento` já existentes no Financial Context | Proposto |
+| 4 | Página pública de checkout por personal | Landing page configurável (bio, planos, botão "assinar") que estende o branding nível 2 (§20.4) e cria `Mensalidade`/`LinkPagamento` via Financial Context | M-G | API, Web | Estende o branding nível 2 já implementado; reaproveita o Financial Context existente | Proposto |
+| 5 | Templates de ficha reutilizáveis | Salvar uma `FichaTreino` como modelo e cloná-la para outro aluno, ajustando cargas/repetições depois | P | Shared, API, Web | CRUD sobre entidades já existentes no Training Context | Proposto |
+| 6 | Adaptação de treino por contexto (casa/tempo curto) | Exercícios substitutos pré-configurados por equipamento/tempo disponível; variação do treino do dia gerada sob demanda do aluno | G | Shared, API, Mobile | Estende a IA de geração de ficha (§20.6), que hoje só gera a ficha inicial e não re-adapta em tempo real | Proposto |
+| 7 | Notificação via WhatsApp Business API (fallback) | Lembretes de mensalidade vencendo/treino não feito via WhatsApp, complementar ao push/WebSocket já planejado (Notification Context) | M | API | Risco predominantemente operacional (custo por mensagem, aprovação e compliance de opt-in com a Meta), não técnico | Nota estratégica — não priorizar sem avaliar custo/compliance |
+| 8 | Nutrição como bounded context novo | Espaço de mercado que o próprio concorrente admite não atacar — não é resposta a uma funcionalidade dele, é whitespace | G (contexto novo) | Todas | Nenhuma sobreposição com o SDD atual; exigiria validar demanda com personals reais antes de desenhar | Nota estratégica — não priorizar sem validação de demanda |
+
+#### Onde o AMFIT já está em paridade ou à frente (não são candidatos — só confirmação de que o roadmap já cobre)
+
+Gamificação com badges/ranking (§17, mais detalhada que o material público do concorrente), coach assíncrono por vídeo (§20.5, sem equivalente claro encontrado), wearables (§20.7, nada encontrado no concorrente), chat em tempo real via WebSocket (arquitetura já mais robusta que a descrição pública deles).
+
+#### Observação sobre propriedade intelectual
+
+Nenhum destes itens depende de nome, texto de marketing ou identidade visual do concorrente — são conceitos genéricos do mercado de SaaS de treino/fitness (RPE é escala científica pública; landing page com checkout é padrão de mercado, ex. Hotmart/Stripe Payment Links). Ao implementar qualquer um, não reutilizar nomenclatura própria do concorrente para os recursos.
+
+---
+
 ## Apêndice B — Estrutura do Módulo Go (exemplo: catalog)
 
 ```
