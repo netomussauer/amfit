@@ -7,6 +7,7 @@ import { useMensalidades } from '../hooks/useMensalidades';
 import { useAtualizarStatusMensalidade } from '../hooks/useAtualizarStatusMensalidade';
 import { formatBRL, formatCompetencia } from '../lib/format';
 import { MarcarPagaModal } from './MarcarPagaModal';
+import { Th } from './Th';
 
 const PER_PAGE = 20;
 
@@ -197,13 +198,3 @@ export function MensalidadesTable() {
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th
-      scope="col"
-      className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[--color-text-muted]"
-    >
-      {children}
-    </th>
-  );
-}

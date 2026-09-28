@@ -14,4 +14,5 @@ export const financeiroKeys = {
   mensalidadeList: (params: MensalidadeListParams) =>
     [...financeiroKeys.mensalidades(), params] as const,
   dashboard: () => [...financeiroKeys.all, 'dashboard'] as const,
+  comparativo: (meses: number) => [...financeiroKeys.all, 'comparativo', meses] as const,
 };

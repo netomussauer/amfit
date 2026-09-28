@@ -53,6 +53,18 @@ type AlunoInadimplente struct {
 	ValorTotalAtrasado float64
 }
 
+// CompetenciaResumo agrega uma competência (ano/mês) para o comparativo
+// financeiro — usado no GET /financeiro/comparativo. Uma competência sem
+// nenhuma mensalidade aparece com todos os valores zerados (a consulta
+// gera a série de meses independente de haver dado ou não).
+type CompetenciaResumo struct {
+	Ano           int
+	Mes           int
+	ReceitaPaga   float64
+	TotalPrevisto float64 // soma de mensalidade.valor na competência, exceto CANCELADA e ISENTA
+	ValorAtrasado float64
+}
+
 // MensalidadeRepository persiste Mensalidade e resolve as consultas
 // agregadas do dashboard financeiro.
 type MensalidadeRepository interface {
@@ -67,6 +79,11 @@ type MensalidadeRepository interface {
 	ListByAluno(ctx context.Context, alunoID uuid.UUID, params ListarMensalidadesParams) ([]*Mensalidade, int, error)
 
 	Dashboard(ctx context.Context, personalID uuid.UUID) (*DashboardFinanceiro, error)
+
+	// Comparativo devolve as últimas `meses` competências (incluindo a
+	// atual), da mais antiga para a mais recente, uma por mês mesmo sem
+	// nenhuma mensalidade lançada nela.
+	Comparativo(ctx context.Context, personalID uuid.UUID, meses int) ([]CompetenciaResumo, error)
 
 	// ── Consumidas só pelo worker (internal/financial/worker) ──────────────
 

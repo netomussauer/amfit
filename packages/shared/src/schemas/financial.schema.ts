@@ -110,3 +110,16 @@ export const DashboardFinanceiroResponseSchema = z.object({
   receita_mes_atual: z.number(),
   inadimplentes: z.array(AlunoInadimplenteSchema),
 });
+
+export const CompetenciaResumoSchema = z.object({
+  ano: z.number().int(),
+  mes: z.number().int().min(1).max(12),
+  receita_paga: z.number(),
+  total_previsto: z.number(),
+  valor_atrasado: z.number(),
+  taxa_inadimplencia_pct: z.number(),
+});
+
+export const ComparativoFinanceiroResponseSchema = z.object({
+  data: z.array(CompetenciaResumoSchema),
+});

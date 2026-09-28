@@ -75,6 +75,7 @@ import {
   MensalidadeResponseSchema,
   MensalidadeListResponseSchema,
   DashboardFinanceiroResponseSchema,
+  ComparativoFinanceiroResponseSchema,
 } from '../schemas/financial.schema';
 import {
   EnviarFeedbackRequestSchema,
@@ -162,6 +163,7 @@ export type AtualizarStatusMensalidadeRequest = z.infer<
 export type MensalidadeResponse = z.infer<typeof MensalidadeResponseSchema>;
 export type MensalidadeListResponse = z.infer<typeof MensalidadeListResponseSchema>;
 export type DashboardFinanceiroResponse = z.infer<typeof DashboardFinanceiroResponseSchema>;
+export type ComparativoFinanceiroResponse = z.infer<typeof ComparativoFinanceiroResponseSchema>;
 
 // Coach
 export type EnviarFeedbackRequest = z.infer<typeof EnviarFeedbackRequestSchema>;

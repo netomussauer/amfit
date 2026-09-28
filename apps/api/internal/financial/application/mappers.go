@@ -89,6 +89,29 @@ func toDashboardResponse(d *domain.DashboardFinanceiro) *DashboardFinanceiroResp
 	}
 }
 
+// toComparativoResponse converte o agregado por competência e calcula a
+// taxa de inadimplência (valor atrasado / total previsto da própria
+// competência) — 0 quando a competência não tem nenhum valor previsto,
+// para não dividir por zero.
+func toComparativoResponse(rows []domain.CompetenciaResumo) *ComparativoResponse {
+	out := make([]CompetenciaResumoResponse, 0, len(rows))
+	for _, r := range rows {
+		var taxa float64
+		if r.TotalPrevisto > 0 {
+			taxa = r.ValorAtrasado / r.TotalPrevisto * 100
+		}
+		out = append(out, CompetenciaResumoResponse{
+			Ano:                  r.Ano,
+			Mes:                  r.Mes,
+			ReceitaPaga:          r.ReceitaPaga,
+			TotalPrevisto:        r.TotalPrevisto,
+			ValorAtrasado:        r.ValorAtrasado,
+			TaxaInadimplenciaPct: taxa,
+		})
+	}
+	return &ComparativoResponse{Data: out}
+}
+
 // toRepoParams converte os filtros de query string (strings) para os tipos
 // tipados que o repository espera, aplicando os defaults de paginação.
 func toRepoParams(req ListarMensalidadesRequest) (domain.ListarMensalidadesParams, error) {

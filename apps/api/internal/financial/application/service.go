@@ -342,6 +342,30 @@ func (s *FinancialService) Dashboard(ctx context.Context, personalID uuid.UUID) 
 	return toDashboardResponse(d), nil
 }
 
+// comparativoMesesDefault e os limites de ?meses= de GET /financeiro/comparativo.
+// O teto de 24 evita que um valor absurdo (ou um erro de integração)
+// dispare um generate_series enorme; abaixo de 1 não faz sentido — os dois
+// casos são corrigidos silenciosamente para o default em vez de 400,
+// porque o parâmetro é só um ajuste de visualização, não uma validação de
+// negócio.
+const (
+	comparativoMesesDefault = 6
+	comparativoMesesMax     = 24
+)
+
+// Comparativo devolve o faturamento por competência dos últimos `meses`
+// meses (GET /financeiro/comparativo), para comparação mês a mês/ano a ano.
+func (s *FinancialService) Comparativo(ctx context.Context, personalID uuid.UUID, meses int) (*ComparativoResponse, error) {
+	if meses <= 0 || meses > comparativoMesesMax {
+		meses = comparativoMesesDefault
+	}
+	rows, err := s.mensalidades.Comparativo(ctx, personalID, meses)
+	if err != nil {
+		return nil, fmt.Errorf("application: comparativo financeiro: %w", err)
+	}
+	return toComparativoResponse(rows), nil
+}
+
 // ── Jobs consumidos pelo worker (internal/financial/worker) ─────────────
 
 // GerarMensalidadesDoMes garante, de forma idempotente, que cada plano

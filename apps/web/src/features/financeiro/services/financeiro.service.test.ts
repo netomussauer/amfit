@@ -42,6 +42,19 @@ const dashboardFixture = {
   inadimplentes: [],
 };
 
+const comparativoFixture = {
+  data: [
+    {
+      ano: 2026,
+      mes: 8,
+      receita_paga: 800,
+      total_previsto: 1000,
+      valor_atrasado: 200,
+      taxa_inadimplencia_pct: 20,
+    },
+  ],
+};
+
 beforeEach(() => {
   mockedGet.mockReset();
   mockedPost.mockReset();
@@ -174,5 +187,24 @@ describe('financeiroService.getDashboard', () => {
     mockedGet.mockResolvedValueOnce({ data: { ...dashboardFixture, receita_mes_atual: 'x' } });
 
     await expect(financeiroService.getDashboard()).rejects.toThrow();
+  });
+});
+
+describe('financeiroService.getComparativo', () => {
+  it('busca /financeiro/comparativo com o parametro meses', async () => {
+    mockedGet.mockResolvedValueOnce({ data: comparativoFixture });
+
+    const resultado = await financeiroService.getComparativo(12);
+
+    expect(mockedGet).toHaveBeenCalledWith('/financeiro/comparativo', { params: { meses: 12 } });
+    expect(resultado).toEqual(comparativoFixture);
+  });
+
+  it('lanca erro de validacao quando a resposta nao bate com o schema', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: { data: [{ ...comparativoFixture.data[0], mes: 13 }] },
+    });
+
+    await expect(financeiroService.getComparativo(6)).rejects.toThrow();
   });
 });

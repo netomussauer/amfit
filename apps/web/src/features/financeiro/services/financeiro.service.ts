@@ -3,6 +3,7 @@ import {
   MensalidadeResponseSchema,
   MensalidadeListResponseSchema,
   DashboardFinanceiroResponseSchema,
+  ComparativoFinanceiroResponseSchema,
   type PlanoResponse,
   type CriarPlanoRequest,
   type AtualizarPlanoRequest,
@@ -11,6 +12,7 @@ import {
   type MarcarPagaRequest,
   type AtualizarStatusMensalidadeRequest,
   type DashboardFinanceiroResponse,
+  type ComparativoFinanceiroResponse,
 } from '@amfit/shared';
 import { apiClient } from '@/shared/lib/api-client';
 import type { MensalidadeListParams } from '../hooks/query-keys';
@@ -75,5 +77,10 @@ export const financeiroService = {
   async getDashboard(): Promise<DashboardFinanceiroResponse> {
     const { data } = await apiClient.get('/financeiro/dashboard');
     return DashboardFinanceiroResponseSchema.parse(data);
+  },
+
+  async getComparativo(meses: number): Promise<ComparativoFinanceiroResponse> {
+    const { data } = await apiClient.get('/financeiro/comparativo', { params: { meses } });
+    return ComparativoFinanceiroResponseSchema.parse(data);
   },
 };

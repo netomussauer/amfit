@@ -60,6 +60,7 @@ type mockMensalidadeRepo struct {
 	listByPersonalFn        func(ctx context.Context, personalID uuid.UUID, params domain.ListarMensalidadesParams) ([]*domain.Mensalidade, int, error)
 	listByAlunoFn           func(ctx context.Context, alunoID uuid.UUID, params domain.ListarMensalidadesParams) ([]*domain.Mensalidade, int, error)
 	dashboardFn             func(ctx context.Context, personalID uuid.UUID) (*domain.DashboardFinanceiro, error)
+	comparativoFn           func(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error)
 	gerarPendentesFn        func(ctx context.Context) (int, error)
 	marcarAtrasadasFn       func(ctx context.Context) (int, error)
 	listarParaLembreteFn    func(ctx context.Context, limit int) ([]*domain.Mensalidade, error)
@@ -99,6 +100,13 @@ func (m *mockMensalidadeRepo) Dashboard(ctx context.Context, personalID uuid.UUI
 		return m.dashboardFn(ctx, personalID)
 	}
 	return &domain.DashboardFinanceiro{}, nil
+}
+
+func (m *mockMensalidadeRepo) Comparativo(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error) {
+	if m.comparativoFn != nil {
+		return m.comparativoFn(ctx, personalID, meses)
+	}
+	return nil, nil
 }
 
 func (m *mockMensalidadeRepo) GerarPendentes(ctx context.Context) (int, error) {

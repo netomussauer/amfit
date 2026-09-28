@@ -269,6 +269,73 @@ func TestEnviarLembretesVencimento_MarcaEnviadoApenasParaOsNotificadosComSucesso
 	}
 }
 
+// ── Comparativo ──────────────────────────────────────────────────────────
+
+func TestComparativo_ClampaMesesForaDoIntervalo(t *testing.T) {
+	casos := []struct {
+		nome          string
+		mesesPedido   int
+		mesesEsperado int
+	}{
+		{"zero cai no default", 0, comparativoMesesDefault},
+		{"negativo cai no default", -3, comparativoMesesDefault},
+		{"acima do teto cai no default", comparativoMesesMax + 1, comparativoMesesDefault},
+		{"dentro do intervalo passa direto", 12, 12},
+	}
+	for _, c := range casos {
+		t.Run(c.nome, func(t *testing.T) {
+			svc, _, mensalidades, _, _ := newFinancialServiceForTest()
+			var recebido int
+			mensalidades.comparativoFn = func(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error) {
+				recebido = meses
+				return nil, nil
+			}
+
+			if _, err := svc.Comparativo(context.Background(), uuid.New(), c.mesesPedido); err != nil {
+				t.Fatalf("erro inesperado: %v", err)
+			}
+			if recebido != c.mesesEsperado {
+				t.Fatalf("meses repassado ao repositorio = %d, esperado %d", recebido, c.mesesEsperado)
+			}
+		})
+	}
+}
+
+func TestComparativo_CalculaTaxaDeInadimplenciaPorCompetencia(t *testing.T) {
+	svc, _, mensalidades, _, _ := newFinancialServiceForTest()
+	mensalidades.comparativoFn = func(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error) {
+		return []domain.CompetenciaResumo{
+			{Ano: 2026, Mes: 8, ReceitaPaga: 800, TotalPrevisto: 1000, ValorAtrasado: 200},
+			{Ano: 2026, Mes: 9, ReceitaPaga: 0, TotalPrevisto: 0, ValorAtrasado: 0}, // mes sem nenhuma mensalidade
+		}, nil
+	}
+
+	resp, err := svc.Comparativo(context.Background(), uuid.New(), 2)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("esperado 2 competencias, got %d", len(resp.Data))
+	}
+	if got := resp.Data[0].TaxaInadimplenciaPct; got != 20 {
+		t.Fatalf("taxa de inadimplencia = %v, esperado 20", got)
+	}
+	if got := resp.Data[1].TaxaInadimplenciaPct; got != 0 {
+		t.Fatalf("taxa de inadimplencia sem previsto = %v, esperado 0 (nao dividir por zero)", got)
+	}
+}
+
+func TestComparativo_ErroDoRepositorioEhPropagado(t *testing.T) {
+	svc, _, mensalidades, _, _ := newFinancialServiceForTest()
+	mensalidades.comparativoFn = func(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error) {
+		return nil, errUpstreamIndisponivel
+	}
+
+	if _, err := svc.Comparativo(context.Background(), uuid.New(), 6); err == nil {
+		t.Fatal("esperado erro propagado do repositorio, got nil")
+	}
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 var errUpstreamIndisponivel = &testError{"upstream indisponivel"}

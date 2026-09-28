@@ -120,3 +120,20 @@ type DashboardFinanceiroResponse struct {
 	ReceitaMesAtual       float64                     `json:"receita_mes_atual"`
 	Inadimplentes         []AlunoInadimplenteResponse `json:"inadimplentes"`
 }
+
+// CompetenciaResumoResponse resume uma competência (ano/mês) no comparativo
+// financeiro.
+type CompetenciaResumoResponse struct {
+	Ano                  int     `json:"ano"`
+	Mes                  int     `json:"mes"`
+	ReceitaPaga          float64 `json:"receita_paga"`
+	TotalPrevisto        float64 `json:"total_previsto"`
+	ValorAtrasado        float64 `json:"valor_atrasado"`
+	TaxaInadimplenciaPct float64 `json:"taxa_inadimplencia_pct"`
+}
+
+// ComparativoResponse é o DTO de saída de GET /financeiro/comparativo — da
+// competência mais antiga para a mais recente.
+type ComparativoResponse struct {
+	Data []CompetenciaResumoResponse `json:"data"`
+}

@@ -45,6 +45,7 @@ func (h *FinancialHandler) RegisterPersonalRoutes(router fiber.Router, mws ...fi
 	middleware.Patch(router, "/mensalidades/:id/marcar-paga", mws, h.MarcarPaga)
 	middleware.Patch(router, "/mensalidades/:id", mws, h.AtualizarStatusMensalidade)
 	middleware.Get(router, "/financeiro/dashboard", mws, h.Dashboard)
+	middleware.Get(router, "/financeiro/comparativo", mws, h.Comparativo)
 }
 
 // ─── Personal: plano ────────────────────────────────────────────────────
@@ -226,6 +227,28 @@ func (h *FinancialHandler) Dashboard(c fiber.Ctx) error {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusInternalServerError, "internal", "Internal Server Error",
 			"falha ao buscar dashboard financeiro",
+		))
+	}
+	return c.JSON(resp)
+}
+
+// Comparativo trata GET /financeiro/comparativo?meses= (role=PERSONAL). O
+// parâmetro é opcional (default e teto tratados no service); um valor
+// inválido (não-numérico) é silenciosamente ignorado — vira 0, que o
+// service também substitui pelo default — pelo mesmo motivo do teto: é
+// ajuste de visualização, não validação de negócio.
+func (h *FinancialHandler) Comparativo(c fiber.Ctx) error {
+	personalID, ok := userIDFromCtx(c)
+	if !ok {
+		return nil
+	}
+	meses, _ := strconv.Atoi(c.Query("meses"))
+	resp, err := h.svc.Comparativo(c.Context(), personalID, meses)
+	if err != nil {
+		log.Error().Err(err).Str("personal_id", personalID.String()).Msg("financeiro comparativo query failed")
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusInternalServerError, "internal", "Internal Server Error",
+			"falha ao buscar comparativo financeiro",
 		))
 	}
 	return c.JSON(resp)

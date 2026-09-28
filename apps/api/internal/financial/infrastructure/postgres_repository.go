@@ -372,6 +372,70 @@ func (r *mensalidadeRepo) Dashboard(ctx context.Context, personalID uuid.UUID) (
 	return &d, nil
 }
 
+// Comparativo gera a série das últimas `meses` competências (incluindo a
+// atual) via generate_series e faz LEFT JOIN com o agregado por
+// competência — assim um mês sem nenhuma mensalidade lançada aparece com
+// zeros em vez de simplesmente sumir da lista, o que quebraria um gráfico
+// de linha no front (eixo com buracos).
+func (r *mensalidadeRepo) Comparativo(ctx context.Context, personalID uuid.UUID, meses int) ([]domain.CompetenciaResumo, error) {
+	const q = `
+		WITH meses AS (
+			SELECT date_trunc('month', CURRENT_DATE) - (n || ' months')::interval AS mes_ref
+			FROM generate_series(0, $2 - 1) AS n
+		),
+		agregado AS (
+			SELECT
+				m.competencia_ano,
+				m.competencia_mes,
+				-- ISENTA fica de fora do previsto (igual à mensalidade.status
+				-- do dashboard, que também nunca conta ISENTA em nenhum dos
+				-- seus totais) — foi perdoada, não é receita esperada.
+				COALESCE(SUM(m.valor) FILTER (WHERE m.status NOT IN ('CANCELADA', 'ISENTA')), 0) AS total_previsto,
+				COALESCE(SUM(m.valor_pago) FILTER (WHERE m.status = 'PAGA'), 0) AS receita_paga,
+				COALESCE(SUM(m.valor) FILTER (WHERE m.status = 'ATRASADA'), 0) AS valor_atrasado
+			FROM mensalidade m
+			JOIN aluno a ON a.id = m.aluno_id
+			WHERE a.personal_id = $1
+				-- Limita a agregação à janela pedida — sem isso, todo
+				-- personal com histórico de faturamento de vários anos
+				-- reagregaria tudo a cada load da página só para responder
+				-- uma janela de 6-24 meses.
+				AND make_date(m.competencia_ano, m.competencia_mes, 1)
+					>= (SELECT min(mes_ref) FROM meses)
+			GROUP BY m.competencia_ano, m.competencia_mes
+		)
+		SELECT
+			EXTRACT(YEAR FROM meses.mes_ref)::int,
+			EXTRACT(MONTH FROM meses.mes_ref)::int,
+			COALESCE(agregado.receita_paga, 0),
+			COALESCE(agregado.total_previsto, 0),
+			COALESCE(agregado.valor_atrasado, 0)
+		FROM meses
+		LEFT JOIN agregado
+			ON agregado.competencia_ano = EXTRACT(YEAR FROM meses.mes_ref)::int
+			AND agregado.competencia_mes = EXTRACT(MONTH FROM meses.mes_ref)::int
+		ORDER BY 1, 2`
+
+	rows, err := r.pool.Query(ctx, q, personalID, meses)
+	if err != nil {
+		return nil, fmt.Errorf("infrastructure: comparativo financeiro: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]domain.CompetenciaResumo, 0, meses)
+	for rows.Next() {
+		var c domain.CompetenciaResumo
+		if err := rows.Scan(&c.Ano, &c.Mes, &c.ReceitaPaga, &c.TotalPrevisto, &c.ValorAtrasado); err != nil {
+			return nil, fmt.Errorf("infrastructure: scan comparativo: %w", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("infrastructure: iterar comparativo: %w", err)
+	}
+	return out, nil
+}
+
 // GerarPendentes insere, de forma idempotente e atômica, a mensalidade da
 // competência corrente para cada plano ATIVO com vigência corrente que
 // ainda não tem uma — ver comentário na migration 000010 sobre a adaptação
