@@ -15,6 +15,7 @@ type Props = {
     concluida: boolean;
     carga_realizada: number | null;
     repeticoes_realizadas: number | null;
+    rpe: number | null;
   }) => void;
 };
 

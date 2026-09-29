@@ -272,6 +272,47 @@ func TestRegistrarSerie_ConcluidaTrue_PreencheExecutadoEm(t *testing.T) {
 	}
 }
 
+func TestRegistrarSerie_ComRPE_RepassaParaORegistroEDevolveNaResposta(t *testing.T) {
+	svc, sessoes, registros, treinos, _ := newServiceForTest()
+
+	alunoID := uuid.New()
+	sessaoID := uuid.New()
+	treinoID := uuid.New()
+	itemID := uuid.New()
+
+	sessoes.findByIDFn = func(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
+		return &domain.SessaoTreino{
+			ID: id, AlunoID: alunoID, TreinoID: treinoID, Status: domain.StatusEmAndamento,
+		}, nil
+	}
+	treinos.getTreinoComItensFn = func(ctx context.Context, tid uuid.UUID) (string, string, []domain.ItemBasico, error) {
+		return "A", "", []domain.ItemBasico{{ID: itemID, Series: 4}}, nil
+	}
+
+	var captured *domain.RegistroSerie
+	registros.upsertFn = func(ctx context.Context, r *domain.RegistroSerie) error {
+		captured = r
+		return nil
+	}
+
+	rpe := 8
+	resp, err := svc.RegistrarSerie(context.Background(), alunoID, sessaoID, RegistrarSerieRequest{
+		ItemTreinoID: itemID.String(),
+		NumeroSerie:  1,
+		Concluida:    true,
+		RPE:          &rpe,
+	})
+	if err != nil {
+		t.Fatalf("RegistrarSerie: %v", err)
+	}
+	if captured == nil || captured.RPE == nil || *captured.RPE != 8 {
+		t.Fatalf("RPE nao foi repassado ao RegistroSerie persistido: %+v", captured)
+	}
+	if resp.RPE == nil || *resp.RPE != 8 {
+		t.Errorf("RPE nao foi mapeado na resposta: %+v", resp)
+	}
+}
+
 func TestRegistrarSerie_ConcluidaFalse_DeixaExecutadoEmNulo(t *testing.T) {
 	svc, sessoes, registros, treinos, _ := newServiceForTest()
 

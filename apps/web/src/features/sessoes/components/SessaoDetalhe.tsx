@@ -204,6 +204,7 @@ function ExercicioBlock({
               <Th>#</Th>
               <Th>Carga</Th>
               <Th>Reps</Th>
+              <Th>RPE</Th>
               <Th>Status</Th>
             </tr>
           </thead>
@@ -287,6 +288,9 @@ function SerieRow({
             </span>
           )}
         </div>
+      </td>
+      <td className="px-4 py-3 text-sm text-[--color-text]">
+        {serie.rpe != null ? serie.rpe : <span className="text-[--color-text-muted]">—</span>}
       </td>
       <td className="px-4 py-3">
         <span

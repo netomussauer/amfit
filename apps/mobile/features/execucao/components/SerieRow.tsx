@@ -16,6 +16,7 @@ type Props = {
     concluida: boolean;
     carga_realizada: number | null;
     repeticoes_realizadas: number | null;
+    rpe: number | null;
   }) => void;
 };
 
@@ -30,6 +31,14 @@ function parseInteiro(raw: string): number | null {
   if (!raw.trim()) return null;
   const value = parseInt(raw, 10);
   return Number.isFinite(value) ? value : null;
+}
+
+/** RPE é 1-10 (escala de Borg CR-10) — clampa em vez de descartar um valor
+ * fora da faixa, pra não perder silenciosamente o que o aluno digitou. */
+function parseRPE(raw: string): number | null {
+  const value = parseInteiro(raw);
+  if (value === null) return null;
+  return Math.min(10, Math.max(1, value));
 }
 
 function formatCarga(value: number | null | undefined): string {
@@ -58,6 +67,9 @@ export function SerieRow({
       ? String(registro.repeticoes_realizadas)
       : '',
   );
+  const [rpe, setRpe] = useState<string>(() =>
+    registro?.rpe != null ? String(registro.rpe) : '',
+  );
 
   // Dois efeitos separados de propósito (achado de code-review): se um único
   // efeito reagisse tanto a `registro` quanto a `cargaSugeridaProgressao`,
@@ -76,6 +88,7 @@ export function SerieRow({
           ? String(registro.repeticoes_realizadas)
           : '',
       );
+      setRpe(registro.rpe != null ? String(registro.rpe) : '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registro, item.carga_sugerida]);
@@ -105,6 +118,7 @@ export function SerieRow({
       concluida: novaCondicao,
       carga_realizada: parseNumero(carga),
       repeticoes_realizadas: parseInteiro(reps),
+      rpe: parseRPE(rpe),
     });
   }
 
@@ -166,6 +180,26 @@ export function SerieRow({
                 : 'border-gray-200 bg-white text-gray-900'
             }`}
             accessibilityLabel={`Repetições da série ${numeroSerie}`}
+          />
+        </View>
+
+        <View className="w-16">
+          <Text className="mb-1 text-[10px] font-medium uppercase text-gray-500">
+            RPE
+          </Text>
+          <TextInput
+            value={rpe}
+            onChangeText={setRpe}
+            keyboardType="number-pad"
+            maxLength={2}
+            placeholder="1-10"
+            editable={!concluida}
+            className={`rounded-md border px-2 py-1.5 text-sm ${
+              concluida
+                ? 'border-emerald-200 bg-white text-gray-700'
+                : 'border-gray-200 bg-white text-gray-900'
+            }`}
+            accessibilityLabel={`Esforço percebido (RPE, de 1 a 10) da série ${numeroSerie}`}
           />
         </View>
       </View>

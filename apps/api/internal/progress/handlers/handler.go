@@ -251,6 +251,7 @@ type historicoPontoDTO struct {
 	NumeroSerie          int       `json:"numero_serie"`
 	CargaRealizada       *float64  `json:"carga_realizada,omitempty"`
 	RepeticoesRealizadas *int      `json:"repeticoes_realizadas,omitempty"`
+	RPE                  *int      `json:"rpe,omitempty"`
 }
 
 type historicoResponseDTO struct {
@@ -268,6 +269,7 @@ func toHistoricoResponse(h domain.HistoricoCargaExercicio) historicoResponseDTO 
 			NumeroSerie:          p.NumeroSerie,
 			CargaRealizada:       p.CargaRealizada,
 			RepeticoesRealizadas: p.RepeticoesRealizadas,
+			RPE:                  p.RPE,
 		})
 	}
 	return historicoResponseDTO{
@@ -284,6 +286,7 @@ type sugestaoResponseDTO struct {
 	CargaSugerida         *float64  `json:"carga_sugerida,omitempty"`
 	UltimaCargaRegistrada *float64  `json:"ultima_carga_registrada,omitempty"`
 	UltimaMediaRepeticoes *float64  `json:"ultima_media_repeticoes,omitempty"`
+	RPEConsiderado        *float64  `json:"rpe_considerado,omitempty"`
 }
 
 func toSugestaoResponse(s domain.SugestaoProgressao) sugestaoResponseDTO {
@@ -297,6 +300,7 @@ func toSugestaoResponse(s domain.SugestaoProgressao) sugestaoResponseDTO {
 		dto.CargaSugerida = s.CargaSugerida
 		dto.UltimaCargaRegistrada = s.UltimaCargaRegistrada
 		dto.UltimaMediaRepeticoes = s.UltimaMediaRepeticoes
+		dto.RPEConsiderado = s.RPEConsiderado
 	}
 	return dto
 }

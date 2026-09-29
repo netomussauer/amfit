@@ -52,6 +52,7 @@ export function ExecucaoTreino({ sessaoId }: Props) {
     concluida: boolean;
     carga_realizada: number | null;
     repeticoes_realizadas: number | null;
+    rpe: number | null;
   }) {
     const body: RegistrarSerieRequest = {
       item_treino_id: input.item_treino_id,
@@ -59,6 +60,7 @@ export function ExecucaoTreino({ sessaoId }: Props) {
       concluida: input.concluida,
       carga_realizada: input.carga_realizada,
       repeticoes_realizadas: input.repeticoes_realizadas,
+      rpe: input.rpe,
     };
 
     registrarSerie.mutate(body);

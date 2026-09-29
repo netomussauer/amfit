@@ -23,6 +23,8 @@ type RegistrarSerieRequest struct {
 	Concluida            bool     `json:"concluida"`
 	CargaRealizada       *float64 `json:"carga_realizada,omitempty" validate:"omitempty,min=0"`
 	RepeticoesRealizadas *int     `json:"repeticoes_realizadas,omitempty" validate:"omitempty,min=0,max=200"`
+	// RPE (esforço percebido, escala de Borg CR-10) — opcional.
+	RPE *int `json:"rpe,omitempty" validate:"omitempty,min=1,max=10"`
 }
 
 // ── Responses ─────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ type RegistroSerieResponse struct {
 	Concluida            bool       `json:"concluida"`
 	CargaRealizada       *float64   `json:"carga_realizada,omitempty"`
 	RepeticoesRealizadas *int       `json:"repeticoes_realizadas,omitempty"`
+	RPE                  *int       `json:"rpe,omitempty"`
 	ExecutadoEm          *time.Time `json:"executado_em,omitempty"`
 }
 

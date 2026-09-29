@@ -202,6 +202,7 @@ func (s *ExecutionService) RegistrarSerie(
 		NumeroSerie:          req.NumeroSerie,
 		CargaRealizada:       req.CargaRealizada,
 		RepeticoesRealizadas: req.RepeticoesRealizadas,
+		RPE:                  req.RPE,
 		Concluida:            req.Concluida,
 	}
 	if req.Concluida {
@@ -421,6 +422,7 @@ func registroToResponse(r *domain.RegistroSerie) RegistroSerieResponse {
 		Concluida:            r.Concluida,
 		CargaRealizada:       r.CargaRealizada,
 		RepeticoesRealizadas: r.RepeticoesRealizadas,
+		RPE:                  r.RPE,
 		ExecutadoEm:          r.ExecutadoEm,
 	}
 }

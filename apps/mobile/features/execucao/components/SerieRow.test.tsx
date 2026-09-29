@@ -30,6 +30,7 @@ describe('SerieRow', () => {
     // Assert
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('40');
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('');
+    expect(screen.getByLabelText(/esforço percebido.*série 1/i).props.value).toBe('');
   });
 
   it('preenche os campos com os dados do registro quando existente', async () => {
@@ -38,6 +39,7 @@ describe('SerieRow', () => {
     const registro = makeRegistroSerieResponse({
       carga_realizada: 82.5,
       repeticoes_realizadas: 8,
+      rpe: 7,
       concluida: true,
     });
 
@@ -49,6 +51,7 @@ describe('SerieRow', () => {
     // Assert
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('82,5');
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('8');
+    expect(screen.getByLabelText(/esforço percebido.*série 1/i).props.value).toBe('7');
   });
 
   it('atualiza os inputs de carga e repetições ao digitar', async () => {
@@ -61,10 +64,12 @@ describe('SerieRow', () => {
     );
     await fireEvent.changeText(screen.getByLabelText('Carga da série 1'), '55,5');
     await fireEvent.changeText(screen.getByLabelText('Repetições da série 1'), '12');
+    await fireEvent.changeText(screen.getByLabelText(/esforço percebido.*série 1/i), '7');
 
     // Assert
     expect(screen.getByLabelText('Carga da série 1').props.value).toBe('55,5');
     expect(screen.getByLabelText('Repetições da série 1').props.value).toBe('12');
+    expect(screen.getByLabelText(/esforço percebido.*série 1/i).props.value).toBe('7');
   });
 
   it('chama onConcluir com os dados corretos e dispara haptics ao marcar como concluída', async () => {
@@ -74,6 +79,7 @@ describe('SerieRow', () => {
     await render(<SerieRow item={item} numeroSerie={2} registro={undefined} onConcluir={onConcluir} />);
     await fireEvent.changeText(screen.getByLabelText('Carga da série 2'), '60');
     await fireEvent.changeText(screen.getByLabelText('Repetições da série 2'), '10');
+    await fireEvent.changeText(screen.getByLabelText(/esforço percebido.*série 2/i), '8');
 
     // Act
     await fireEvent.press(screen.getByLabelText('Marcar série 2 como concluída'));
@@ -85,8 +91,40 @@ describe('SerieRow', () => {
       concluida: true,
       carga_realizada: 60,
       repeticoes_realizadas: 10,
+      rpe: 8,
     });
     expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+  });
+
+  it('clampa o RPE digitado para o intervalo 1-10', async () => {
+    // Arrange
+    const item = makeItemTreinoResponse();
+    const onConcluir = jest.fn();
+    await render(
+      <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={onConcluir} />,
+    );
+    await fireEvent.changeText(screen.getByLabelText(/esforço percebido.*série 1/i), '15');
+
+    // Act
+    await fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
+
+    // Assert
+    expect(onConcluir).toHaveBeenCalledWith(expect.objectContaining({ rpe: 10 }));
+  });
+
+  it('envia rpe null quando o campo fica vazio', async () => {
+    // Arrange
+    const item = makeItemTreinoResponse();
+    const onConcluir = jest.fn();
+    await render(
+      <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={onConcluir} />,
+    );
+
+    // Act
+    await fireEvent.press(screen.getByLabelText('Marcar série 1 como concluída'));
+
+    // Assert
+    expect(onConcluir).toHaveBeenCalledWith(expect.objectContaining({ rpe: null }));
   });
 
   it('não dispara haptics ao desmarcar uma série já concluída', async () => {
@@ -221,6 +259,7 @@ describe('SerieRow', () => {
     // Assert
     expect(screen.getByLabelText('Carga da série 1').props.editable).toBe(false);
     expect(screen.getByLabelText('Repetições da série 1').props.editable).toBe(false);
+    expect(screen.getByLabelText(/esforço percebido.*série 1/i).props.editable).toBe(false);
     expect(
       screen.getByLabelText('Marcar série 1 como concluída').props.accessibilityState,
     ).toMatchObject({ checked: true });

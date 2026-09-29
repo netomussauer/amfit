@@ -55,7 +55,7 @@ type historicoRepo struct {
 // CalcularSugestaoProgressao (achado em code-review), que assume que a
 // ULTIMA sessao da lista e de fato a mais recente.
 const queryHistoricoCarga = `
-SELECT sessao_id, data_execucao, numero_serie, carga_realizada, repeticoes_realizadas
+SELECT sessao_id, data_execucao, numero_serie, carga_realizada, repeticoes_realizadas, rpe
 FROM (
     SELECT
         s.id              AS sessao_id,
@@ -63,7 +63,8 @@ FROM (
         s.iniciado_em     AS iniciado_em,
         r.numero_serie    AS numero_serie,
         r.carga_realizada AS carga_realizada,
-        r.repeticoes_realizadas AS repeticoes_realizadas
+        r.repeticoes_realizadas AS repeticoes_realizadas,
+        r.rpe             AS rpe
     FROM registro_serie r
     JOIN sessao_treino s ON s.id = r.sessao_id
     JOIN item_treino   i ON i.id = r.item_treino_id
@@ -101,6 +102,7 @@ func (r *historicoRepo) HistoricoCarga(
 			&p.NumeroSerie,
 			&p.CargaRealizada,
 			&p.RepeticoesRealizadas,
+			&p.RPE,
 		); err != nil {
 			return nil, fmt.Errorf("historico carga scan: %w", err)
 		}

@@ -47,6 +47,7 @@ export function useRegistrarSerie(sessaoId: string) {
           concluida: body.concluida,
           carga_realizada: body.carga_realizada ?? null,
           repeticoes_realizadas: body.repeticoes_realizadas ?? null,
+          rpe: body.rpe ?? null,
           executado_em: new Date().toISOString(),
         };
 

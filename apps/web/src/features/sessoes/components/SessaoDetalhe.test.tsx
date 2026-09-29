@@ -67,6 +67,7 @@ const sessaoComTreinoFixture: SessaoResponse = {
       concluida: true,
       carga_realizada: 45,
       repeticoes_realizadas: 10,
+      rpe: 8,
     },
     {
       id: 'serie-2',
@@ -135,6 +136,7 @@ describe('SessaoDetalhe', () => {
     expect(linhas).toHaveLength(3);
     expect(within(tabela).getByText('Concluída')).toBeInTheDocument();
     expect(within(tabela).getByText('Pulada')).toBeInTheDocument();
+    expect(within(tabela).getByText('8')).toBeInTheDocument();
   });
 
   it('exibe o fallback agrupado por item_treino_id quando a sessao nao tem treino expandido', () => {

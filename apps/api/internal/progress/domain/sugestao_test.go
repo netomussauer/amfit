@@ -169,3 +169,91 @@ func TestCalcularSugestaoProgressao_UsaAsDuasSessoesMaisRecentes(t *testing.T) {
 		t.Fatalf("esperava 22.5 (20 + incremento), veio %v", out.CargaSugerida)
 	}
 }
+
+// ── RPE ──────────────────────────────────────────────────────────────────
+
+func TestCalcularSugestaoProgressao_RPEAlto_ForcaManterMesmoTendoBatido(t *testing.T) {
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	pontos := []HistoricoCargaPonto{
+		{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+		// Bateu objetivamente (mesma carga, mesmas reps) mas relatou RPE 9
+		// (quase falha) — o freio de seguranca deve reverter pra MANTER.
+		{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10), RPE: i(9)},
+	}
+	out := CalcularSugestaoProgressao(uuid.New(), pontos)
+
+	if out.Direcao != DirecaoManter {
+		t.Fatalf("esperava DirecaoManter com RPE alto, veio %s", out.Direcao)
+	}
+	if out.CargaSugerida == nil || *out.CargaSugerida != 20 {
+		t.Fatalf("esperava manter a carga em 20, veio %v", out.CargaSugerida)
+	}
+	if out.RPEConsiderado == nil || *out.RPEConsiderado != 9 {
+		t.Fatalf("esperava RPEConsiderado=9, veio %v", out.RPEConsiderado)
+	}
+}
+
+func TestCalcularSugestaoProgressao_RPEBaixoComFolga_DobraOIncremento(t *testing.T) {
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	pontos := []HistoricoCargaPonto{
+		{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+		// Bateu objetivamente e relatou RPE 4 (folga clara) — incremento
+		// sugerido deve ser o dobrado (5kg), nao o padrao (2.5kg).
+		{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10), RPE: i(4)},
+	}
+	out := CalcularSugestaoProgressao(uuid.New(), pontos)
+
+	if out.Direcao != DirecaoAumentar {
+		t.Fatalf("esperava DirecaoAumentar, veio %s", out.Direcao)
+	}
+	if out.CargaSugerida == nil || *out.CargaSugerida != 25 {
+		t.Fatalf("esperava 25 (20 + incremento com folga), veio %v", out.CargaSugerida)
+	}
+}
+
+func TestCalcularSugestaoProgressao_RPEMedio_UsaIncrementoPadrao(t *testing.T) {
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	pontos := []HistoricoCargaPonto{
+		{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+		{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10), RPE: i(7)},
+	}
+	out := CalcularSugestaoProgressao(uuid.New(), pontos)
+
+	if out.CargaSugerida == nil || *out.CargaSugerida != 22.5 {
+		t.Fatalf("esperava 22.5 (incremento padrao com RPE medio), veio %v", out.CargaSugerida)
+	}
+}
+
+func TestCalcularSugestaoProgressao_SemRPEReportado_ComportamentoInalterado(t *testing.T) {
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	pontos := []HistoricoCargaPonto{
+		{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+		{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+	}
+	out := CalcularSugestaoProgressao(uuid.New(), pontos)
+
+	if out.Direcao != DirecaoAumentar || out.CargaSugerida == nil || *out.CargaSugerida != 22.5 {
+		t.Fatalf("esperava comportamento pre-RPE inalterado, veio %+v", out)
+	}
+	if out.RPEConsiderado != nil {
+		t.Fatalf("esperava RPEConsiderado nulo sem nenhum RPE reportado, veio %v", *out.RPEConsiderado)
+	}
+}
+
+func TestCalcularSugestaoProgressao_RPEMediaEntreVariasSeries(t *testing.T) {
+	sessaoAnterior, sessaoAtual := uuid.New(), uuid.New()
+	pontos := []HistoricoCargaPonto{
+		{SessaoID: sessaoAnterior, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10)},
+		// Media (8+6)/2 = 7 — nem folga nem freio, incremento padrao.
+		{SessaoID: sessaoAtual, NumeroSerie: 1, CargaRealizada: f(20), RepeticoesRealizadas: i(10), RPE: i(8)},
+		{SessaoID: sessaoAtual, NumeroSerie: 2, CargaRealizada: f(20), RepeticoesRealizadas: i(10), RPE: i(6)},
+	}
+	out := CalcularSugestaoProgressao(uuid.New(), pontos)
+
+	if out.RPEConsiderado == nil || *out.RPEConsiderado != 7 {
+		t.Fatalf("esperava RPEConsiderado=7 (media de 8 e 6), veio %v", out.RPEConsiderado)
+	}
+	if out.CargaSugerida == nil || *out.CargaSugerida != 22.5 {
+		t.Fatalf("esperava incremento padrao com RPE medio=7, veio %v", out.CargaSugerida)
+	}
+}

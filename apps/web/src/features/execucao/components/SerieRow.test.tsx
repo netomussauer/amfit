@@ -142,6 +142,7 @@ describe('SerieRow', () => {
 
     fireEvent.change(screen.getByLabelText('Carga (kg)'), { target: { value: '60' } });
     fireEvent.change(screen.getByLabelText('Reps'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('RPE'), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: /marcar série 2 como concluída/i }));
 
     expect(onConcluir).toHaveBeenCalledWith({
@@ -150,7 +151,44 @@ describe('SerieRow', () => {
       concluida: true,
       carga_realizada: 60,
       repeticoes_realizadas: 10,
+      rpe: 8,
     });
+  });
+
+  it('envia rpe null quando o campo fica vazio', () => {
+    const item = makeItem();
+    const onConcluir = vi.fn();
+    render(
+      <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={onConcluir} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /marcar série 1 como concluída/i }));
+
+    expect(onConcluir).toHaveBeenCalledWith(expect.objectContaining({ rpe: null }));
+  });
+
+  it('clampa o RPE digitado para o intervalo 1-10', () => {
+    const item = makeItem();
+    const onConcluir = vi.fn();
+    render(
+      <SerieRow item={item} numeroSerie={1} registro={undefined} onConcluir={onConcluir} />,
+    );
+
+    fireEvent.change(screen.getByLabelText('RPE'), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: /marcar série 1 como concluída/i }));
+
+    expect(onConcluir).toHaveBeenCalledWith(expect.objectContaining({ rpe: 10 }));
+  });
+
+  it('preenche o RPE com o dado do registro quando existente', () => {
+    const item = makeItem();
+    const registro = makeRegistro({ rpe: 6 });
+
+    render(
+      <SerieRow item={item} numeroSerie={1} registro={registro} onConcluir={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('RPE')).toHaveValue('6');
   });
 
   it('desabilita os campos quando a serie ja esta concluida', () => {
@@ -163,5 +201,6 @@ describe('SerieRow', () => {
 
     expect(screen.getByLabelText('Carga (kg)')).toBeDisabled();
     expect(screen.getByLabelText('Reps')).toBeDisabled();
+    expect(screen.getByLabelText('RPE')).toBeDisabled();
   });
 });

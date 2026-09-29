@@ -37,9 +37,9 @@ type SessaoTreino struct {
 
 // RegistroSerie captura os dados reais de execução de uma série.
 //
-// CargaRealizada e RepeticoesRealizadas são opcionais — o aluno pode marcar
-// "concluída" sem informar números. ExecutadoEm é populado quando a série
-// passa a Concluida=true.
+// CargaRealizada, RepeticoesRealizadas e RPE são opcionais — o aluno pode
+// marcar "concluída" sem informar números. ExecutadoEm é populado quando a
+// série passa a Concluida=true.
 type RegistroSerie struct {
 	ID                   uuid.UUID
 	SessaoID             uuid.UUID
@@ -47,8 +47,12 @@ type RegistroSerie struct {
 	NumeroSerie          int
 	CargaRealizada       *float64
 	RepeticoesRealizadas *int
-	Concluida            bool
-	ExecutadoEm          *time.Time
+	// RPE é o esforço percebido pelo aluno na escala de Borg CR-10 (1-10) —
+	// consumido pelo Progress Context para refinar a sugestão de
+	// progressão de carga (ver progress/domain/sugestao.go).
+	RPE         *int
+	Concluida   bool
+	ExecutadoEm *time.Time
 }
 
 // SessaoComResumo é o read-model agregado para o histórico de sessões.

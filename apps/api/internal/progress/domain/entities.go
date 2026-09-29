@@ -34,6 +34,9 @@ type HistoricoCargaPonto struct {
 	NumeroSerie          int
 	CargaRealizada       *float64
 	RepeticoesRealizadas *int
+	// RPE e o esforco percebido (escala de Borg CR-10, 1-10) reportado pelo
+	// aluno nesta serie — consumido por CalcularSugestaoProgressao.
+	RPE *int
 }
 
 // HistoricoCargaExercicio agrega os pontos de historico de um exercicio

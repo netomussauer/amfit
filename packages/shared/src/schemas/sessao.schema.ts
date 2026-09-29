@@ -8,6 +8,11 @@ const SessaoStatusEnum = z.enum([
   SESSAO_STATUS.ABANDONADO,
 ]);
 
+// rpeSchema é o esforço percebido na escala de Borg CR-10 (1-10),
+// consumido pelo Progress Context para refinar a sugestão de progressão
+// de carga (ver docs/SDD.md §20.8, item 2).
+const rpeSchema = z.number().int().min(1).max(10).nullable().optional();
+
 export const RegistrarSerieRequestSchema = z.object({
   item_treino_id: z.string().uuid('ID do item de treino inválido'),
   numero_serie: z
@@ -24,6 +29,7 @@ export const RegistrarSerieRequestSchema = z.object({
     .max(200, 'Repetições inválidas')
     .nullable()
     .optional(),
+  rpe: rpeSchema,
 });
 
 export const RegistroSerieResponseSchema = z.object({
@@ -33,6 +39,7 @@ export const RegistroSerieResponseSchema = z.object({
   concluida: z.boolean(),
   carga_realizada: z.number().nullable().optional(),
   repeticoes_realizadas: z.number().int().nonnegative().nullable().optional(),
+  rpe: rpeSchema,
   // Só preenchido quando concluida=true (Execution registra o instante).
   executado_em: z.string().datetime({ offset: true }).nullable().optional(),
 });

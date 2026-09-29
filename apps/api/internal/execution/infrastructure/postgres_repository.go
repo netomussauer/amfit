@@ -247,19 +247,20 @@ func (r *registroRepo) Upsert(ctx context.Context, reg *domain.RegistroSerie) er
 	const q = `
 		INSERT INTO registro_serie (
 			id, sessao_id, item_treino_id, numero_serie,
-			carga_realizada, repeticoes_realizadas, concluida, executado_em
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			carga_realizada, repeticoes_realizadas, rpe, concluida, executado_em
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (sessao_id, item_treino_id, numero_serie)
 		DO UPDATE SET
 			carga_realizada       = EXCLUDED.carga_realizada,
 			repeticoes_realizadas = EXCLUDED.repeticoes_realizadas,
+			rpe                   = EXCLUDED.rpe,
 			concluida             = EXCLUDED.concluida,
 			executado_em          = EXCLUDED.executado_em
 		RETURNING id`
 
 	err := r.pool.QueryRow(ctx, q,
 		reg.ID, reg.SessaoID, reg.ItemTreinoID, reg.NumeroSerie,
-		reg.CargaRealizada, reg.RepeticoesRealizadas, reg.Concluida, reg.ExecutadoEm,
+		reg.CargaRealizada, reg.RepeticoesRealizadas, reg.RPE, reg.Concluida, reg.ExecutadoEm,
 	).Scan(&reg.ID)
 	if err != nil {
 		return fmt.Errorf("infrastructure: upsert registro: %w", err)
@@ -270,7 +271,7 @@ func (r *registroRepo) Upsert(ctx context.Context, reg *domain.RegistroSerie) er
 func (r *registroRepo) ListBySessao(ctx context.Context, sessaoID uuid.UUID) ([]*domain.RegistroSerie, error) {
 	const q = `
 		SELECT id, sessao_id, item_treino_id, numero_serie,
-		       carga_realizada, repeticoes_realizadas, concluida, executado_em
+		       carga_realizada, repeticoes_realizadas, rpe, concluida, executado_em
 		FROM registro_serie
 		WHERE sessao_id = $1
 		ORDER BY item_treino_id, numero_serie`
@@ -286,7 +287,7 @@ func (r *registroRepo) ListBySessao(ctx context.Context, sessaoID uuid.UUID) ([]
 		var reg domain.RegistroSerie
 		if err := rows.Scan(
 			&reg.ID, &reg.SessaoID, &reg.ItemTreinoID, &reg.NumeroSerie,
-			&reg.CargaRealizada, &reg.RepeticoesRealizadas, &reg.Concluida, &reg.ExecutadoEm,
+			&reg.CargaRealizada, &reg.RepeticoesRealizadas, &reg.RPE, &reg.Concluida, &reg.ExecutadoEm,
 		); err != nil {
 			return nil, fmt.Errorf("infrastructure: scan registro: %w", err)
 		}

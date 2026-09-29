@@ -15,6 +15,27 @@ const (
 // anilha comum em academia; nao varia por exercicio/grupo muscular ainda.
 const incrementoPadraoKg = 2.5
 
+// incrementoComFolgaKg substitui incrementoPadraoKg quando o RPE medio da
+// sessao mais recente indica folga clara (aluno relatou esforco baixo
+// mesmo tendo batido a sessao anterior) — ver rpeFolgaLimiar abaixo.
+const incrementoComFolgaKg = 5.0
+
+// rpeFolgaLimiar e rpeAltoLimiar sao os limiares da escala de Borg CR-10
+// (1-10) que a sugestao usa como sinal subjetivo, complementar ao sinal
+// objetivo (completude de series/repeticoes):
+//   - RPE medio <= rpeFolgaLimiar: aluno relatou folga — se a sessao ja
+//     bateu a anterior objetivamente, o incremento sugerido dobra.
+//   - RPE medio >= rpeAltoLimiar: aluno relatou estar perto da falha —
+//     freio de seguranca que forca MANTER mesmo tendo batido a sessao
+//     anterior objetivamente (empurrar carga aqui seria arriscado).
+//
+// Sessoes sem nenhum RPE reportado (aluno pulou o campo) caem no
+// comportamento anterior a esta funcionalidade, sem nenhum dos dois ajustes.
+const (
+	rpeFolgaLimiar = 5.0
+	rpeAltoLimiar  = 9.0
+)
+
 // SugestaoProgressao e o resultado do calculo de sobrecarga progressiva
 // para um exercicio especifico de um aluno, derivado das duas sessoes
 // concluidas mais recentes (auto-referencial — nao depende da meta de
@@ -32,12 +53,17 @@ type SugestaoProgressao struct {
 	// como referencia (achado de code-review).
 	UltimaCargaRegistrada *float64
 	UltimaMediaRepeticoes *float64
+	// RPEConsiderado e a media de RPE da sessao mais recente que pesou no
+	// calculo (nil quando nenhuma serie daquela sessao reportou RPE, e
+	// nesse caso nao influenciou a direcao/incremento sugeridos).
+	RPEConsiderado *float64
 }
 
 type sessaoResumo struct {
 	sessaoID    uuid.UUID
 	cargaMaxima *float64
 	mediaReps   *float64
+	mediaRPE    *float64
 }
 
 // CalcularSugestaoProgressao deriva uma sugestao de carga comparando a
@@ -73,7 +99,20 @@ func CalcularSugestaoProgressao(exercicioID uuid.UUID, pontos []HistoricoCargaPo
 	sugerida := *atual.cargaMaxima
 	if bateuOuSuperou {
 		direcao = DirecaoAumentar
-		sugerida = *atual.cargaMaxima + incrementoPadraoKg
+		incremento := incrementoPadraoKg
+		if atual.mediaRPE != nil && *atual.mediaRPE <= rpeFolgaLimiar {
+			// RPE baixo + bateu a sessao anterior = folga clara — o aluno
+			// tem margem para um salto maior, nao so o passo padrao.
+			incremento = incrementoComFolgaKg
+		}
+		sugerida = *atual.cargaMaxima + incremento
+	}
+	if atual.mediaRPE != nil && *atual.mediaRPE >= rpeAltoLimiar {
+		// Freio de seguranca: RPE alto (perto da falha) na sessao mais
+		// recente reverte qualquer sugestao de aumento, mesmo que a
+		// completude objetiva de series/repeticoes tenha batido a anterior.
+		direcao = DirecaoManter
+		sugerida = *atual.cargaMaxima
 	}
 
 	return SugestaoProgressao{
@@ -83,6 +122,7 @@ func CalcularSugestaoProgressao(exercicioID uuid.UUID, pontos []HistoricoCargaPo
 		CargaSugerida:         &sugerida,
 		UltimaCargaRegistrada: atual.cargaMaxima,
 		UltimaMediaRepeticoes: atual.mediaReps,
+		RPEConsiderado:        atual.mediaRPE,
 	}
 }
 
@@ -99,6 +139,8 @@ func agruparPorSessaoComCarga(pontos []HistoricoCargaPonto) []sessaoResumo {
 		temCarga  bool
 		somaReps  int
 		countReps int
+		somaRPE   int
+		countRPE  int
 	}, 8)
 
 	for _, p := range pontos {
@@ -109,6 +151,8 @@ func agruparPorSessaoComCarga(pontos []HistoricoCargaPonto) []sessaoResumo {
 				temCarga  bool
 				somaReps  int
 				countReps int
+				somaRPE   int
+				countRPE  int
 			}{}
 			acumulado[p.SessaoID] = acc
 			ordem = append(ordem, p.SessaoID)
@@ -120,6 +164,10 @@ func agruparPorSessaoComCarga(pontos []HistoricoCargaPonto) []sessaoResumo {
 		if p.RepeticoesRealizadas != nil {
 			acc.somaReps += *p.RepeticoesRealizadas
 			acc.countReps++
+		}
+		if p.RPE != nil {
+			acc.somaRPE += *p.RPE
+			acc.countRPE++
 		}
 	}
 
@@ -134,6 +182,10 @@ func agruparPorSessaoComCarga(pontos []HistoricoCargaPonto) []sessaoResumo {
 		if acc.countReps > 0 {
 			media := float64(acc.somaReps) / float64(acc.countReps)
 			r.mediaReps = &media
+		}
+		if acc.countRPE > 0 {
+			media := float64(acc.somaRPE) / float64(acc.countRPE)
+			r.mediaRPE = &media
 		}
 		resumos = append(resumos, r)
 	}

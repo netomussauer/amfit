@@ -16,6 +16,7 @@ type Props = {
     concluida: boolean;
     carga_realizada: number | null;
     repeticoes_realizadas: number | null;
+    rpe: number | null;
   }) => void;
 };
 
@@ -30,6 +31,14 @@ function parseInteiro(raw: string): number | null {
   if (!raw.trim()) return null;
   const value = parseInt(raw, 10);
   return Number.isFinite(value) ? value : null;
+}
+
+/** RPE é 1-10 (escala de Borg CR-10) — clampa em vez de descartar um valor
+ * fora da faixa, pra não perder silenciosamente o que o aluno digitou. */
+function parseRPE(raw: string): number | null {
+  const value = parseInteiro(raw);
+  if (value === null) return null;
+  return Math.min(10, Math.max(1, value));
 }
 
 function formatCarga(value: number | null | undefined): string {
@@ -58,6 +67,9 @@ export function SerieRow({
       ? String(registro.repeticoes_realizadas)
       : '',
   );
+  const [rpe, setRpe] = useState<string>(() =>
+    registro?.rpe != null ? String(registro.rpe) : '',
+  );
 
   // Dois efeitos separados de propósito (achado de code-review): se um único
   // efeito reagisse tanto a `registro` quanto a `cargaSugeridaProgressao`,
@@ -76,6 +88,7 @@ export function SerieRow({
           ? String(registro.repeticoes_realizadas)
           : '',
       );
+      setRpe(registro.rpe != null ? String(registro.rpe) : '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registro, item.carga_sugerida]);
@@ -102,6 +115,7 @@ export function SerieRow({
       concluida: novaCondicao,
       carga_realizada: parseNumero(carga),
       repeticoes_realizadas: parseInteiro(reps),
+      rpe: parseRPE(rpe),
     });
   }
 
@@ -161,6 +175,29 @@ export function SerieRow({
             value={reps}
             onChange={(e) => setReps(e.target.value)}
             placeholder={item.repeticoes}
+            disabled={concluida}
+            className={[
+              'w-full rounded-md border bg-[--color-bg] px-2 py-1.5 text-sm text-[--color-text] focus:outline-none focus:ring-2 focus:ring-[--color-primary] disabled:cursor-not-allowed disabled:opacity-70',
+              inputBorderClass,
+            ].join(' ')}
+          />
+        </div>
+
+        <div className="w-16 flex-shrink-0">
+          <label
+            htmlFor={`rpe-${item.id}-${numeroSerie}`}
+            className="mb-1 block text-[10px] font-medium uppercase text-[--color-text-muted]"
+          >
+            RPE
+          </label>
+          <input
+            id={`rpe-${item.id}-${numeroSerie}`}
+            type="text"
+            inputMode="numeric"
+            value={rpe}
+            onChange={(e) => setRpe(e.target.value)}
+            placeholder="1-10"
+            maxLength={2}
             disabled={concluida}
             className={[
               'w-full rounded-md border bg-[--color-bg] px-2 py-1.5 text-sm text-[--color-text] focus:outline-none focus:ring-2 focus:ring-[--color-primary] disabled:cursor-not-allowed disabled:opacity-70',

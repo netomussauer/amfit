@@ -8,6 +8,7 @@ export const PontoProgressoResponseSchema = z.object({
   numero_serie: z.number().int().positive(),
   carga_realizada: z.number().nullable().optional(),
   repeticoes_realizadas: z.number().int().nonnegative().nullable().optional(),
+  rpe: z.number().int().min(1).max(10).nullable().optional(),
 });
 
 export const HistoricoExercicioResponseSchema = z.object({
@@ -44,6 +45,12 @@ export const SugestaoProgressaoResponseSchema = z.object({
   carga_sugerida: z.number().optional(),
   ultima_carga_registrada: z.number().optional(),
   ultima_media_repeticoes: z.number().optional(),
+  /**
+   * Média de RPE da sessão mais recente considerada no cálculo — ausente
+   * quando nenhuma série daquela sessão reportou RPE (não influenciou a
+   * sugestão nesse caso).
+   */
+  rpe_considerado: z.number().optional(),
 });
 
 // ── Dashboard do Personal ────────────────────────────────────────────
