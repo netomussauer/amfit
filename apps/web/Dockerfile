@@ -57,10 +57,13 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 # A partir do output:'standalone', a pasta .next/standalone contem o
-# server.js minimo. .next/static deve ser copiado a parte.
-# public/ pode nao existir (Next.js cria por default mas pode estar vazio).
+# server.js minimo. .next/static e public/ nao entram nela e precisam ser
+# copiados a parte (public/ passou a ter conteudo real — fontes
+# self-hospedadas em public/fonts/, ver globals.css — antes era so uma
+# pasta vazia que o Next criava por default).
 COPY --from=builder --chown=nonroot:nonroot /repo/apps/web/.next/standalone ./
 COPY --from=builder --chown=nonroot:nonroot /repo/apps/web/.next/static    ./apps/web/.next/static
+COPY --from=builder --chown=nonroot:nonroot /repo/apps/web/public         ./apps/web/public
 
 USER nonroot:nonroot
 EXPOSE 3000

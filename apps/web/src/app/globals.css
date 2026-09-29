@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Fontes — self-hospedadas em apps/web/public/fonts ─────────
+   Arquivos woff2 variáveis (subset latin) baixados uma vez do Google
+   Fonts e commitados no repo, em vez de next/font/google: o build de
+   produção roda no Tekton/Kaniko do lab com egress restrito (ver
+   comentário no Dockerfile, stage "deps") — next/font faria essa mesma
+   requisição em build time e quebraria o pipeline. font-weight como
+   intervalo (300 900) porque o arquivo é uma fonte variável de verdade,
+   não uma instância estática por peso. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/inter-variable-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-variable-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-variable-latin.woff2') format('woff2');
+}
+
 /* ── Primitivos ─────────────────────────────────────────────── */
 :root {
   /* Cores */
@@ -18,8 +48,9 @@
   --color-amber-500:  #f59e0b;
   --color-white:      #ffffff;
 
-  /* Tipografia */
+  /* Tipografia — @font-face acima; aqui só a pilha com fallback. */
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* Escala */
@@ -70,6 +101,29 @@
   --color-text:       var(--color-slate-900);
   --color-text-muted: #64748b;
   --color-border:     #e2e8f0;
+
+  /* Faixa de destaque escura (ex.: seção "Sua marca" da landing page) —
+     tokens próprios em vez de reaproveitar --color-text/--color-bg-subtle
+     invertidos, porque esses dois se invertem no dark theme e a faixa
+     viraria clara com texto escuro (o oposto do efeito pretendido). */
+  --color-spotlight-bg:    var(--color-slate-900);
+  --color-spotlight-fg:    var(--color-slate-50);
+  --color-spotlight-muted: rgb(248 250 252 / 72%);
+  --color-spotlight-line:  rgb(248 250 252 / 14%);
+  --color-spotlight-chip:  rgb(248 250 252 / 6%);
+}
+
+/* ── Identidade visual — títulos de página ─────────────────────
+   Todo <h1> do app (título de cada tela: "Dashboard", "Financeiro",
+   "Fichas"...) usa a mesma fonte de destaque da landing page, pra manter
+   uma identidade única do marketing até o produto logado. Só a família
+   muda aqui — peso e tamanho continuam vindo do className Tailwind de
+   cada página (ex.: "text-2xl font-bold"), que tem mais especificidade
+   e não é afetado por esta regra. Escopo deliberadamente limitado a h1 —
+   os demais títulos (modais, cards, seções internas) usam h2/h3 e
+   continuam em --font-sans. */
+h1 {
+  font-family: var(--font-display);
 }
 
 /* ── Dark theme ──────────────────────────────────────────────── */
@@ -80,4 +134,12 @@
   --color-text:       #f1f5f9;
   --color-text-muted: #94a3b8;
   --color-border:     #334155;
+
+  /* Um degrau mais escura que --color-bg, pra continuar lendo como uma
+     faixa de destaque deliberada mesmo com a página já escura. */
+  --color-spotlight-bg:    #050a14;
+  --color-spotlight-fg:    #f1f5f9;
+  --color-spotlight-muted: rgb(241 245 249 / 68%);
+  --color-spotlight-line:  rgb(241 245 249 / 12%);
+  --color-spotlight-chip:  rgb(241 245 249 / 5%);
 }

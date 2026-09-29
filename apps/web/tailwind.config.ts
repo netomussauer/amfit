@@ -25,6 +25,7 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       borderRadius: {
         sm: 'var(--radius-sm)',
