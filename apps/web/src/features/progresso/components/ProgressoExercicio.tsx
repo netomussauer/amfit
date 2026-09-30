@@ -134,7 +134,7 @@ export function ProgressoExercicio({ alunoId, exercicioId }: Props) {
           <section aria-labelledby="tabela-evolucao-heading">
             <h2
               id="tabela-evolucao-heading"
-              className="mb-2 text-sm font-semibold text-[--color-text]"
+              className="mb-2 font-sans text-sm font-semibold text-[--color-text]"
             >
               Dados por sessão
             </h2>

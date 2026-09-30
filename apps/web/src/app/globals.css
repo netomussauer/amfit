@@ -113,16 +113,19 @@
   --color-spotlight-chip:  rgb(248 250 252 / 6%);
 }
 
-/* ── Identidade visual — títulos de página ─────────────────────
-   Todo <h1> do app (título de cada tela: "Dashboard", "Financeiro",
-   "Fichas"...) usa a mesma fonte de destaque da landing page, pra manter
-   uma identidade única do marketing até o produto logado. Só a família
-   muda aqui — peso e tamanho continuam vindo do className Tailwind de
-   cada página (ex.: "text-2xl font-bold"), que tem mais especificidade
-   e não é afetado por esta regra. Escopo deliberadamente limitado a h1 —
-   os demais títulos (modais, cards, seções internas) usam h2/h3 e
-   continuam em --font-sans. */
-h1 {
+/* ── Identidade visual — títulos de página e de seção ───────────
+   <h1> (título de cada tela) e <h2> (títulos de seção dentro da tela —
+   "Mensalidades", "Marca (White Label)", "Anamnese"...) usam a mesma
+   fonte de destaque da landing page. Só a família muda aqui — peso e
+   tamanho continuam vindo do className Tailwind de cada título, que tem
+   mais especificidade e não é afetado por esta regra.
+   <h3> fica de fora deliberadamente: todo h3 fora da landing page é um
+   título pequeno de card/item de lista (text-sm, ~14px — card de
+   exercício, linha de ficha, linha de sessão), tamanho pequeno demais
+   pra uma serifada de destaque como a Fraunces, que é desenhada pra
+   tamanhos grandes (título de seção pra cima). */
+h1,
+h2 {
   font-family: var(--font-display);
 }
 
