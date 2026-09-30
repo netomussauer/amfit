@@ -2,6 +2,7 @@
 export { DashboardKpis } from './components/DashboardKpis';
 export { ProgressoExercicio } from './components/ProgressoExercicio';
 export { EvolucaoCargaChart } from './components/EvolucaoCargaChart';
+export { EvolucaoCargaView } from './components/EvolucaoCargaView';
 
 // Hooks
 export { useDashboard } from './hooks/useDashboard';
