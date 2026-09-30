@@ -10,6 +10,12 @@ describe('LandingPage', () => {
     expect(screen.getAllByRole('link', { name: /comece agora/i }).length).toBeGreaterThan(0);
   });
 
+  it('mostra um botão de login visível no menu, para quem já tem conta', () => {
+    render(<LandingPage />);
+
+    expect(screen.getByRole('link', { name: /^entrar$/i })).toHaveAttribute('href', '/login');
+  });
+
   it('mostra os 4 pilares de funcionalidades', () => {
     render(<LandingPage />);
 

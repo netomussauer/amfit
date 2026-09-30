@@ -12,6 +12,7 @@ import {
   ReordenarItensRequestSchema,
   SalvarFichaComoTemplateRequestSchema,
   TemplateResponseSchema,
+  TemplateListResponseSchema,
   TreinoResponseSchema,
   type AtualizarFichaRequest,
   type AtualizarItemTreinoRequest,
@@ -26,18 +27,22 @@ import {
   type ReordenarItensRequest,
   type SalvarFichaComoTemplateRequest,
   type TemplateResponse,
+  type TemplateListResponse,
   type TreinoResponse,
 } from '@amfit/shared';
 import { apiClient } from '@/shared/lib/api-client';
 import { stripEmpty } from '@/shared/lib/strip-empty';
 import type { FichaListParams } from '../hooks/query-keys';
 
-function buildListQuery(
-  params: FichaListParams,
+function buildQuery(
+  params: Record<string, string | boolean | undefined>,
 ): Record<string, string | boolean> {
   const query: Record<string, string | boolean> = {};
-  if (params.aluno_id) query.aluno_id = params.aluno_id;
-  if (typeof params.ativa === 'boolean') query.ativa = params.ativa;
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === 'boolean' || (typeof value === 'string' && value)) {
+      query[key] = value;
+    }
+  }
   return query;
 }
 
@@ -46,7 +51,7 @@ export const fichaService = {
 
   async list(params: FichaListParams): Promise<FichaListResponse> {
     const { data } = await apiClient.get('/fichas', {
-      params: buildListQuery(params),
+      params: buildQuery(params),
     });
     return FichaListResponseSchema.parse(data);
   },
@@ -97,6 +102,18 @@ export const fichaService = {
     const body = SalvarFichaComoTemplateRequestSchema.parse(payload);
     const { data } = await apiClient.post(`/fichas/${fichaId}/salvar-como-template`, body);
     return TemplateResponseSchema.parse(data);
+  },
+
+  /**
+   * Lista os templates visíveis pro personal — os do sistema (curados pela
+   * anamnese) mais os próprios, salvos via `salvarComoTemplate` — GET
+   * /templates-treino.
+   */
+  async listarTemplates(params: { nivel?: string; objetivo?: string } = {}): Promise<TemplateListResponse> {
+    const { data } = await apiClient.get('/templates-treino', {
+      params: buildQuery(params),
+    });
+    return TemplateListResponseSchema.parse(data);
   },
 
   // ── Treinos ─────────────────────────────────────────────────────────

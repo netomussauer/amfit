@@ -12,3 +12,13 @@ export const fichaKeys = {
   details: () => [...fichaKeys.all, 'detail'] as const,
   detail: (id: string) => [...fichaKeys.details(), id] as const,
 };
+
+export type TemplateListParams = {
+  nivel?: string;
+  objetivo?: string;
+};
+
+export const templateKeys = {
+  all: ['templates-treino'] as const,
+  list: (params: TemplateListParams) => [...templateKeys.all, params] as const,
+};

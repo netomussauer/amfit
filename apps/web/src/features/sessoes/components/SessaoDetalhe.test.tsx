@@ -137,6 +137,7 @@ describe('SessaoDetalhe', () => {
     expect(within(tabela).getByText('Concluída')).toBeInTheDocument();
     expect(within(tabela).getByText('Pulada')).toBeInTheDocument();
     expect(within(tabela).getByText('8')).toBeInTheDocument();
+    expect(screen.getByText(/esforço percebido que o aluno relatou/i)).toBeInTheDocument();
   });
 
   it('exibe o fallback agrupado por item_treino_id quando a sessao nao tem treino expandido', () => {

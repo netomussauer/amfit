@@ -108,6 +108,12 @@ export function MinhaSessaoDetalhe({ sessaoId }: Props) {
         >
           Exercícios executados
         </h2>
+        {sessao.treino && sessao.treino.itens.length > 0 && (
+          <p className="text-xs text-[--color-text-muted]">
+            RPE: o esforço percebido que você relatou em cada série (1 = muito fácil, 10 = no
+            limite). É um dos sinais usados para sugerir a próxima carga.
+          </p>
+        )}
 
         {sessao.treino && sessao.treino.itens.length > 0 ? (
           <ul className="space-y-4" aria-label="Lista de exercícios da sessão">

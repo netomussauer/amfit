@@ -1,9 +1,12 @@
+import { createElement } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
 import type { TemplateResponse } from '@amfit/shared';
-import { QueryWrapper } from '@/shared/test-utils/setup-query';
+import { QueryWrapper, createTestQueryClient } from '@/shared/test-utils/setup-query';
 import { fichaService } from '../services/ficha.service';
+import { templateKeys } from './query-keys';
 import { useSalvarFichaComoTemplate } from './useSalvarFichaComoTemplate';
 
 vi.mock('../services/ficha.service', () => ({
@@ -34,6 +37,23 @@ describe('useSalvarFichaComoTemplate', () => {
 
     expect(mockedSalvarComoTemplate).toHaveBeenCalledWith('ficha-1', body);
     expect(result.current.data).toEqual(templateFixture);
+  });
+
+  it('invalida a lista de templates para que /modelos mostre o novo modelo', async () => {
+    mockedSalvarComoTemplate.mockResolvedValueOnce(templateFixture);
+    const client = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+
+    const { result } = renderHook(() => useSalvarFichaComoTemplate(), {
+      wrapper: ({ children }) => createElement(QueryClientProvider, { client }, children),
+    });
+
+    const body = { nome: 'Full Body Modelo', nivel: 'AVANCADO' as const, objetivo: 'forca' as const };
+    result.current.mutate({ fichaId: 'ficha-1', body });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: templateKeys.all });
   });
 
   it('expõe o AxiosError quando a mutation falha (ex.: 422 de ficha sem itens)', async () => {

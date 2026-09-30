@@ -185,7 +185,11 @@ export function FichaBuilder({ fichaId }: Props) {
           role="status"
           className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-[--color-success]"
         >
-          Modelo &quot;{templateSalvo}&quot; salvo com sucesso.
+          Modelo &quot;{templateSalvo}&quot; salvo com sucesso.{' '}
+          <Link href="/modelos" className="font-medium underline hover:no-underline">
+            Ver meus modelos
+          </Link>
+          .
         </p>
       )}
 

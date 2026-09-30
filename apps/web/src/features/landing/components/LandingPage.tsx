@@ -99,12 +99,20 @@ function TopNav() {
             Dúvidas
           </a>
         </div>
-        <a
-          href="#comecar"
-          className="whitespace-nowrap rounded-md bg-[--color-primary] px-5 py-2.5 text-sm font-bold text-white hover:bg-[--color-primary-hover]"
-        >
-          Comece agora
-        </a>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="whitespace-nowrap text-sm font-bold text-[--color-text] hover:text-[--color-primary-hover]"
+          >
+            Entrar
+          </Link>
+          <a
+            href="#comecar"
+            className="whitespace-nowrap rounded-md bg-[--color-primary] px-5 py-2.5 text-sm font-bold text-white hover:bg-[--color-primary-hover]"
+          >
+            Comece agora
+          </a>
+        </div>
       </Container>
     </nav>
   );

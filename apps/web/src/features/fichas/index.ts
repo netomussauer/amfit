@@ -8,6 +8,8 @@ export { ItemTreinoForm } from './components/ItemTreinoForm';
 export { ExercicioSelector } from './components/ExercicioSelector';
 export { Modal } from './components/Modal';
 export { SalvarComoTemplateModal } from './components/SalvarComoTemplateModal';
+export { TemplatesList } from './components/TemplatesList';
+export { AplicarTemplateModal } from './components/AplicarTemplateModal';
 
 // Hooks
 export { useFichas } from './hooks/useFichas';
@@ -15,6 +17,7 @@ export { useFicha } from './hooks/useFicha';
 export { useCriarFicha } from './hooks/useCriarFicha';
 export { useCriarFichaFromTemplate } from './hooks/useCriarFichaFromTemplate';
 export { useSalvarFichaComoTemplate } from './hooks/useSalvarFichaComoTemplate';
+export { useTemplates } from './hooks/useTemplates';
 export { useAtualizarFicha } from './hooks/useAtualizarFicha';
 export { useDesativarFicha } from './hooks/useDesativarFicha';
 export { useCriarTreino } from './hooks/useCriarTreino';
@@ -24,4 +27,4 @@ export { useCriarItem } from './hooks/useCriarItem';
 export { useAtualizarItem } from './hooks/useAtualizarItem';
 export { useRemoverItem } from './hooks/useRemoverItem';
 export { useReordenarItens } from './hooks/useReordenarItens';
-export { fichaKeys } from './hooks/query-keys';
+export { fichaKeys, templateKeys } from './hooks/query-keys';

@@ -137,6 +137,7 @@ describe('MinhaSessaoDetalhe', () => {
     expect(within(tabela).getByText('Concluída')).toBeInTheDocument();
     expect(within(tabela).getByText('Pulada')).toBeInTheDocument();
     expect(within(tabela).getByText('8')).toBeInTheDocument();
+    expect(screen.getByText(/esforço percebido que você relatou/i)).toBeInTheDocument();
   });
 
   it('exibe link "Ver evolução" apontando para /progresso/:exercicioId', () => {

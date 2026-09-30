@@ -459,3 +459,47 @@ describe('fichaService.salvarComoTemplate', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('fichaService.listarTemplates', () => {
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  const templateListFixture = {
+    data: [
+      {
+        id: '77777777-7777-7777-7777-777777777777',
+        nome: 'Full Body (modelo)',
+        nivel: 'INTERMEDIARIO' as const,
+        objetivo: 'hipertrofia',
+        criado_por: 'PERSONAL' as const,
+        itens: [],
+      },
+    ],
+  };
+
+  it('busca GET /templates-treino sem filtros', async () => {
+    mockedGet.mockResolvedValueOnce({ data: templateListFixture });
+
+    const resultado = await fichaService.listarTemplates();
+
+    expect(mockedGet).toHaveBeenCalledWith('/templates-treino', { params: {} });
+    expect(resultado).toEqual(templateListFixture);
+  });
+
+  it('repassa nivel e objetivo como query params quando informados', async () => {
+    mockedGet.mockResolvedValueOnce({ data: templateListFixture });
+
+    await fichaService.listarTemplates({ nivel: 'INTERMEDIARIO', objetivo: 'hipertrofia' });
+
+    expect(mockedGet).toHaveBeenCalledWith('/templates-treino', {
+      params: { nivel: 'INTERMEDIARIO', objetivo: 'hipertrofia' },
+    });
+  });
+
+  it('lanca erro de validacao quando a resposta nao bate com o schema', async () => {
+    mockedGet.mockResolvedValueOnce({ data: { data: [{ ...templateListFixture.data[0], nivel: 'MEDIANO' }] } });
+
+    await expect(fichaService.listarTemplates()).rejects.toThrow();
+  });
+});
