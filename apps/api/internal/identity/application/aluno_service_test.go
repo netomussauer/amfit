@@ -98,7 +98,7 @@ func TestListarAlunos_FiltroPersonalIDPropagado(t *testing.T) {
 		return out, len(out), nil
 	}
 
-	resp, err := svc.ListarAlunos(context.Background(), personalA, 1, 20, nil)
+	resp, err := svc.ListarAlunos(context.Background(), personalA, 1, 20, nil, "")
 	if err != nil {
 		t.Fatalf("ListarAlunos: %v", err)
 	}
@@ -112,6 +112,24 @@ func TestListarAlunos_FiltroPersonalIDPropagado(t *testing.T) {
 		if a.Nome == "B1" {
 			t.Errorf("aluno do personalB vazou para listagem do personalA")
 		}
+	}
+}
+
+func TestListarAlunos_BuscaPropagaParaOFiltroSemEspacosExtras(t *testing.T) {
+	svc, alunos, _ := newAlunoServiceForTest()
+
+	var filtroRecebido domain.AlunoFilter
+	alunos.listByFn = func(ctx context.Context, personalID uuid.UUID, f domain.AlunoFilter) ([]*domain.Aluno, int, error) {
+		filtroRecebido = f
+		return nil, 0, nil
+	}
+
+	_, err := svc.ListarAlunos(context.Background(), uuid.New(), 1, 20, nil, "  Maria  ")
+	if err != nil {
+		t.Fatalf("ListarAlunos: %v", err)
+	}
+	if filtroRecebido.Busca != "Maria" {
+		t.Errorf("busca esperada %q, got %q", "Maria", filtroRecebido.Busca)
 	}
 }
 

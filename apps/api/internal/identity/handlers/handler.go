@@ -226,7 +226,9 @@ func (h *IdentityHandler) ListarAlunos(c fiber.Ctx) error {
 		ativo = &b
 	}
 
-	resp, err := h.svc.Aluno.ListarAlunos(c.Context(), personalID, page, perPage, ativo)
+	busca := strings.TrimSpace(c.Query("busca", ""))
+
+	resp, err := h.svc.Aluno.ListarAlunos(c.Context(), personalID, page, perPage, ativo, busca)
 	if err != nil {
 		return middleware.WriteProblem(c, middleware.NewProblem(
 			fiber.StatusInternalServerError, "internal", "Internal Server Error",

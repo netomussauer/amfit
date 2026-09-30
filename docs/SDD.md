@@ -525,6 +525,11 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: busca
+          in: query
+          description: Filtro por nome (case-insensitive, correspondência parcial)
+          schema:
+            type: string
         - name: page
           in: query
           schema:

@@ -111,6 +111,7 @@ func (s *AlunoService) ListarAlunos(
 	personalID uuid.UUID,
 	page, perPage int,
 	ativo *bool,
+	busca string,
 ) (*AlunoListResponse, error) {
 	if page < 1 {
 		page = defaultPage
@@ -124,6 +125,7 @@ func (s *AlunoService) ListarAlunos(
 
 	filter := domain.AlunoFilter{
 		Ativo:   ativo,
+		Busca:   strings.TrimSpace(busca),
 		Page:    page,
 		PerPage: perPage,
 	}

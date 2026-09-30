@@ -25,6 +25,7 @@ type PersonalTrainerRepository interface {
 // AlunoFilter agrupa parâmetros opcionais de busca paginada de alunos.
 type AlunoFilter struct {
 	Ativo   *bool
+	Busca   string
 	Page    int
 	PerPage int
 }

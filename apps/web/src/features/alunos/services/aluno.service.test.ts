@@ -76,6 +76,26 @@ describe('alunoService.list', () => {
 
     await expect(alunoService.list({ page: 1, perPage: 20 })).rejects.toThrow();
   });
+
+  it('inclui busca na query quando informada', async () => {
+    mockedGet.mockResolvedValueOnce({ data: alunoListFixture });
+
+    await alunoService.list({ page: 1, perPage: 20, busca: 'Ana' });
+
+    expect(mockedGet).toHaveBeenCalledWith('/alunos', {
+      params: { page: 1, per_page: 20, busca: 'Ana' },
+    });
+  });
+
+  it('omite busca da query quando vazia', async () => {
+    mockedGet.mockResolvedValueOnce({ data: alunoListFixture });
+
+    await alunoService.list({ page: 1, perPage: 20, busca: '' });
+
+    expect(mockedGet).toHaveBeenCalledWith('/alunos', {
+      params: { page: 1, per_page: 20 },
+    });
+  });
 });
 
 describe('alunoService.getById', () => {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/amfit/api/internal/identity/domain"
@@ -246,23 +247,29 @@ func (r *alunoRepo) ListByPersonal(
 	}
 	offset := (page - 1) * perPage
 
-	// Conta o total respeitando o filtro de ativo.
-	countQ := `SELECT COUNT(*) FROM aluno WHERE personal_id = $1`
+	// Aridade fixa (mesmo padrão de catalog/infrastructure ListExercicios):
+	// cada filtro opcional é sempre o mesmo placeholder, condicionado por
+	// "$N::tipo IS NULL OR ..." / "$N::text = '' OR ...". Evita ter que
+	// recalcular índices de $N em countQ e listQ toda vez que um filtro
+	// novo é adicionado — o que a versão anterior fazia via len(args)+1.
+	const whereClause = `
+		WHERE personal_id = $1
+		  AND ($2::bool IS NULL OR ativo = $2)
+		  AND ($3::text = '' OR nome ILIKE '%' || $3 || '%' ESCAPE '\')`
+
+	countQ := `SELECT COUNT(*) FROM aluno` + whereClause
 	listQ := `
 		SELECT id, personal_id, nome, email, data_nascimento, sexo,
 		       COALESCE(telefone, ''), ativo, criado_em, atualizado_em
-		FROM aluno
-		WHERE personal_id = $1`
+		FROM aluno` + whereClause + `
+		ORDER BY nome ASC LIMIT $4 OFFSET $5`
 
-	args := []any{personalID}
+	// Escapa os curingas do LIKE (% e _) e o próprio caractere de escape no
+	// termo digitado, para que "Ana_" busque o caractere literal "_" em vez
+	// de tratá-lo como "qualquer caractere".
+	busca := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(filter.Busca)
 
-	if filter.Ativo != nil {
-		countQ += ` AND ativo = $2`
-		listQ += ` AND ativo = $2`
-		args = append(args, *filter.Ativo)
-	}
-
-	listQ += fmt.Sprintf(` ORDER BY nome ASC LIMIT $%d OFFSET $%d`, len(args)+1, len(args)+2)
+	args := []any{personalID, filter.Ativo, busca}
 	listArgs := append(append([]any{}, args...), perPage, offset)
 
 	var total int
@@ -399,9 +406,9 @@ func (r *credencialRepo) FindByOwner(
 		WHERE owner_id = $1 AND owner_type = $2`
 
 	var (
-		c        domain.Credencial
-		typeStr  string
-		ultimo   *time.Time
+		c       domain.Credencial
+		typeStr string
+		ultimo  *time.Time
 	)
 	err := r.pool.QueryRow(ctx, q, ownerID, string(ownerType)).Scan(
 		&c.ID, &c.OwnerID, &typeStr, &c.PasswordHash, &ultimo,

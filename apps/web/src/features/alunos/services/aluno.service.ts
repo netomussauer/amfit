@@ -25,6 +25,7 @@ export const alunoService = {
       per_page: params.perPage,
     };
     if (typeof params.ativo === 'boolean') query.ativo = params.ativo;
+    if (params.busca) query.busca = params.busca;
 
     const { data } = await apiClient.get('/alunos', { params: query });
     return AlunoListResponseSchema.parse(data);

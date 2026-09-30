@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError } from 'axios';
@@ -43,7 +43,7 @@ const alunosFixture: AlunoListResponse = {
       criado_em: '2026-01-01T00:00:00Z',
     },
   ],
-  pagination: { total: 2, page: 1, per_page: 100 },
+  pagination: { total: 2, page: 1, per_page: 20 },
 };
 
 const templateFixture: TemplateResponse = {
@@ -147,5 +147,41 @@ describe('AplicarTemplateModal', () => {
     await user.click(screen.getByRole('button', { name: /cancelar/i }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('busca alunos repassando o termo digitado (apos debounce) para o hook', async () => {
+    const user = userEvent.setup();
+    render(<AplicarTemplateModal template={templateFixture} onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/buscar aluno/i), 'Ana');
+
+    await waitFor(() =>
+      expect(mockedUseAlunos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busca: 'Ana' }),
+      ),
+    );
+  });
+
+  it('avisa quando ha mais alunos do que a pagina atual mostra', () => {
+    mockAlunosReturn({
+      data: { ...alunosFixture, pagination: { total: 45, page: 1, per_page: 20 } },
+    });
+
+    render(<AplicarTemplateModal template={templateFixture} onClose={vi.fn()} />);
+
+    expect(screen.getByText(/45 alunos encontrados/i)).toBeInTheDocument();
+  });
+
+  it('limpa o aluno selecionado ao mudar o termo de busca', async () => {
+    const user = userEvent.setup();
+    render(<AplicarTemplateModal template={templateFixture} onClose={vi.fn()} />);
+
+    const select = screen.getByRole('combobox', { name: /aluno/i });
+    await user.selectOptions(select, 'aluno-2');
+    expect(select).toHaveValue('aluno-2');
+
+    await user.type(screen.getByLabelText(/buscar aluno/i), 'A');
+
+    expect(select).toHaveValue('');
   });
 });

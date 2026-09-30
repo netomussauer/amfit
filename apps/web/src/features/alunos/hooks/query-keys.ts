@@ -2,6 +2,7 @@ export type AlunoListParams = {
   page: number;
   perPage: number;
   ativo?: boolean;
+  busca?: string;
 };
 
 export const alunoKeys = {

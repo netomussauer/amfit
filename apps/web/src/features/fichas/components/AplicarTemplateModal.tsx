@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TemplateResponse } from '@amfit/shared';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useAlunos } from '@/features/alunos';
 import { useCriarFichaFromTemplate } from '../hooks/useCriarFichaFromTemplate';
 import { Modal } from './Modal';
@@ -11,6 +12,8 @@ type Props = {
   template: TemplateResponse;
   onClose: () => void;
 };
+
+const ALUNOS_POR_PAGINA = 20;
 
 /**
  * Aplica um template (curado ou salvo pelo próprio personal) a um aluno
@@ -21,14 +24,21 @@ type Props = {
 export function AplicarTemplateModal({ template, onClose }: Props) {
   const router = useRouter();
   const [alunoId, setAlunoId] = useState('');
+  const [buscaAluno, setBuscaAluno] = useState('');
   const [vigenciaInicio, setVigenciaInicio] = useState(() => today());
   const [serverError, setServerError] = useState<string | null>(null);
   const { mutate, isPending } = useCriarFichaFromTemplate();
 
+  const buscaDebounced = useDebounce(buscaAluno, 250);
+
+  // Personals com mais de ALUNOS_POR_PAGINA alunos ativos precisam buscar
+  // pelo nome — sem isso, o <select> mostraria só a primeira página e
+  // esconderia o restante sem nenhum indício de que havia mais alunos.
   const { data: alunos, isLoading: carregandoAlunos } = useAlunos({
     page: 1,
-    perPage: 100,
+    perPage: ALUNOS_POR_PAGINA,
     ativo: true,
+    busca: buscaDebounced || undefined,
   });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -68,6 +78,24 @@ export function AplicarTemplateModal({ template, onClose }: Props) {
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div>
+          <label
+            htmlFor="aluno-busca"
+            className="mb-1 block text-sm font-medium text-[--color-text]"
+          >
+            Buscar aluno
+          </label>
+          <input
+            id="aluno-busca"
+            type="search"
+            value={buscaAluno}
+            onChange={(e) => {
+              setBuscaAluno(e.target.value);
+              setAlunoId('');
+            }}
+            placeholder="Nome do aluno..."
+            className="mb-2 w-full rounded-md border border-[--color-border] bg-[--color-bg] px-3 py-2 text-sm text-[--color-text] placeholder:text-[--color-text-muted] focus:outline-none focus:ring-2 focus:ring-[--color-primary]"
+          />
+
           <label htmlFor="aluno" className="mb-1 block text-sm font-medium text-[--color-text]">
             Aluno *
           </label>
@@ -88,6 +116,12 @@ export function AplicarTemplateModal({ template, onClose }: Props) {
               </option>
             ))}
           </select>
+          {alunos && alunos.pagination.total > ALUNOS_POR_PAGINA && (
+            <p className="mt-1 text-xs text-[--color-text-muted]">
+              {alunos.pagination.total} alunos encontrados — refine a busca acima para ver
+              alunos além dos primeiros {ALUNOS_POR_PAGINA}.
+            </p>
+          )}
         </div>
 
         <div>
