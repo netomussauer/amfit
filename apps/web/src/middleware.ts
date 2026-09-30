@@ -2,7 +2,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ACCESS_TOKEN_COOKIE, parseJwt } from '@/shared/lib/auth';
 
 // Rotas do portal do personal (gestão de alunos/exercícios/fichas).
-const PERSONAL_PREFIXES = ['/dashboard', '/alunos', '/exercicios', '/configuracoes', '/modelos'];
+const PERSONAL_PREFIXES = [
+  '/dashboard',
+  '/alunos',
+  '/exercicios',
+  '/configuracoes',
+  '/modelos',
+  '/financeiro',
+  '/coach',
+];
 // Rotas do portal do aluno (visão + execução do próprio treino).
 const ALUNO_PREFIXES = ['/treino', '/historico', '/progresso', '/perfil'];
 const PROTECTED_PREFIXES = [...PERSONAL_PREFIXES, ...ALUNO_PREFIXES];
@@ -67,6 +75,8 @@ export const config = {
     '/exercicios/:path*',
     '/configuracoes/:path*',
     '/modelos/:path*',
+    '/financeiro/:path*',
+    '/coach/:path*',
     '/treino/:path*',
     '/historico/:path*',
     '/progresso/:path*',

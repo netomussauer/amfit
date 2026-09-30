@@ -53,6 +53,8 @@ describe('middleware — config.matcher cobre toda rota protegida', () => {
     'exercicios',
     'configuracoes',
     'modelos',
+    'financeiro',
+    'coach',
     'treino',
     'historico',
     'progresso',
