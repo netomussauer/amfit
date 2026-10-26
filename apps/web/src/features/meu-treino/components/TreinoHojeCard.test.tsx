@@ -36,6 +36,7 @@ describe('TreinoHojeCard', () => {
     render(<TreinoHojeCard treino={makeTreino({ letra: 'A', nome: null, itens: [item('1')] })} />);
 
     expect(screen.getByText('1 exercício')).toBeInTheDocument();
+    expect(screen.getByLabelText('Treino A, 1 exercício')).toBeInTheDocument();
   });
 
   it('lista cada exercicio com nome, grupo muscular e series x repeticoes', () => {

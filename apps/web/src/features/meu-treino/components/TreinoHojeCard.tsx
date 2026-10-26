@@ -15,10 +15,13 @@ function formatCarga(carga: number | null | undefined): string | null {
 }
 
 export function TreinoHojeCard({ treino }: Props) {
+  const totalExercicios = treino.itens.length;
+  const rotuloExercicios = totalExercicios === 1 ? 'exercício' : 'exercícios';
+
   return (
     <div
       className="rounded-lg border border-[--color-border] bg-[--color-bg] p-4 shadow-sm"
-      aria-label={`Treino ${treino.letra}${treino.nome ? `, ${treino.nome}` : ''}, ${treino.itens.length} exercícios`}
+      aria-label={`Treino ${treino.letra}${treino.nome ? `, ${treino.nome}` : ''}, ${totalExercicios} ${rotuloExercicios}`}
     >
       <div className="flex items-center gap-3">
         <span
@@ -35,8 +38,7 @@ export function TreinoHojeCard({ treino }: Props) {
             <p className="truncate text-xs text-[--color-text-muted]">{treino.nome}</p>
           )}
           <p className="mt-0.5 text-xs text-[--color-text-muted]">
-            {treino.itens.length}{' '}
-            {treino.itens.length === 1 ? 'exercício' : 'exercícios'}
+            {totalExercicios} {rotuloExercicios}
           </p>
         </div>
       </div>
