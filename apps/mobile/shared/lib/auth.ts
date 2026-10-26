@@ -49,7 +49,14 @@ export function parseJwt(token: string): JwtPayload | null {
     if (!base64) return null;
     const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    const json = atob(padded);
+    // atob devolve uma "binary string" (1 char = 1 byte); o payload é UTF-8,
+    // então reinterpretamos os bytes via percent-encoding. Sem isso, nomes com
+    // acento ("João") viram mojibake ("JoÃ£o"). Evita TextDecoder, que nem
+    // todo runtime do React Native expõe.
+    const binary = atob(padded);
+    const json = decodeURIComponent(
+      Array.from(binary, (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''),
+    );
     return JSON.parse(json) as JwtPayload;
   } catch {
     return null;
