@@ -72,8 +72,10 @@
     ],
     "collectCoverageFrom": [
       "features/**/*.{ts,tsx}",
+      "shared/**/*.{ts,tsx}",
       "!features/**/index.ts",
-      "!features/**/*.test.{ts,tsx}"
+      "!features/**/*.test.{ts,tsx}",
+      "!shared/**/*.test.{ts,tsx}"
     ]
   }
 }
