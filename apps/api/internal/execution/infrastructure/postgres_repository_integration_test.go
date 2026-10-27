@@ -86,6 +86,46 @@ func TestSessao_CreateEFindByID(t *testing.T) {
 	}
 }
 
+func TestSessao_CreateOrResumeEmAndamento(t *testing.T) {
+	e := novoEnv(t)
+	c := e.cenario()
+	outroTreino := e.Treino(e.Ficha(c.personal, e.Aluno(c.personal), e.Dias(-1), nil, true), "A", 0)
+
+	nova := func(treino uuid.UUID) *domain.SessaoTreino {
+		return &domain.SessaoTreino{
+			ID: uuid.New(), AlunoID: c.aluno, TreinoID: treino, DataExecucao: e.Dias(0),
+			Status: domain.StatusEmAndamento, IniciadoEm: time.Now(),
+		}
+	}
+
+	primeira, created, err := e.repos.Sessoes.CreateOrResumeEmAndamento(e.Ctx, nova(c.treino))
+	if err != nil || !created {
+		t.Fatalf("primeira chamada: created=%v err=%v", created, err)
+	}
+
+	// Segunda chamada para o mesmo (aluno, treino) no mesmo dia: retoma a existente.
+	segunda, created, err := e.repos.Sessoes.CreateOrResumeEmAndamento(e.Ctx, nova(c.treino))
+	if err != nil || created || segunda.ID != primeira.ID {
+		t.Errorf("deveria retomar %s: created=%v id=%v err=%v", primeira.ID, created, segunda, err)
+	}
+
+	// Outro treino do mesmo aluno e uma sessao independente.
+	outra, created, err := e.repos.Sessoes.CreateOrResumeEmAndamento(e.Ctx, nova(outroTreino))
+	if err != nil || !created || outra.ID == primeira.ID {
+		t.Errorf("outro treino: created=%v id=%v err=%v", created, outra, err)
+	}
+
+	// Depois de concluida, uma nova chamada cria outra sessao (so EM_ANDAMENTO e retomada).
+	fim := time.Now().UTC()
+	if _, err := e.repos.Sessoes.UpdateStatus(e.Ctx, primeira.ID, domain.StatusConcluido, &fim); err != nil {
+		t.Fatal(err)
+	}
+	terceira, created, err := e.repos.Sessoes.CreateOrResumeEmAndamento(e.Ctx, nova(c.treino))
+	if err != nil || !created || terceira.ID == primeira.ID {
+		t.Errorf("apos concluir deveria criar nova sessao: created=%v id=%v err=%v", created, terceira, err)
+	}
+}
+
 func TestSessao_FindEmAndamentoHoje(t *testing.T) {
 	e := novoEnv(t)
 	c := e.cenario()
