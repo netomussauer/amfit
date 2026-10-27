@@ -130,6 +130,11 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 			}
 			return nil, fmt.Errorf("application: find personal: %w", err)
 		}
+		// Conta desativada não entra. Mesmo erro de credencial inválida: não
+		// revela se a conta existe nem que foi desativada.
+		if !pt.Ativo {
+			return nil, domain.ErrInvalidCredentials
+		}
 		ownerID = pt.ID
 		tenantID = pt.ID
 		nome = pt.Nome
@@ -142,6 +147,9 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 				return nil, domain.ErrInvalidCredentials
 			}
 			return nil, fmt.Errorf("application: find aluno: %w", err)
+		}
+		if !al.Ativo {
+			return nil, domain.ErrInvalidCredentials
 		}
 		ownerID = al.ID
 		tenantID = al.PersonalID
@@ -214,6 +222,12 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, domain.ErrInvalidRefreshToken
 	}
 
+	// Quem foi desativado depois de receber o refresh token (válido por 30
+	// dias) não pode renovar a sessão.
+	if err := s.requireOwnerAtivo(ctx, ownerID, domain.OwnerType(role)); err != nil {
+		return nil, err
+	}
+
 	tenantID := ownerID
 	if tenantStr != "" {
 		if parsed, perr := uuid.Parse(tenantStr); perr == nil {
@@ -222,6 +236,39 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 	}
 
 	return s.issueTokens(ctx, ownerID, tenantID, nome, domain.OwnerType(role))
+}
+
+// requireOwnerAtivo devolve ErrInvalidRefreshToken se o dono do refresh token
+// não existe mais, está desativado ou tem um role desconhecido. Erros de
+// infraestrutura são propagados.
+func (s *AuthService) requireOwnerAtivo(ctx context.Context, ownerID uuid.UUID, role domain.OwnerType) error {
+	switch role {
+	case domain.OwnerTypePersonal:
+		pt, err := s.personals.FindByID(ctx, ownerID)
+		if err != nil {
+			if errors.Is(err, domain.ErrPersonalNotFound) {
+				return domain.ErrInvalidRefreshToken
+			}
+			return fmt.Errorf("application: find personal: %w", err)
+		}
+		if !pt.Ativo {
+			return domain.ErrInvalidRefreshToken
+		}
+	case domain.OwnerTypeAluno:
+		al, err := s.alunos.FindByID(ctx, ownerID)
+		if err != nil {
+			if errors.Is(err, domain.ErrAlunoNotFound) {
+				return domain.ErrInvalidRefreshToken
+			}
+			return fmt.Errorf("application: find aluno: %w", err)
+		}
+		if !al.Ativo {
+			return domain.ErrInvalidRefreshToken
+		}
+	default:
+		return domain.ErrInvalidRefreshToken
+	}
+	return nil
 }
 
 // Logout revoga o refresh token correspondente ao JTI fornecido.

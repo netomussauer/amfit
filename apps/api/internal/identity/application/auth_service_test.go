@@ -117,8 +117,90 @@ func TestLogin_EmailInexistente_RetornaInvalidCredentials(t *testing.T) {
 	}
 }
 
+// personalAtivo faz o repositorio devolver um personal ativo para qualquer id —
+// o Refresh agora confere que o dono do token ainda existe e esta ativo.
+func personalAtivo(personals *mockPersonalRepo) {
+	personals.findByIDFn = func(_ context.Context, id uuid.UUID) (*domain.PersonalTrainer, error) {
+		return &domain.PersonalTrainer{ID: id, Nome: "Foo", Ativo: true}, nil
+	}
+}
+
+func TestLogin_ContaDesativada_RetornaInvalidCredentials(t *testing.T) {
+	for _, tipo := range []string{"PERSONAL", "ALUNO"} {
+		t.Run(tipo, func(t *testing.T) {
+			svc, personals, alunos, creds, _ := newAuthServiceForTest(t)
+			hash := fixedHash(t)
+			id := uuid.New()
+
+			personals.findByEmail = func(context.Context, string) (*domain.PersonalTrainer, error) {
+				return &domain.PersonalTrainer{ID: id, Email: "x@x.com", Nome: "X", Ativo: false}, nil
+			}
+			alunos.findByEmailFn = func(context.Context, string) (*domain.Aluno, error) {
+				return &domain.Aluno{ID: id, PersonalID: uuid.New(), Email: "x@x.com", Nome: "X", Ativo: false}, nil
+			}
+			creds.findByOwnerFn = func(_ context.Context, owner uuid.UUID, ot domain.OwnerType) (*domain.Credencial, error) {
+				return &domain.Credencial{ID: uuid.New(), OwnerID: owner, OwnerType: ot, PasswordHash: hash}, nil
+			}
+
+			// Senha CORRETA: mesmo assim a conta desativada nao entra.
+			_, err := svc.Login(context.Background(), LoginRequest{Email: "x@x.com", Senha: fixedPassword, Tipo: tipo})
+
+			if !errors.Is(err, domain.ErrInvalidCredentials) {
+				t.Fatalf("got %v, want ErrInvalidCredentials", err)
+			}
+		})
+	}
+}
+
+func TestRefresh_DonoDesativadoOuInexistente_RetornaInvalidRefreshToken(t *testing.T) {
+	casos := map[string]struct {
+		role  domain.OwnerType
+		setup func(*mockPersonalRepo, *mockAlunoRepo)
+	}{
+		"personal desativado": {domain.OwnerTypePersonal, func(p *mockPersonalRepo, _ *mockAlunoRepo) {
+			p.findByIDFn = func(_ context.Context, id uuid.UUID) (*domain.PersonalTrainer, error) {
+				return &domain.PersonalTrainer{ID: id, Ativo: false}, nil
+			}
+		}},
+		"personal removido": {domain.OwnerTypePersonal, func(p *mockPersonalRepo, _ *mockAlunoRepo) {
+			p.findByIDFn = func(context.Context, uuid.UUID) (*domain.PersonalTrainer, error) {
+				return nil, domain.ErrPersonalNotFound
+			}
+		}},
+		"aluno desativado": {domain.OwnerTypeAluno, func(_ *mockPersonalRepo, a *mockAlunoRepo) {
+			a.findByIDFn = func(_ context.Context, id uuid.UUID) (*domain.Aluno, error) {
+				return &domain.Aluno{ID: id, Ativo: false}, nil
+			}
+		}},
+		"aluno removido": {domain.OwnerTypeAluno, func(_ *mockPersonalRepo, a *mockAlunoRepo) {
+			a.findByIDFn = func(context.Context, uuid.UUID) (*domain.Aluno, error) {
+				return nil, domain.ErrAlunoNotFound
+			}
+		}},
+		"role desconhecido": {domain.OwnerType("ADMIN"), func(*mockPersonalRepo, *mockAlunoRepo) {}},
+	}
+	for nome, c := range casos {
+		t.Run(nome, func(t *testing.T) {
+			svc, personals, alunos, _, _ := newAuthServiceForTest(t)
+			c.setup(personals, alunos)
+			id := uuid.New()
+			resp, err := svc.issueTokens(context.Background(), id, id, "Foo", c.role)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = svc.Refresh(context.Background(), resp.RefreshToken)
+
+			if !errors.Is(err, domain.ErrInvalidRefreshToken) {
+				t.Errorf("got %v, want ErrInvalidRefreshToken", err)
+			}
+		})
+	}
+}
+
 func TestRefresh_TokenValido_RetornaNovoPar(t *testing.T) {
-	svc, _, _, _, refresh := newAuthServiceForTest(t)
+	svc, personals, _, _, refresh := newAuthServiceForTest(t)
+	personalAtivo(personals)
 
 	// Emite um par via login simulado (chamando issueTokens diretamente).
 	ownerID := uuid.New()
@@ -159,7 +241,8 @@ func TestRefresh_TokenValido_RetornaNovoPar(t *testing.T) {
 }
 
 func TestRefresh_TokenRevogado_RetornaErro(t *testing.T) {
-	svc, _, _, _, _ := newAuthServiceForTest(t)
+	svc, personals, _, _, _ := newAuthServiceForTest(t)
+	personalAtivo(personals)
 
 	ownerID := uuid.New()
 	resp, err := svc.issueTokens(context.Background(), ownerID, ownerID, "Foo", domain.OwnerTypePersonal)
