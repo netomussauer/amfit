@@ -3,7 +3,7 @@ MAIN       := ./cmd/server
 MIGRATIONS := migrations
 DB_URL     ?= postgres://amfit:amfit123%21@localhost:5432/amfit?sslmode=disable
 
-.PHONY: dev build test lint migrate-up migrate-down migrate-create keys docker-up
+.PHONY: dev build test test-integration lint migrate-up migrate-down migrate-create keys docker-up
 
 ## dev: executa o servidor com go run (hot path para desenvolvimento)
 dev:
@@ -16,6 +16,10 @@ build:
 ## test: executa todos os testes com race detector
 test:
 	go test ./... -race -count=1
+
+## test-integration: testes de repositorio contra PostgreSQL real (testcontainers; exige Docker acessivel)
+test-integration:
+	go test -tags=integration ./... -race -count=1
 
 ## lint: executa o linter completo
 lint:
