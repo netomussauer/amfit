@@ -104,6 +104,27 @@ func TestAuthMiddleware_Rejeita401(t *testing.T) {
 	}
 }
 
+// Um refresh token (typ=refresh) tem a mesma assinatura e os mesmos claims do
+// access token; o middleware nao pode aceita-lo como credencial de acesso.
+func TestAuthMiddleware_RejeitaRefreshTokenComoAccessToken(t *testing.T) {
+	priv := chaveTeste(t)
+	claims := jwt.MapClaims{"sub": "u1", "role": "ALUNO", "tenant_id": "t1", "typ": "refresh", "jti": "j1"}
+	refresh, err := auth.SignRefreshToken(claims, priv, 30*24*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status, body := chamar(t, appAutenticado(&priv.PublicKey), "Bearer "+refresh)
+
+	if status != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 (%s)", status, body)
+	}
+	var p ProblemDetail
+	if err := json.Unmarshal(body, &p); err != nil || p.Type != problemTypeBase+"unauthorized" {
+		t.Errorf("corpo inesperado: %s (%v)", body, err)
+	}
+}
+
 func TestRequireRole(t *testing.T) {
 	priv := chaveTeste(t)
 	app := appAutenticado(&priv.PublicKey, RequireRole("PERSONAL"))

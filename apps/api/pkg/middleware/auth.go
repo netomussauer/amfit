@@ -33,6 +33,19 @@ func NewAuthMiddleware(publicKey *rsa.PublicKey) fiber.Handler {
 			))
 		}
 
+		// Refresh tokens (typ=refresh, validade de 30 dias) usam as mesmas chaves
+		// e claims sub/role/tenant_id do access token. Sem esta checagem um
+		// refresh token vazado abriria qualquer rota por 30 dias, sem passar pela
+		// verificação de revogação que só existe em /auth/refresh — o que anula o
+		// logout e a revogação em troca de senha.
+		if typ, _ := claims["typ"].(string); typ == "refresh" {
+			return WriteProblem(c, NewProblem(
+				fiber.StatusUnauthorized,
+				"unauthorized", "Unauthorized",
+				"invalid or expired token",
+			))
+		}
+
 		c.Locals("user_id", claims["sub"])
 		c.Locals("role", claims["role"])
 		c.Locals("tenant_id", claims["tenant_id"])
