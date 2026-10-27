@@ -9,7 +9,7 @@ Plataforma de gestão de treinos de musculação com dois perfis: **personal tra
 | Backend (5 bounded contexts) | ✅ Identity, Catalog, Training, Execution, Progress |
 | Web admin (Next.js) | ✅ Personal: auth, alunos, exercícios, fichas, histórico, dashboard, evolução de carga, configurações de conta. ✅ Aluno (portal próprio, roteado por perfil): treino de hoje, execução de treino (com timer de descanso), histórico, progresso, perfil |
 | Mobile (Expo) | ✅ Aluno (treino do dia, player, histórico, evolução de carga) + Personal (dashboard, exercícios) |
-| Testes automatizados | ✅ Backend Go: todos os 5 contextos têm testes de application (Identity 59.2%, Catalog 65.3%, Training 46.8%, Execution 76.9%, Progress 17 testes). Frontend: só Progress (web Vitest+RTL 39 testes, mobile Jest+jest-expo+RTL 24 testes, lib compartilhada Vitest 12 testes) — demais features do web/mobile ainda sem teste |
+| Testes automatizados | ✅ **Backend Go:** 220 testes de unidade + 88 de integração contra PostgreSQL real (testcontainers) nos 8 contextos (`make test` / `make test-integration`). Cobertura de `application`: Progress 91,9%, Execution 77,8%, Identity 68,3%, Catalog 65,3%, Training 62,1%, Coach 53,6%, Financial 48,5%, Notification 35,5%; `pkg/auth` e `pkg/middleware` 90,7%. Repositórios (`infrastructure`) ~75–85% nos contextos de banco. **Ainda sem teste:** handlers HTTP de todos os contextos exceto Training (parcial, 38,6%). **Web:** 756 testes em 149 arquivos (Vitest + Testing Library). **Mobile:** 460 testes em 79 suítes (Jest + jest-expo). **Shared:** 12 testes. Ver a seção [Testes](#testes) |
 | Build CI (Tekton) | ✅ Pipelines API + Web ativos (`golang-test` reativado: `go vet` + `go test -race`) |
 | Deploy GitOps (ArgoCD) | ✅ Application Healthy em produção (lab K3s) |
 
@@ -113,6 +113,32 @@ make keys              # gera par RS256 em keys/
 docker compose up -d
 docker compose down -v
 ```
+
+## Testes
+
+| Camada | Comando | Observação |
+|---|---|---|
+| API (unidade) | `cd apps/api && make test` | `go test ./... -race`. É o que o CI (Tekton) roda; não precisa de Docker. |
+| API (integração) | `cd apps/api && make test-integration` | Repositórios contra **PostgreSQL real** (testcontainers). Exige acesso ao Docker (socket). |
+| Web | `cd apps/web && pnpm test` · `pnpm typecheck` | Vitest + Testing Library. O `typecheck` usa `tsconfig.typecheck.json` (ver abaixo). |
+| Mobile | `cd apps/mobile && pnpm test` · `npx tsc --noEmit` | Jest (`jest-expo`) + Testing Library. |
+| Shared | `cd packages/shared && pnpm test` | Vitest. |
+
+**Testes de integração da API.** Ficam atrás da build tag `integration`, então o
+`go test ./...` comum os ignora (o pod do CI não tem Docker). O pacote
+[`internal/testsupport/pgtest`](apps/api/internal/testsupport/pgtest) sobe **um**
+container `postgres:16-alpine` por binário de teste, aplica as migrations reais num
+banco-template e entrega a cada teste um banco próprio clonado desse template
+(`CREATE DATABASE … TEMPLATE …`, ~0,1 s). `pgtest.Seed` insere dados-base por SQL,
+sem depender dos repositórios de outros contextos. O container é removido pelo Ryuk
+ao fim do processo. Nunca aponte esses testes para o Postgres compartilhado do lab.
+A imagem pode ser trocada com `PGTEST_IMAGE`.
+
+**Typecheck do web.** No workspace completo o pnpm instala `@types/react` 18 (web)
+e 19 (mobile), e o `@tanstack/react-query` do web acaba resolvendo os tipos 19
+(erros falsos de `ReactNode`). Por isso `pnpm typecheck` usa um tsconfig próprio que
+fixa `react`/`react-dom` nos tipos do web. O mapeamento **não** vai no
+`tsconfig.json` porque o Next aplica `paths` como alias do bundler.
 
 ## Build de imagens (Tekton no cluster)
 
