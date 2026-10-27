@@ -177,10 +177,14 @@ type mensalidadeRepo struct {
 	pool *pgxpool.Pool
 }
 
+// mensalidadeColumns qualifica todas as colunas com o alias `m`: as listagens
+// por personal fazem JOIN com aluno, que também tem id/criado_em/atualizado_em
+// (sem o prefixo o Postgres responde "column reference is ambiguous").
+// Toda query que usa esta lista precisa declarar `FROM mensalidade m`.
 const mensalidadeColumns = `
-	id, plano_id, aluno_id, competencia_ano, competencia_mes, data_vencimento,
-	valor, status, valor_pago, data_pagamento, forma_pagamento,
-	COALESCE(observacao, ''), lembrete_enviado, criado_em, atualizado_em`
+	m.id, m.plano_id, m.aluno_id, m.competencia_ano, m.competencia_mes, m.data_vencimento,
+	m.valor, m.status, m.valor_pago, m.data_pagamento, m.forma_pagamento,
+	COALESCE(m.observacao, ''), m.lembrete_enviado, m.criado_em, m.atualizado_em`
 
 func scanMensalidadeRow(row rowScanner) (*domain.Mensalidade, error) {
 	var m domain.Mensalidade
@@ -202,7 +206,7 @@ func scanMensalidadeRow(row rowScanner) (*domain.Mensalidade, error) {
 }
 
 func (r *mensalidadeRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.Mensalidade, error) {
-	q := fmt.Sprintf(`SELECT %s FROM mensalidade WHERE id = $1`, mensalidadeColumns)
+	q := fmt.Sprintf(`SELECT %s FROM mensalidade m WHERE m.id = $1`, mensalidadeColumns)
 
 	m, err := scanMensalidadeRow(r.pool.QueryRow(ctx, q, id))
 	if err != nil {
