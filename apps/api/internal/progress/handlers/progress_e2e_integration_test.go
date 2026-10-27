@@ -32,7 +32,9 @@ import (
 // teste + middleware JWT + o catalogo de templates do Training (via o mesmo
 // adapter que o cmd/server/main.go usa). Nada e falso.
 
-type matcherDoTraining struct{ repos *traininginfra.PostgresRepositories }
+type matcherDoTraining struct {
+	repos *traininginfra.PostgresRepositories
+}
 
 func (m matcherDoTraining) MelhorMatch(ctx context.Context, personalID uuid.UUID, nivel, objetivo string) (*domain.TemplateMatch, error) {
 	t, err := m.repos.Templates.MelhorMatch(ctx, personalID, nivel, objetivo)
