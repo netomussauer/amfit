@@ -273,6 +273,12 @@ func parseListarMensalidadesParams(c fiber.Ctx, aceitaAlunoID bool) (application
 
 	if aceitaAlunoID {
 		if v := c.Query("aluno_id", ""); v != "" {
+			// Valida aqui, como os demais filtros: um UUID malformado chegaria ao
+			// service como erro genérico e viraria 500 em vez de 400.
+			if _, err := uuid.Parse(v); err != nil {
+				pd := middleware.NewProblem(fiber.StatusBadRequest, "bad-request", "Bad Request", "aluno_id invalido")
+				return req, &pd
+			}
 			req.AlunoID = &v
 		}
 	}
