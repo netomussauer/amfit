@@ -92,11 +92,18 @@ spec:
       # do Go em golang-test) faz seu proprio retry/backoff interno bem
       # mais longo que isso, entao uma unica tentativa pode consumir os 30m
       # inteiros sem nunca dar chance do `retries` do PipelineTask agir.
-      # 8m por tentativa e generoso pro build da API (normalmente < 1min
-      # com rede saudavel) mas curto o bastante pra falhar rapido e deixar
-      # a proxima tentativa rodar.
-      retries: 2
-      timeout: "8m"
+      # 15m por tentativa, 1 retry (mesmo orcamento do build do Web). O
+      # build da API NAO e mais "< 1min": medido em 2026-10-27, a etapa leva
+      # ~6,2 min com so as dependencias de runtime (47e86e5) e ~7,5 min depois
+      # que o go.mod passou a incluir as dependencias dos testes de integracao
+      # (testcontainers etc., baixadas pelo `go mod download`). Com o limite
+      # anterior de 8m e 2 retries, qualquer lentidao do node estourava a
+      # tentativa, repetia 3x (3 x 8m = 24m) e o PipelineRun inteiro caia em
+      # PipelineRunTimeout (tasks: 30m) sem publicar imagem — aconteceu em
+      # fae0f34 e b24f0ad. So 1 retry mantem o pior caso dentro do orcamento
+      # de tasks (golang-test ~9m + 15m + retry).
+      retries: 1
+      timeout: "15m"
       taskRef:
         name: kaniko-build-push
         kind: Task
