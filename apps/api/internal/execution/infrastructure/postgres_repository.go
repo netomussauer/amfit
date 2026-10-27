@@ -57,6 +57,71 @@ func (r *sessaoRepo) Create(ctx context.Context, s *domain.SessaoTreino) error {
 	return nil
 }
 
+// CreateOrResumeEmAndamento serializa "procurar e inserir" com um lock
+// consultivo transacional por (aluno, treino): quem chega primeiro cria, os
+// demais esperam o lock, enxergam a sessão recém-criada e a retomam. O lock é
+// do Postgres, então vale entre réplicas da API; é liberado no fim da
+// transação. Não depende de índice único (e portanto de migration/limpeza de
+// duplicatas já existentes).
+func (r *sessaoRepo) CreateOrResumeEmAndamento(
+	ctx context.Context,
+	s *domain.SessaoTreino,
+) (*domain.SessaoTreino, bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, false, fmt.Errorf("infrastructure: begin tx iniciar sessão: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	const lockQ = `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`
+	if _, err := tx.Exec(ctx, lockQ, "sessao-em-andamento:"+s.AlunoID.String()+":"+s.TreinoID.String()); err != nil {
+		return nil, false, fmt.Errorf("infrastructure: lock iniciar sessão: %w", err)
+	}
+
+	const findQ = `
+		SELECT id, aluno_id, treino_id, data_execucao, status,
+		       iniciado_em, concluido_em, COALESCE(observacao, '')
+		FROM sessao_treino
+		WHERE aluno_id = $1
+		  AND treino_id = $2
+		  AND data_execucao = CURRENT_DATE
+		  AND status = 'EM_ANDAMENTO'
+		ORDER BY iniciado_em DESC
+		LIMIT 1`
+
+	var existente domain.SessaoTreino
+	var status string
+	err = tx.QueryRow(ctx, findQ, s.AlunoID, s.TreinoID).Scan(
+		&existente.ID, &existente.AlunoID, &existente.TreinoID, &existente.DataExecucao, &status,
+		&existente.IniciadoEm, &existente.ConcluidoEm, &existente.Observacao,
+	)
+	switch {
+	case err == nil:
+		existente.Status = domain.StatusSessao(status)
+		if err := tx.Commit(ctx); err != nil {
+			return nil, false, fmt.Errorf("infrastructure: commit retomar sessão: %w", err)
+		}
+		return &existente, false, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, false, fmt.Errorf("infrastructure: find sessão em andamento: %w", err)
+	}
+
+	const insertQ = `
+		INSERT INTO sessao_treino (
+			id, aluno_id, treino_id, data_execucao, status, iniciado_em, observacao
+		) VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''))
+		RETURNING iniciado_em`
+	if err := tx.QueryRow(ctx, insertQ,
+		s.ID, s.AlunoID, s.TreinoID, s.DataExecucao, string(s.Status), s.IniciadoEm, s.Observacao,
+	).Scan(&s.IniciadoEm); err != nil {
+		return nil, false, fmt.Errorf("infrastructure: insert sessão: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, fmt.Errorf("infrastructure: commit iniciar sessão: %w", err)
+	}
+	return s, true, nil
+}
+
 func (r *sessaoRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {
 	const q = `
 		SELECT id, aluno_id, treino_id, data_execucao, status,

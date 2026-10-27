@@ -95,22 +95,11 @@ func (s *ExecutionService) IniciarSessao(
 		return nil, domain.ErrTreinoInvalido
 	}
 
-	// Idempotência — se já existe sessão EM_ANDAMENTO hoje, devolve ela.
-	existing, err := s.sessoes.FindEmAndamentoHoje(ctx, alunoID, treinoID)
-	if err != nil && !errors.Is(err, domain.ErrSessaoNotFound) {
-		return nil, fmt.Errorf("application: find sessão em andamento: %w", err)
-	}
-	if existing != nil {
-		log.Info().
-			Str("sessao_id", existing.ID.String()).
-			Str("aluno_id", alunoID.String()).
-			Str("treino_id", treinoID.String()).
-			Msg("sessão EM_ANDAMENTO retomada (idempotência)")
-		return s.buildSessaoResponse(ctx, existing)
-	}
-
+	// Idempotência — se já existe sessão EM_ANDAMENTO hoje, devolve ela. A
+	// checagem e a criação são atômicas no repositório: um duplo toque (ou duas
+	// réplicas) não cria sessões duplicadas.
 	now := time.Now().UTC()
-	sessao := &domain.SessaoTreino{
+	candidata := &domain.SessaoTreino{
 		ID:           uuid.New(),
 		AlunoID:      alunoID,
 		TreinoID:     treinoID,
@@ -119,8 +108,17 @@ func (s *ExecutionService) IniciarSessao(
 		IniciadoEm:   now,
 	}
 
-	if err := s.sessoes.Create(ctx, sessao); err != nil {
-		return nil, fmt.Errorf("application: create sessão: %w", err)
+	sessao, created, err := s.sessoes.CreateOrResumeEmAndamento(ctx, candidata)
+	if err != nil {
+		return nil, fmt.Errorf("application: iniciar sessão: %w", err)
+	}
+	if !created {
+		log.Info().
+			Str("sessao_id", sessao.ID.String()).
+			Str("aluno_id", alunoID.String()).
+			Str("treino_id", treinoID.String()).
+			Msg("sessão EM_ANDAMENTO retomada (idempotência)")
+		return s.buildSessaoResponse(ctx, sessao)
 	}
 
 	log.Info().

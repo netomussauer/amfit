@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/amfit/api/internal/execution/domain"
@@ -23,6 +24,26 @@ func (m *mockSessaoRepo) Create(ctx context.Context, s *domain.SessaoTreino) err
 		return m.createFn(ctx, s)
 	}
 	return nil
+}
+
+// CreateOrResumeEmAndamento reproduz a semantica anterior (procurar e, se nao
+// houver, criar) a partir dos mesmos hooks, para os testes de service nao
+// precisarem conhecer a implementacao atomica do repositorio real.
+func (m *mockSessaoRepo) CreateOrResumeEmAndamento(
+	ctx context.Context,
+	s *domain.SessaoTreino,
+) (*domain.SessaoTreino, bool, error) {
+	existing, err := m.FindEmAndamentoHoje(ctx, s.AlunoID, s.TreinoID)
+	if err != nil && !errors.Is(err, domain.ErrSessaoNotFound) {
+		return nil, false, err
+	}
+	if existing != nil {
+		return existing, false, nil
+	}
+	if err := m.Create(ctx, s); err != nil {
+		return nil, false, err
+	}
+	return s, true, nil
 }
 
 func (m *mockSessaoRepo) FindByID(ctx context.Context, id uuid.UUID) (*domain.SessaoTreino, error) {

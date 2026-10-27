@@ -12,6 +12,13 @@ type SessaoRepository interface {
 	// Create persiste uma nova sessão. Espera-se que o ID já esteja gerado.
 	Create(ctx context.Context, s *SessaoTreino) error
 
+	// CreateOrResumeEmAndamento cria a sessão OU devolve a EM_ANDAMENTO que já
+	// existe hoje para o par (aluno, treino) — de forma atômica, inclusive entre
+	// réplicas da API. Sem isso, "procurar e inserir" em duas chamadas deixa uma
+	// janela em que um duplo toque em "Iniciar treino" cria várias sessões
+	// EM_ANDAMENTO. O segundo retorno é true quando uma sessão nova foi criada.
+	CreateOrResumeEmAndamento(ctx context.Context, s *SessaoTreino) (sessao *SessaoTreino, created bool, err error)
+
 	// FindByID retorna a sessão pelo ID. Retorna ErrSessaoNotFound se não existir.
 	FindByID(ctx context.Context, id uuid.UUID) (*SessaoTreino, error)
 
