@@ -7,6 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: amfit-tekton
     app.kubernetes.io/component: pipeline-api
+    app.kubernetes.io/part-of: amfit
     app.kubernetes.io/managed-by: argocd
     environment: dev
     lab_id: lab-k8s-01
