@@ -31,7 +31,17 @@ type pushTokenRepo struct {
 	pool *pgxpool.Pool
 }
 
+// O token Expo identifica o aparelho. Quando outra conta registra o mesmo
+// token (logout + login de outra pessoa no mesmo celular), o vínculo antigo é
+// desativado na mesma instrução — senão a conta anterior continuaria
+// recebendo as notificações da nova.
 const queryUpsertPushToken = `
+WITH desativa_outros AS (
+    UPDATE push_token
+       SET ativo = FALSE, atualizado_em = NOW()
+     WHERE token = $4 AND ativo = TRUE
+       AND NOT (owner_id = $2 AND owner_tipo = $3)
+)
 INSERT INTO push_token (id, owner_id, owner_tipo, token, plataforma, ativo)
 VALUES ($1, $2, $3, $4, $5, TRUE)
 ON CONFLICT (owner_id, owner_tipo, token) DO UPDATE SET
