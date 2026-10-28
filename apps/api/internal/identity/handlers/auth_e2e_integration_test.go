@@ -38,6 +38,8 @@ type api struct {
 	app  *fiber.App
 	pool *pgxpool.Pool
 	priv *rsa.PrivateKey
+	// logos: unico falso da pilha (o MinIO do logo).
+	logos *fakeLogos
 }
 
 func novaAPI(t *testing.T) *api {
@@ -48,13 +50,16 @@ func novaAPI(t *testing.T) *api {
 		t.Fatal(err)
 	}
 	repos := infrastructure.NewPostgresRepositories(pool)
+	logos := &fakeLogos{}
 	svc := application.NewIdentityService(
 		repos.Personal, repos.Aluno, repos.Credencial, repos.RefreshTokens, repos.TenantConfig,
-		nil, priv, &priv.PublicKey,
+		logos, priv, &priv.PublicKey,
 	)
 	h := handlers.NewIdentityHandler(svc)
 
-	app := fiber.New()
+	// BodyLimit folgado como em producao (main.go): o 413 do logo tem de vir
+	// do handler, nao do limite padrao de 4 MB do Fiber.
+	app := fiber.New(fiber.Config{BodyLimit: 16 << 20})
 	h.RegisterPublic(app)
 	authMW := middleware.NewAuthMiddleware(&priv.PublicKey)
 	h.RegisterAuthenticated(app, authMW)
@@ -63,7 +68,7 @@ func novaAPI(t *testing.T) *api {
 	h.RegisterAlunoRoutes(app, authMW, middleware.RequireRole("ALUNO"))
 	h.RegisterPersonalRoutes(app, authMW, middleware.RequireRole("PERSONAL"))
 
-	return &api{t: t, app: app, pool: pool, priv: priv}
+	return &api{t: t, app: app, pool: pool, priv: priv, logos: logos}
 }
 
 // do faz a requisição; token vazio = sem Authorization.
