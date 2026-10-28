@@ -243,6 +243,9 @@ func main() {
 		AppName:      "AMFIT API",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
+		// Upload de mídia do Catalog (imagem ≤5 MB, vídeo ≤10 MB); o padrão
+		// do Fiber é 4 MB e barraria o upload antes do handler.
+		BodyLimit: cataloghandlers.MaxRequestBodyBytes,
 	})
 
 	app.Use(middleware.Recovery())

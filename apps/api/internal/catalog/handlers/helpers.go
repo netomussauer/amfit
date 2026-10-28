@@ -16,6 +16,12 @@ import (
 // grandes em memória/disk-buffer do parser multipart.
 const maxAbsoluteUploadBytes = 12 * 1024 * 1024 // 12 MB
 
+// MaxRequestBodyBytes é o BodyLimit que o fiber.App precisa ter para que
+// uploads de mídia cheguem ao handler: o padrão do Fiber (4 MB) rejeitaria
+// imagens de até 5 MB e vídeos de até 10 MB, que o service aceita. Inclui 1 MB
+// de folga para os campos textuais e o overhead do multipart.
+const MaxRequestBodyBytes = maxAbsoluteUploadBytes + 1024*1024
+
 // bindAndValidate parseia o body JSON e roda as tags de validação do struct.
 // Retorna ok=true quando o request é válido. Quando ok=false, a resposta de
 // erro (400/422) já foi escrita.
