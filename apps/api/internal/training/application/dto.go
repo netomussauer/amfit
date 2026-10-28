@@ -16,7 +16,7 @@ type CriarFichaRequest struct {
 type AtualizarFichaRequest struct {
 	Nome           *string `json:"nome,omitempty" validate:"omitempty,min=2,max=150"`
 	VigenciaInicio *string `json:"vigencia_inicio,omitempty" validate:"omitempty,datetime=2006-01-02"`
-	VigenciaFim    *string `json:"vigencia_fim,omitempty"`
+	VigenciaFim    *string `json:"vigencia_fim,omitempty" validate:"omitempty,eq=|datetime=2006-01-02"` // "" limpa o campo
 	Ativa          *bool   `json:"ativa,omitempty"`
 }
 

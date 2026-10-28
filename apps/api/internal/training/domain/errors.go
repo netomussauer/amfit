@@ -44,6 +44,11 @@ var (
 	// parciais que deixariam o estado inconsistente.
 	ErrReorderInconsistente = errors.New("training: lista de itens para reordenação inconsistente")
 
+	// ErrExercicioInvalido indica que o exercício de um item não existe, está
+	// inativo ou é privado de outro personal — prescrevê-lo exporia o nome
+	// dele na ficha.
+	ErrExercicioInvalido = errors.New("training: exercício inválido para este treino")
+
 	// ErrTemplateNotFound indica que o template não existe, está inativo,
 	// ou não é visível para o personal (não é global nem é dele).
 	ErrTemplateNotFound = errors.New("training: template de treino não encontrado")

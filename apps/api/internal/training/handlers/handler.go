@@ -634,6 +634,11 @@ func writeItemError(c fiber.Ctx, err error, fallback string) error {
 			fiber.StatusNotFound, "not-found", "Not Found",
 			"treino não encontrado",
 		))
+	case errors.Is(err, domain.ErrExercicioInvalido):
+		return middleware.WriteProblem(c, middleware.NewProblem(
+			fiber.StatusUnprocessableEntity, "validation", "Unprocessable Entity",
+			"exercício inválido",
+		))
 	}
 	return middleware.WriteProblem(c, middleware.NewProblem(
 		fiber.StatusInternalServerError, "internal", "Internal Server Error",

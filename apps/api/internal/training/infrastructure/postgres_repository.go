@@ -301,17 +301,33 @@ type itemTreinoRepo struct {
 }
 
 func (r *itemTreinoRepo) Create(ctx context.Context, i *domain.ItemTreino) error {
+	// O exercício precisa existir, estar ativo e ser global ou do personal dono
+	// da ficha: só a FK aceitaria o exercício privado de outro personal, e o
+	// GET da ficha passaria a mostrar o nome dele.
 	const q = `
 		INSERT INTO item_treino (
 			id, treino_id, exercicio_id, ordem,
 			series, repeticoes, carga_sugerida, descanso_segundos, observacao
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''))`
+		)
+		SELECT $1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, '')
+		WHERE EXISTS (
+			SELECT 1
+			FROM exercicio e
+			JOIN treino t ON t.id = $2
+			JOIN ficha_treino f ON f.id = t.ficha_id
+			WHERE e.id = $3 AND e.ativo = TRUE
+			  AND (e.personal_id IS NULL OR e.personal_id = f.personal_id)
+		)`
 
-	if _, err := r.pool.Exec(ctx, q,
+	tag, err := r.pool.Exec(ctx, q,
 		i.ID, i.TreinoID, i.ExercicioID, i.Ordem,
 		i.Series, i.Repeticoes, i.CargaSugerida, i.DescansoSegundos, i.Observacao,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("infrastructure: insert item: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrExercicioInvalido
 	}
 	return nil
 }
@@ -433,7 +449,13 @@ func (r *itemTreinoRepo) Reorder(
 	if err := tx.QueryRow(ctx, countQ, treinoID, novosIDs).Scan(&hits); err != nil {
 		return fmt.Errorf("infrastructure: count itens reorder: %w", err)
 	}
-	if hits != len(novosIDs) {
+	// A lista tem de cobrir TODOS os itens do treino: uma lista parcial
+	// reatribuiria 0..n-1 só a alguns e colidiria com a ordem dos demais.
+	var total int
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM item_treino WHERE treino_id = $1`, treinoID).Scan(&total); err != nil {
+		return fmt.Errorf("infrastructure: count total itens reorder: %w", err)
+	}
+	if hits != len(novosIDs) || total != len(novosIDs) {
 		return domain.ErrReorderInconsistente
 	}
 
