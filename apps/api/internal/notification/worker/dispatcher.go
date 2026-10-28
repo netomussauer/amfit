@@ -33,6 +33,12 @@ type ExpoSender interface {
 	Send(ctx context.Context, to, title, body string, data json.RawMessage) error
 }
 
+// Lider é implementado opcionalmente pelo NotificacaoRepository para eleger,
+// entre réplicas, quem despacha neste ciclo. liberar deve ser chamado ao fim.
+type Lider interface {
+	TentarLiderar(ctx context.Context) (liberar func(), lider bool, err error)
+}
+
 // Dispatcher faz polling na tabela notificacao a cada `interval` e despacha
 // as pendentes via ExpoSender (SDD §13.2 — "worker é uma goroutine de
 // background iniciada junto com a API").
@@ -74,6 +80,20 @@ func (d *Dispatcher) Run(ctx context.Context) {
 // interrompem o processamento das demais — só ficam registrados como ERRO
 // pra investigação, sem travar a fila inteira.
 func (d *Dispatcher) processarPendentes(ctx context.Context) {
+	// Com mais de uma réplica da API, só uma despacha por ciclo (as demais
+	// pulam o tick); sem isso a mesma pendente seria enviada em dobro.
+	if l, ok := d.notifs.(Lider); ok {
+		liberar, lider, err := l.TentarLiderar(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("notification dispatcher: eleger lider")
+			return
+		}
+		if !lider {
+			return
+		}
+		defer liberar()
+	}
+
 	pendentes, err := d.notifs.ListarPendentes(ctx, batchSize)
 	if err != nil {
 		log.Error().Err(err).Msg("notification dispatcher: listar pendentes")

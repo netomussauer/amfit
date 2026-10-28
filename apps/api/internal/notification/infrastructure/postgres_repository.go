@@ -5,6 +5,7 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/amfit/api/internal/notification/domain"
 	"github.com/google/uuid"
@@ -117,6 +118,43 @@ func (r *notificacaoRepo) Criar(ctx context.Context, n *domain.Notificacao) erro
 		return fmt.Errorf("criar notificacao: %w", err)
 	}
 	return nil
+}
+
+// TentarLiderar tenta obter, sem bloquear, o lock advisory de sessão que
+// elege UM dispatcher por vez entre todas as réplicas da API. Sem isso, duas
+// réplicas leriam as mesmas pendentes (ListarPendentes não reserva nada) e
+// mandariam o mesmo push em dobro. O lock vive numa conexão dedicada do pool,
+// segurada até o release; se a réplica morrer, o Postgres solta o lock com a
+// conexão.
+func (r *notificacaoRepo) TentarLiderar(ctx context.Context) (func(), bool, error) {
+	conn, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return nil, false, fmt.Errorf("adquirir conexao para lock do dispatcher: %w", err)
+	}
+	var ok bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtextextended('amfit.notification.dispatcher', 0))`).Scan(&ok); err != nil {
+		conn.Release()
+		return nil, false, fmt.Errorf("pg_try_advisory_lock: %w", err)
+	}
+	if !ok {
+		conn.Release()
+		return nil, false, nil
+	}
+	release := func() {
+		// ctx do ciclo pode já estar cancelado (shutdown): o unlock usa o seu.
+		uctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var unlocked bool
+		err := conn.QueryRow(uctx, `SELECT pg_advisory_unlock(hashtextextended('amfit.notification.dispatcher', 0))`).Scan(&unlocked)
+		if err != nil || !unlocked {
+			// Não devolve ao pool uma conexão que pode ainda segurar o lock:
+			// fechá-la solta o lock no servidor.
+			_ = conn.Hijack().Close(uctx)
+			return
+		}
+		conn.Release()
+	}
+	return release, true, nil
 }
 
 const queryListarPendentes = `
