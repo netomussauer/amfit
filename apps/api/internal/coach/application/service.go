@@ -140,7 +140,17 @@ func (s *CoachService) EnviarVideo(
 		log.Error().Err(err).Str("coach_video_id", v.ID.String()).Msg("coach: falha ao notificar personal")
 	}
 
-	resp, err := s.toResponse(ctx, &domain.CoachVideoComFeedback{CoachVideo: *v, AlunoNome: alunoNome})
+	criado := &domain.CoachVideoComFeedback{CoachVideo: *v, AlunoNome: alunoNome}
+	if itemTreinoID != nil {
+		// O INSERT não devolve o nome do exercício (vem de um JOIN); sem este
+		// reload a resposta do POST omitiria exercicio_nome enquanto o GET do
+		// mesmo vídeo o traz. Best-effort: o vídeo já foi criado.
+		if full, err := s.videos.FindComFeedback(ctx, v.ID); err == nil && full != nil {
+			criado.ExercicioNome = full.ExercicioNome
+		}
+	}
+
+	resp, err := s.toResponse(ctx, criado)
 	if err != nil {
 		return nil, err
 	}

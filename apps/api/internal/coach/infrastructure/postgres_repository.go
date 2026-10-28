@@ -119,6 +119,27 @@ func scanCoachVideoComFeedback(row rowScanner) (*domain.CoachVideoComFeedback, e
 }
 
 func (r *coachVideoRepo) Create(ctx context.Context, v *domain.CoachVideo) error {
+	// O item precisa ser de uma ficha do próprio aluno: só a FK não basta, ela
+	// aceitaria o item de qualquer aluno/personal e o GET devolveria o nome do
+	// exercício dele (vazamento entre tenants).
+	if v.ItemTreinoID != nil {
+		const qItem = `
+			SELECT EXISTS (
+				SELECT 1
+				FROM item_treino it
+				JOIN treino t ON t.id = it.treino_id
+				JOIN ficha_treino f ON f.id = t.ficha_id
+				WHERE it.id = $1 AND f.aluno_id = $2
+			)`
+		var doAluno bool
+		if err := r.pool.QueryRow(ctx, qItem, *v.ItemTreinoID, v.AlunoID).Scan(&doAluno); err != nil {
+			return fmt.Errorf("infrastructure: validar item_treino do aluno: %w", err)
+		}
+		if !doAluno {
+			return domain.ErrItemTreinoInvalido
+		}
+	}
+
 	const q = `
 		INSERT INTO coach_video
 			(id, aluno_id, personal_id, item_treino_id, video_object_key,

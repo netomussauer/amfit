@@ -20,6 +20,12 @@ import (
 // catalog/identity para upload de mídia.
 const maxAbsoluteVideoUploadBytes = 150 * 1024 * 1024
 
+// MaxRequestBodyBytes é o BodyLimit que o fiber.App precisa ter para o
+// upload de vídeo chegar ao handler: o padrão do Fiber (4 MB) barraria até
+// um clipe curto de celular, e o service aceita até 100 MB. Inclui 1 MB de
+// folga para os campos textuais e o overhead do multipart.
+const MaxRequestBodyBytes = maxAbsoluteVideoUploadBytes + 1024*1024
+
 // statusCoachVideoValidos é o whitelist usado para validar o filtro
 // ?status= — sem essa checagem, um valor desconhecido só falharia lá na
 // frente como erro de cast do Postgres, virando um 500 genérico em vez do

@@ -93,6 +93,24 @@ func TestEnviarVideo_Sucesso_CriaComStatusAguardandoFeedbackENotificaPersonal(t 
 	_ = storage
 }
 
+func TestEnviarVideo_ComItem_RespostaTrazNomeDoExercicio(t *testing.T) {
+	svc, videos, _, _, _, _ := newCoachServiceForTest()
+	nome := "Supino"
+	videos.findComFeedbackFn = func(ctx context.Context, id uuid.UUID) (*domain.CoachVideoComFeedback, error) {
+		return &domain.CoachVideoComFeedback{ExercicioNome: &nome}, nil
+	}
+
+	resp, err := svc.EnviarVideo(context.Background(), uuid.New(), EnviarVideoRequest{
+		DuracaoSegundos: 10, ItemTreinoID: uuid.NewString(),
+	}, validVideoUpload())
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if resp.ExercicioNome == nil || *resp.ExercicioNome != "Supino" {
+		t.Errorf("exercicio_nome = %v, quer Supino", resp.ExercicioNome)
+	}
+}
+
 func TestEnviarVideo_ItemTreinoIDInvalido_DevolveErro(t *testing.T) {
 	svc, _, _, _, _, _ := newCoachServiceForTest()
 
